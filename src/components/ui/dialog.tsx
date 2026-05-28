@@ -146,7 +146,204 @@ function DialogDescription({
   )
 }
 
+// ---------------------------------------------------------------------------
+// ConfirmDialog / AlertDialog — 高层便捷组件，替代 confirm() / alert()
+// ---------------------------------------------------------------------------
+
+interface ConfirmDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title?: string
+  description?: string
+  confirmText?: string
+  cancelText?: string
+  variant?: "default" | "destructive"
+  onConfirm: () => void
+  onCancel?: () => void
+}
+
+function ConfirmDialog({
+  open,
+  onOpenChange,
+  title = "确认",
+  description,
+  confirmText = "确认",
+  cancelText = "取消",
+  variant = "default",
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onCancel?.()
+              onOpenChange(false)
+            }}
+          >
+            {cancelText}
+          </Button>
+          <Button
+            variant={variant === "destructive" ? "destructive" : "default"}
+            onClick={() => {
+              onConfirm()
+              onOpenChange(false)
+            }}
+          >
+            {confirmText}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface AlertDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title?: string
+  description?: string
+  okText?: string
+}
+
+function AlertDialog({
+  open,
+  onOpenChange,
+  title = "提示",
+  description,
+  okText = "知道了",
+}: AlertDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>{okText}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// useConfirm / useAlert — 命令式 Promise API，直接替换 confirm() / alert()
+// ---------------------------------------------------------------------------
+
+interface ConfirmOptions {
+  title?: string
+  description: string
+  confirmText?: string
+  cancelText?: string
+  variant?: "default" | "destructive"
+}
+
+interface AlertOptions {
+  title?: string
+  description: string
+  okText?: string
+}
+
+function useConfirm() {
+  const [state, setState] = React.useState<{
+    open: boolean
+    options: ConfirmOptions
+    resolve: (value: boolean) => void
+  } | null>(null)
+
+  const confirm = React.useCallback(
+    (options: ConfirmOptions): Promise<boolean> => {
+      return new Promise<boolean>((resolve) => {
+        setState({ open: true, options, resolve })
+      })
+    },
+    []
+  )
+
+  const handleConfirm = React.useCallback(() => {
+    state?.resolve(true)
+    setState(null)
+  }, [state])
+
+  const handleCancel = React.useCallback(() => {
+    state?.resolve(false)
+    setState(null)
+  }, [state])
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open) {
+        state?.resolve(false)
+        setState(null)
+      }
+    },
+    [state]
+  )
+
+  const ConfirmDialogElement = state ? (
+    <ConfirmDialog
+      open={state.open}
+      onOpenChange={handleOpenChange}
+      title={state.options.title}
+      description={state.options.description}
+      confirmText={state.options.confirmText}
+      cancelText={state.options.cancelText}
+      variant={state.options.variant}
+      onConfirm={handleConfirm}
+      onCancel={handleCancel}
+    />
+  ) : null
+
+  return { confirm, ConfirmDialog: ConfirmDialogElement }
+}
+
+function useAlert() {
+  const [state, setState] = React.useState<{
+    open: boolean
+    options: AlertOptions
+    resolve: () => void
+  } | null>(null)
+
+  const alert = React.useCallback((options: AlertOptions): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      setState({ open: true, options, resolve })
+    })
+  }, [])
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open) {
+        state?.resolve()
+        setState(null)
+      }
+    },
+    [state]
+  )
+
+  const AlertDialogElement = state ? (
+    <AlertDialog
+      open={state.open}
+      onOpenChange={handleOpenChange}
+      title={state.options.title}
+      description={state.options.description}
+      okText={state.options.okText}
+    />
+  ) : null
+
+  return { alert, AlertDialog: AlertDialogElement }
+}
+
 export {
+  // 原始底层组件
   Dialog,
   DialogClose,
   DialogContent,
@@ -157,4 +354,10 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  // 高层便捷组件
+  ConfirmDialog,
+  AlertDialog,
+  // 命令式 hooks
+  useConfirm,
+  useAlert,
 }

@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ==================== 响应式断点变量 ==================== */
+:root {
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -117,55 +126,169 @@
   --amber: #f59e0b;
 }
 
-/* ==================== 暗色主题（备用） ==================== */
+/* ==================== 暗色主题（优化对比度） ==================== */
 .dark {
-  --background: #0c0a1a;
-  --foreground: #e8e5f5;
-  --card: #14112a;
-  --card-foreground: #e8e5f5;
-  --popover: #14112a;
-  --popover-foreground: #e8e5f5;
+  --background: #0b0918;
+  --foreground: #f0eef9;
+  --card: #161330;
+  --card-foreground: #f0eef9;
+  --popover: #161330;
+  --popover-foreground: #f0eef9;
   --primary: #818cf8;
   --primary-foreground: #ffffff;
-  --secondary: #1e1b35;
-  --secondary-foreground: #c4b5fd;
-  --muted: #1e1b35;
-  --muted-foreground: #94a3b8;
-  --accent: #272347;
-  --accent-foreground: #c4b5fd;
+  --secondary: #1e1b3a;
+  --secondary-foreground: #d6c9fa;
+  --muted: #1e1b3a;
+  --muted-foreground: #a8b4cc;
+  --accent: #2a2650;
+  --accent-foreground: #d6c9fa;
   --destructive: #f87171;
-  --border: #2a2745;
-  --input: #1e1b35;
+  --border: #302d52;
+  --input: #1e1b3a;
   --ring: #818cf8;
   --chart-1: #818cf8;
   --chart-2: #a78bfa;
   --chart-3: #22d3ee;
   --chart-4: #fbbf24;
   --chart-5: #34d399;
-  --sidebar: #0c0a1a;
-  --sidebar-foreground: #e8e5f5;
+  --sidebar: #0b0918;
+  --sidebar-foreground: #f0eef9;
   --sidebar-primary: #818cf8;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #272347;
-  --sidebar-accent-foreground: #c4b5fd;
-  --sidebar-border: #2a2745;
+  --sidebar-accent: #2a2650;
+  --sidebar-accent-foreground: #d6c9fa;
+  --sidebar-border: #302d52;
   --sidebar-ring: #818cf8;
   --brand: #818cf8;
   --brand-foreground: #ffffff;
   --amber: #fbbf24;
 }
 
+/* ==================== Base Layer ==================== */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* 平滑滚动 */
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
-  html {
-    @apply font-sans;
+
+  /* focus-visible 无障碍样式 */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
   }
 }
+
+/* ==================== 自定义滚动条 ==================== */
+/* Webkit 浏览器（Chrome / Safari / Edge） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(168, 180, 204, 0.2);
+  background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 180, 204, 0.4);
+  background-clip: content-box;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(168, 180, 204, 0.2) transparent;
+}
+
+/* ==================== 过渡动画类 ==================== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out both;
+}
+
+/* 可选延迟工具类 */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
 
 /* ==================== 品牌渐变 ==================== */
 .brand-gradient {
@@ -188,9 +311,9 @@
 }
 
 .dark .glass-card {
-  background: #14112a;
-  border-color: #2a2745;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: #161330;
+  border-color: #302d52;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* ==================== 页面背景 ==================== */
@@ -202,10 +325,10 @@
 }
 
 .dark .grid-bg {
-  background-color: #0c0a1a;
+  background-color: #0b0918;
   background-image:
-    radial-gradient(circle at 20% 50%, rgba(129, 140, 248, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(167, 139, 250, 0.04) 0%, transparent 50%);
+    radial-gradient(circle at 20% 50%, rgba(129, 140, 248, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(167, 139, 250, 0.05) 0%, transparent 50%);
 }
 
 /* ==================== 选中高亮 ==================== */
@@ -217,8 +340,8 @@
 
 .dark .neon-glow {
   box-shadow:
-    0 0 0 2px rgba(129, 140, 248, 0.3),
-    0 4px 20px rgba(129, 140, 248, 0.12);
+    0 0 0 2px rgba(129, 140, 248, 0.35),
+    0 4px 20px rgba(129, 140, 248, 0.15);
 }
 
 /* ==================== 卡片悬停 ==================== */
@@ -237,8 +360,8 @@
 
 .dark .card-hover:hover {
   box-shadow:
-    0 4px 6px rgba(0, 0, 0, 0.2),
-    0 10px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(129, 140, 248, 0.2);
-  border-color: rgba(129, 140, 248, 0.4);
+    0 4px 6px rgba(0, 0, 0, 0.25),
+    0 10px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(129, 140, 248, 0.25);
+  border-color: rgba(129, 140, 248, 0.45);
 }
