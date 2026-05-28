@@ -7,13 +7,10 @@ import {
   BaseProvider,
   ProviderError,
   sleep,
-  generateId,
 } from './base';
 import type {
   ProviderConfig,
   TaskStatus,
-  Model,
-  MediaType,
 } from './types';
 
 /** 数字人选项 */
@@ -193,9 +190,10 @@ export class SiliconFlowDigitalHuman extends BaseProvider implements DigitalHuma
       throw new ProviderError(`TTS 生成失败 (${res.status}): ${errText.slice(0, 200)}`, 'TTS_FAILED', this.id, res.status);
     }
 
-    // 返回音频 blob URL
-    const blob = await res.blob();
-    const audioUrl = URL.createObjectURL(blob);
+    // 返回 base64 data URI（避免 blob URL 内存泄漏）
+    const buffer = await res.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const audioUrl = `data:audio/mp3;base64,${base64}`;
 
     return { audioUrl, duration: Math.ceil(options.text.length * 0.15) };
   }
@@ -266,7 +264,7 @@ export class SiliconFlowDigitalHuman extends BaseProvider implements DigitalHuma
   }
 
   /** 构建数字人 prompt */
-  private buildPrompt(options: DigitalHumanOptions): void | string {
+  private buildPrompt(options: DigitalHumanOptions): string {
     const styleMap: Record<string, string> = {
       talking: 'person talking, lip sync, natural gestures, looking at camera',
       gesturing: 'person gesturing while speaking, expressive hand movements, looking at camera',
