@@ -3,13 +3,8 @@
   "appName": "萌萌的",
   "webDir": "public",
   "bundledWebRuntime": false,
-  "server": {
-    "url": "http://localhost:3000",
-    "cleartext": true
-  },
   "android": {
     "buildOptions": {
-      "keystorePath": "signing.properties",
       "releaseType": "APK"
     }
   },
