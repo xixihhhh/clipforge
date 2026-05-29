@@ -243,7 +243,7 @@ export function NavbarWithStatus() {
   return (
     <nav className="flex items-center justify-between p-4 bg-gray-900">
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-bold">带货剪手</h1>
+        <h1 className="text-xl font-bold">萌萌的</h1>
       </div>
       
       <div className="flex items-center gap-4">

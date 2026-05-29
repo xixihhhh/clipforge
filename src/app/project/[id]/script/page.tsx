@@ -122,7 +122,7 @@ export default function ScriptPage() {
                   <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <span className="text-lg font-bold tracking-tight">带货剪手</span>
+              <span className="text-lg font-bold tracking-tight">萌萌的</span>
             </Link>
             <span className="text-muted-foreground">/</span>
             <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>

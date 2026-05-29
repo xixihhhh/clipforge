@@ -34,7 +34,7 @@ export const viewport: Viewport = {
 /*  Metadata 配置 — SEO + PWA + og:image                               */
 /* ------------------------------------------------------------------ */
 export const metadata: Metadata = {
-  title: "带货剪手 - 电商带货短视频 AI 生成",
+  title: "萌萌的 - 电商带货短视频 AI 生成",
   description: "上传商品图，AI 生成脚本，一键生成带货短视频",
   icons: {
     icon: "/favicon.ico",
@@ -44,27 +44,27 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "带货剪手",
+    title: "萌萌的",
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "带货剪手 - 电商带货短视频 AI 生成",
+    title: "萌萌的 - 电商带货短视频 AI 生成",
     description: "上传商品图，AI 生成脚本，一键生成带货短视频",
     type: "website",
     locale: "zh_CN",
-    siteName: "带货剪手",
+    siteName: "萌萌的",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "带货剪手 - 电商带货短视频 AI 生成",
+        alt: "萌萌的 - 电商带货短视频 AI 生成",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "带货剪手 - 电商带货短视频 AI 生成",
+    title: "萌萌的 - 电商带货短视频 AI 生成",
     description: "上传商品图，AI 生成脚本，一键生成带货短视频",
     images: ["/og-image.png"],
   },

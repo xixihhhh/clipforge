@@ -1,21 +1,32 @@
 {
-  "name": "带货剪手",
-  "short_name": "带货剪手",
+  "name": "萌萌的",
+  "short_name": "萌萌的",
+  "description": "AI驱动的电商带货短视频生成工具",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",
-  "theme_color": "#7c5cfc",
+  "theme_color": "#ff6b9d",
   "orientation": "portrait",
+  "scope": "/",
+  "lang": "zh-CN",
   "icons": [
     {
-      "src": "/icons/icon-192x192.svg",
+      "src": "/icons/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
