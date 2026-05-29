@@ -7,16 +7,16 @@ import {
   LuSearch,
   LuFilter,
   LuClock,
-  LuCheckCircle2,
-  LuXCircle,
-  LuBarChart3,
+  LuCircleCheck,
+  LuCircleX,
+  LuChartBar,
   LuTrash2,
   LuRefreshCw,
   LuDownload,
   LuPlay,
   LuPause,
   LuEye,
-  LuLoader2,
+  LuLoader,
   LuFilm,
   LuCalendar,
   LuTrendingUp,
@@ -77,7 +77,7 @@ const statusMap: Record<
   generating: {
     label: "生成中",
     color: "bg-cyan-500/20 text-cyan-400",
-    icon: <LuLoader2 className="w-3.5 h-3.5 animate-spin" />,
+    icon: <LuLoader className="w-3.5 h-3.5 animate-spin" />,
   },
   video: {
     label: "合成中",
@@ -87,12 +87,12 @@ const statusMap: Record<
   done: {
     label: "已完成",
     color: "bg-emerald-500/20 text-emerald-400",
-    icon: <LuCheckCircle2 className="w-3.5 h-3.5" />,
+    icon: <LuCircleCheck className="w-3.5 h-3.5" />,
   },
   failed: {
     label: "失败",
     color: "bg-red-500/20 text-red-400",
-    icon: <LuXCircle className="w-3.5 h-3.5" />,
+    icon: <LuCircleX className="w-3.5 h-3.5" />,
   },
 };
 
@@ -202,7 +202,7 @@ function StatsCards({ projects }: { projects: Project[] }) {
       label: "总生成数",
       value: total.toString(),
       sub: `完成 ${done} · 失败 ${failed}`,
-      icon: <LuBarChart3 className="w-5 h-5 text-blue-400" />,
+      icon: <LuChartBar className="w-5 h-5 text-blue-400" />,
       color: "from-blue-500/10 to-blue-500/5",
     },
     {
@@ -223,7 +223,7 @@ function StatsCards({ projects }: { projects: Project[] }) {
       label: "进行中",
       value: (total - done - failed).toString(),
       sub: "正在生成/合成中的任务",
-      icon: <LuLoader2 className="w-5 h-5 text-cyan-400" />,
+      icon: <LuLoader className="w-5 h-5 text-cyan-400" />,
       color: "from-cyan-500/10 to-cyan-500/5",
     },
   ];

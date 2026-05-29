@@ -1,0 +1,19 @@
+{
+  "appId": "com.mengmeng.daihuo",
+  "appName": "萌萌的",
+  "webDir": ".next",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#7c5cfc",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#7c5cfc"
+    }
+  }
+}

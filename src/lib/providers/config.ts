@@ -11,7 +11,7 @@ export function getEnvProviderConfig(providerId: string): ProviderConfig {
 
   return {
     apiKey: process.env[`${prefix}_API_KEY`] || process.env.AI_API_KEY || '',
-    apiEndpoint: process.env[`${prefix}_API_ENDPOINT`] || getDefaultEndpoint(providerId),
+    baseUrl: process.env[`${prefix}_API_ENDPOINT`] || getDefaultEndpoint(providerId),
   };
 }
 

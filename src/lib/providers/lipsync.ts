@@ -48,7 +48,7 @@ export class SiliconFlowLipSync extends BaseProvider {
   readonly icon = '👄';
 
   private getApiBase(config?: Partial<ProviderConfig>): string {
-    return (config?.apiEndpoint || this.config.apiEndpoint || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
+    return (config?.baseUrl || this.config.baseUrl || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
   }
 
   /**
@@ -83,7 +83,7 @@ export class SiliconFlowLipSync extends BaseProvider {
           audio: options.audioUrl,
         }),
       },
-      { apiKey, apiEndpoint: base },
+      { apiKey, baseUrl: base },
     );
 
     if (this.isError(res)) {
@@ -115,7 +115,7 @@ export class SiliconFlowLipSync extends BaseProvider {
     const res = await this.request<Record<string, unknown>>(
       `${base}/video/status/${taskId}`,
       { method: 'GET', headers: { Authorization: `Bearer ${apiKey}` } },
-      { apiKey, apiEndpoint: base },
+      { apiKey, baseUrl: base },
     );
 
     if (this.isError(res)) {

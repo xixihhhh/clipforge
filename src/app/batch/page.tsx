@@ -2,17 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import {
-  LuArrowLeft,
-  LuCheck,
-  LuLoader,
-  LuPackage,
-  LuZap,
-  LuBox,
-  LuLayoutGrid,
-  LuEye,
-  LuVideo,
-} from "react-icons/lu";
+import {LuArrowLeft, LuCheck, LuLoader, LuPackage, LuZap, LuBox, LuLayoutGrid, LuEye, LuVideo} from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

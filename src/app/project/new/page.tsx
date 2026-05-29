@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark } from "react-icons/lu";
+import {LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark} from "react-icons/lu";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";

@@ -158,7 +158,7 @@ registerProvider({
   description: '基于 Wan 模型的图生视频数字人口播',
   category: 'digital-human' as const,
   factory: (config) => new SiliconFlowDigitalHuman(config),
-  defaultConfig: { apiEndpoint: 'https://api.siliconflow.cn/v1' },
+  defaultConfig: { baseUrl: 'https://api.siliconflow.cn/v1' },
   supportedModes: ['image-to-video' as const],
   models: [
     {
@@ -178,7 +178,7 @@ registerProvider({
   description: '基于 Wan 模型的音频驱动唇形同步，静态形象图 + TTS 音频 → 口播视频',
   category: 'digital-human' as const,
   factory: (config) => new SiliconFlowLipSync(config),
-  defaultConfig: { apiEndpoint: 'https://api.siliconflow.cn/v1' },
+  defaultConfig: { baseUrl: 'https://api.siliconflow.cn/v1' },
   supportedModes: ['image-to-video' as const],
   models: [
     {
@@ -198,7 +198,7 @@ registerProvider({
   description: '基于 CosyVoice2 模型的 3 秒声音克隆，支持音色提取和 TTS 合成',
   category: 'digital-human' as const,
   factory: (config) => new SiliconFlowVoiceClone(config),
-  defaultConfig: { apiEndpoint: 'https://api.siliconflow.cn/v1' },
+  defaultConfig: { baseUrl: 'https://api.siliconflow.cn/v1' },
   supportedModes: ['text-to-audio' as const],
   models: [
     {
@@ -218,7 +218,7 @@ registerProvider({
   description: '基于 BRIA 模型的智能背景替换，支持虚化、纯色和自定义背景图三种模式',
   category: 'digital-human' as const,
   factory: (config) => new SiliconFlowBackground(config),
-  defaultConfig: { apiEndpoint: 'https://api.siliconflow.cn/v1' },
+  defaultConfig: { baseUrl: 'https://api.siliconflow.cn/v1' },
   supportedModes: ['image-to-image' as const],
   models: [
     {

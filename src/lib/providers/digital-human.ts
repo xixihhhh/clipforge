@@ -101,7 +101,7 @@ export class SiliconFlowDigitalHuman extends BaseProvider implements DigitalHuma
   readonly icon = '🤖';
 
   private getApiBase(config?: Partial<ProviderConfig>): string {
-    return (config?.apiEndpoint || this.config.apiEndpoint || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
+    return (config?.baseUrl || this.config.baseUrl || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
   }
 
   /** 获取可用数字人形象（内置预设） */
@@ -139,7 +139,7 @@ export class SiliconFlowDigitalHuman extends BaseProvider implements DigitalHuma
           prompt,
         }),
       },
-      { apiKey, apiEndpoint: base },
+      { apiKey, baseUrl: base },
     );
 
     if (this.isError(res)) {
@@ -207,7 +207,7 @@ export class SiliconFlowDigitalHuman extends BaseProvider implements DigitalHuma
     const res = await this.request<Record<string, unknown>>(
       `${base}/video/status/${taskId}`,
       { method: 'GET', headers: { Authorization: `Bearer ${apiKey}` } },
-      { apiKey, apiEndpoint: base },
+      { apiKey, baseUrl: base },
     );
 
     if (this.isError(res)) {

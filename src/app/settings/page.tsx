@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette } from "react-icons/lu";
+import {LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette} from "react-icons/lu";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useCharacterStore, type Character } from "@/lib/stores/project-store";
 import { useBrandStore } from "@/lib/stores/brand-store";

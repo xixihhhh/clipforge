@@ -65,8 +65,8 @@ export class SiliconFlowBackground extends BaseProvider {
 
   private getApiBase(config?: Partial<ProviderConfig>): string {
     return (
-      config?.apiEndpoint ||
-      this.config.apiEndpoint ||
+      config?.baseUrl ||
+      this.config.baseUrl ||
       'https://api.siliconflow.cn/v1'
     ).replace(/\/+$/, '');
   }

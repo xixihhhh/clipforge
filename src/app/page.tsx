@@ -4,8 +4,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   LuSettings, LuPlus, LuVideo, LuFilm, LuPackage,
-  LuTriangleAlert, LuBarChart3, LuClock, LuCheckCircle2,
-  LuLoader2, LuLayoutTemplate, LuImage, LuArrowRight,
+  LuTriangleAlert, LuChartBar, LuClock, LuCircleCheck,
+  LuLoader, LuLayoutGrid, LuImage, LuArrowRight,
   LuSearch, LuX, LuTrash2, LuArrowUpDown,
 } from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,7 +95,7 @@ export default function HomePage() {
 
   // 系统状态检测
   const isLLMConfigured = llm.apiKey.length > 0;
-  const hasAnyProvider = Object.values(providers).some(p => p.enabled && p.apiKey.length > 0);
+  const hasAnyProvider = Object.values(providers).some((p: any) => p.enabled && p.apiKey.length > 0);
   const isSystemReady = isLLMConfigured && hasAnyProvider;
 
   // 项目统计
@@ -245,7 +245,7 @@ export default function HomePage() {
           <Card className="glass-card">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
-                <LuBarChart3 className="w-6 h-6 text-blue-500" />
+                <LuChartBar className="w-6 h-6 text-blue-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.total}</p>
@@ -257,7 +257,7 @@ export default function HomePage() {
           <Card className="glass-card">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
-                <LuCheckCircle2 className="w-6 h-6 text-emerald-500" />
+                <LuCircleCheck className="w-6 h-6 text-emerald-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.completed}</p>
@@ -269,7 +269,7 @@ export default function HomePage() {
           <Card className="glass-card">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                <LuLoader2 className="w-6 h-6 text-amber-500" />
+                <LuLoader className="w-6 h-6 text-amber-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.inProgress}</p>
@@ -301,7 +301,7 @@ export default function HomePage() {
               <Card className="card-hover glass-card cursor-pointer group h-full">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg group-hover:scale-105 transition-transform">
-                    <LuLayoutTemplate className="w-[22px] h-[22px] text-white" />
+                    <LuLayoutGrid className="w-[22px] h-[22px] text-white" />
                   </div>
                   <div>
                     <h3 className="font-semibold">模板库</h3>
@@ -424,7 +424,7 @@ export default function HomePage() {
                   </Link>
                   <Link href="/templates">
                     <Button variant="outline">
-                      <LuLayoutTemplate className="w-4 h-4 mr-2" />
+                      <LuLayoutGrid className="w-4 h-4 mr-2" />
                       浏览模板
                     </Button>
                   </Link>

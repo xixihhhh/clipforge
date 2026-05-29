@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX } from "react-icons/lu";
+import {LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX} from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

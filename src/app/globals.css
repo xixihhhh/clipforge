@@ -194,6 +194,12 @@
 }
 
 /* ==================== Base Layer ==================== */
+/* 系统字体栈 */
+:root {
+  --font-geist-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-geist-mono: "SF Mono", "Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

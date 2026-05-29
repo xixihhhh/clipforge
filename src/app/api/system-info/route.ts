@@ -28,3 +28,4 @@ export async function GET() {
     uptime: Math.floor(uptime),
   });
 }
+export const dynamic = 'force-static';

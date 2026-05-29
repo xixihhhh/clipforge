@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuSmartphone, LuCopy, LuShuffle } from "react-icons/lu";
+import {LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuSmartphone, LuCopy, LuShuffle} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

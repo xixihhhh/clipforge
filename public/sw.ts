@@ -268,16 +268,14 @@ async function cacheFirstStrategy(request: Request): Promise<Response> {
   const cachedResponse = await cache.match(request);
   
   if (cachedResponse) {
-    // 后台更新缓存
-    event.waitUntil(
-      fetch(request)
-        .then(async (response) => {
-          if (response.ok) {
-            await cache.put(request, response);
-          }
-        })
-        .catch(() => {/* 忽略更新错误 */})
-    );
+    // 后台更新缓存（不阻塞当前请求）
+    fetch(request)
+      .then(async (response) => {
+        if (response.ok) {
+          await cache.put(request, response.clone());
+        }
+      })
+      .catch(() => {/* 忽略更新错误 */});
     return cachedResponse;
   }
   
@@ -329,7 +327,7 @@ async function staleWhileRevalidateStrategy(request: Request): Promise<Response>
     // 检查是否过期
     if (!isCacheExpired(cachedResponse, CACHE_EXPIRATION.api)) {
       // 未过期，返回缓存但仍后台更新
-      event.waitUntil(fetchAndCache.catch(() => {}));
+      fetchAndCache.catch(() => {});
       return cachedResponse;
     }
     // 已过期，等待网络响应
@@ -600,7 +598,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 /**
  * Sync 事件 - 后台同步
  */
-self.addEventListener('sync', (event: SyncEvent) => {
+self.addEventListener('sync', (event: any) => {
   console.log('SW: Background sync triggered:', event.tag);
   
   if (event.tag === SYNC_TAGS.backgroundSync) {

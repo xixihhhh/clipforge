@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus } from "react-icons/lu";
+import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

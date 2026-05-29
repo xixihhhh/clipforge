@@ -3,26 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  LuArrowLeft,
-  LuSearch,
-  LuFilter,
-  LuPlay,
-  LuClock,
-  LuTag,
-  LuTrendingUp,
-  LuLayoutGrid,
-  LuEye,
-  LuSparkles,
-  LuStar,
-  LuArrowDownAZ,
-  LuMonitor,
-  LuFilm,
-  LuMusic,
-  LuType,
-  LuZap,
-  LuRocket,
-} from "react-icons/lu";
+import {LuArrowLeft, LuSearch, LuFilter, LuPlay, LuClock, LuTag, LuTrendingUp, LuLayoutGrid, LuEye, LuSparkles, LuStar, LuArrowDownAZ, LuMonitor, LuFilm, LuMusic, LuType, LuZap, LuRocket} from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

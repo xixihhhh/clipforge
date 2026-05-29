@@ -50,7 +50,7 @@ export class SiliconFlowVoiceClone extends BaseProvider implements VoiceClonePro
   readonly icon = '🎙️';
 
   private getApiBase(config?: Partial<ProviderConfig>): string {
-    return (config?.apiEndpoint || this.config.apiEndpoint || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
+    return (config?.baseUrl || this.config.baseUrl || 'https://api.siliconflow.cn/v1').replace(/\/+$/, '');
   }
 
   /** 克隆声音 */

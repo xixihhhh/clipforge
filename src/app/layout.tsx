@@ -1,19 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// 使用系统字体栈，避免构建时网络问题
 import GlobalProviders from "@/components/GlobalProviders";
 import MobileNav from "@/components/MobileNav";
 import MobileLayout from "@/components/MobileLayout";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = {
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+};
 
-const geistMono = Geist_Mono({
+const geistMono = {
   variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+};
 
 /* ------------------------------------------------------------------ */
 /*  Viewport 配置 — 适配移动端 PWA                                     */

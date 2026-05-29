@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { LuArrowLeft, LuZap, LuCheck, LuCircleX, LuImage, LuArrowRight } from "react-icons/lu";
+import {LuArrowLeft, LuZap, LuCheck, LuCircleX, LuImage, LuArrowRight} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

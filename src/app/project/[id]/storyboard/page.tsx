@@ -3,21 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  LuClapperboard,
-  LuClock,
-  LuImage,
-  LuArrowRight,
-  LuArrowLeft,
-  LuGripVertical,
-  LuPencil,
-  LuTrash2,
-  LuPlus,
-  LuPlay,
-  LuX,
-  LuCheck,
-  LuCopy,
-} from "react-icons/lu";
+import {LuClapperboard, LuClock, LuImage, LuArrowRight, LuArrowLeft, LuGripVertical, LuPencil, LuTrash2, LuPlus, LuPlay, LuX, LuCheck, LuCopy} from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
