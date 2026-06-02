@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus} from "react-icons/lu";
 import Link from "next/link";
