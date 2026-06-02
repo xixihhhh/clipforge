@@ -241,7 +241,8 @@ export default function NewProjectPage() {
 - totalDuration: 总时长（秒）
 - shots: 分镜数组，每个分镜包含：
   - shotId: 编号
-  - type: 类型（hook开场/pain_point痛点/product_reveal产品展示/demo使用演示/social_proof信任背书/cta促单）
+  - type: 类型，只能是以下6个值之一（严格禁止其他值）：
+    hook（开场钩子）/ pain_point（痛点）/ product_reveal（产品展示）/ demo（使用演示）/ social_proof（信任背书）/ cta（促单转化）
   - duration: 时长（秒）
   - description: 画面描述
   - camera: 镜头说明

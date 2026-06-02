@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight} from "react-icons/lu";
 import Link from "next/link";
@@ -55,18 +55,49 @@ const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
   cta: { label: "转化", color: "bg-amber-500/20 text-amber-400" },
 };
 
-// 模拟视频片段数据
-const initialClips: VideoClipItem[] = [
-  { shotId: 1, type: "hook", duration: 3, voiceover: "你还在用产品核心卖点？", transition: "ai_start_end" },
-  { shotId: 2, type: "pain_point", duration: 4, voiceover: "普通商品核心痛点，擦个嘴尴尬场景", transition: "ai_start_end" },
-  { shotId: 3, type: "product_reveal", duration: 3, voiceover: "惊喜发现通用品牌", transition: "ai_start_end" },
-  { shotId: 4, type: "demo", duration: 5, voiceover: "湿水都不破！拉扯都不会烂", transition: "ai_start_end" },
-  { shotId: 5, type: "cta", duration: 3, voiceover: "限时特价！赶紧去抢！", transition: "direct_concat" },
+// 备用视频片段数据
+const fallbackClips: VideoClipItem[] = [
+  { shotId: 1, type: "hook", duration: 3, voiceover: "吸引眼球的开场", transition: "ai_start_end" },
+  { shotId: 2, type: "pain_point", duration: 4, voiceover: "痛点描述", transition: "ai_start_end" },
+  { shotId: 3, type: "product_reveal", duration: 3, voiceover: "产品展示", transition: "ai_start_end" },
+  { shotId: 4, type: "demo", duration: 5, voiceover: "使用演示", transition: "ai_start_end" },
+  { shotId: 5, type: "cta", duration: 3, voiceover: "引导下单", transition: "direct_concat" },
 ];
+
+// 从 sessionStorage 读取脚本数据并转换为 VideoClipItem 数组
+function getClipsFromSessionStorage(id: string): VideoClipItem[] | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const stored = sessionStorage.getItem(`scripts_${id}`);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    let shots: any[] = [];
+    if (Array.isArray(parsed)) {
+      const first = parsed[0];
+      if (first.shots) shots = first.shots;
+      else shots = parsed;
+    } else if (parsed.shots) {
+      shots = parsed.shots;
+    }
+    if (!shots.length) return null;
+    return shots.map((shot: any, index: number) => ({
+      shotId: shot.shotId || index + 1,
+      type: (shot.type as VideoClipItem["type"]) || "hook",
+      duration: shot.duration || 3,
+      voiceover: shot.voiceover || "",
+      transition: "ai_start_end" as const,
+    }));
+  } catch {
+    return null;
+  }
+}
 
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>();
-  const [clips, setClips] = useState<VideoClipItem[]>(initialClips);
+  const [clips, setClips] = useState<VideoClipItem[]>(() => {
+    const stored = getClipsFromSessionStorage(id);
+    return stored || fallbackClips;
+  });
   const [config, setConfig] = useState<ComposeConfig>({
     ttsEnabled: true,
     ttsVoice: "female-gentle",
