@@ -201,24 +201,18 @@ export default function NewProjectPage() {
       }
       const project = await projectRes.json();
 
-      // 第2步：上传图片（携带 projectId）
-      setProgress({ step: "uploading", percent: 35, message: "正在上传商品图片..." });
-      const formData = new FormData();
-      images.forEach((img) => formData.append("files", img.file));
-      formData.append("projectId", project.id);
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!uploadRes.ok) {
-        const errData = await uploadRes.json().catch(() => ({}));
-        throw new Error(errData.error || "图片上传失败，请检查网络后重试");
+      // 第2步：将图片编码为 base64 data URL（跳过文件上传，直接存到项目）
+      setProgress({ step: "uploading", percent: 35, message: "正在处理商品图片..." });
+      const paths: string[] = [];
+      for (const img of images) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(img.file);
+        });
+        paths.push(dataUrl);
       }
-      const { paths } = await uploadRes.json();
-
-      // 第2.5步：更新项目的图片路径
-      await fetch(`/api/project/${project.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productImages: paths }),
-      });
 
       // 第3步：生成脚本
       setProgress({ step: "generating", percent: 60, message: "AI 正在分析商品并生成脚本..." });
