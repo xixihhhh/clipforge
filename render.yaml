@@ -2,8 +2,8 @@ services:
   - type: web
     name: daihuo-jianshou
     env: node
-    buildCommand: npx shadcn@latest add --yes; pnpm install --frozen-lockfile && pnpm run build
-    startCommand: pnpm start
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: 22
