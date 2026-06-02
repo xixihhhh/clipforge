@@ -221,46 +221,58 @@ export default function NewProjectPage() {
         ? characters.find((c) => c.id === selectedCharacterId)
         : null;
 
-      const scriptRes = await fetch("/api/llm/script", {
+      // 直接调用 LLM API（绕过服务端路由）
+      const systemPrompt = "你是一位顶级电商短视频编导。请根据商品信息生成3个不同风格的带货脚本。每个脚本包含标题、总时长和分镜列表。每个分镜包含：shotId(编号)、type(类型:hook/pain_point/product_reveal/demo/social_proof/cta)、duration(秒)、description(画面描述)、camera(镜头说明)、voiceover(旁白文案)、visualSource(视觉来源)。请以JSON数组格式返回，不要加markdown包裹。";
+
+      const userPrompt = `请为以下商品生成3个带货脚本（风格: ${scriptStyle}）：
+商品名称: ${productName}
+品类: ${category}
+商品描述: ${sellingPoints}
+目标时长: ${duration}秒
+${priceRange ? `价格区间: ${priceRange}` : ""}
+${targetAudience.length ? `目标用户: ${targetAudience.join(",")}` : ""}
+${platforms.length ? `投放平台: ${platforms.join(",")}` : ""}`;
+
+      const llmRes = await fetch(llm.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${llm.apiKey}`,
+        },
         body: JSON.stringify({
-          projectId: project.id,
-          productName,
-          category,
-          productDescription: sellingPoints,
-          targetDuration: parseInt(duration),
-          styleType: scriptStyle,
-          videoMode,
-          productImages: [],  // 不传大图片base64数据，跳过图片分析
-          llmConfig: {
-            baseUrl: llm.baseUrl,
-            apiKey: llm.apiKey,
-            model: llm.model,
-            visionModel: llm.visionModel,
-          },
-          priceRange,
-          targetAudience: targetAudience.join(","),
-          platforms: platforms.join(","),
-          usageAdvantage,
-          // 传入选中的模板 ID
-          ...(selectedTemplateId && { templateId: selectedTemplateId }),
-          ...(selectedCharacter && {
-            character: {
-              id: selectedCharacter.id,
-              name: selectedCharacter.name,
-              appearance: selectedCharacter.appearance || "",
-              voiceStyle: selectedCharacter.voiceProfile?.style,
-            },
-          }),
+          model: llm.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.8,
+          max_tokens: 16000,
         }),
       });
 
-      // 使用了模板时递增使用次数
-      if (selectedTemplateId) {
-        incrementUseCount(selectedTemplateId);
+      if (!llmRes.ok) {
+        const errText = await llmRes.text().catch(() => "未知错误");
+        throw new Error(`AI 生成失败 (${llmRes.status}): ${errText}`);
       }
-      if (!scriptRes.ok) throw new Error("脚本生成失败，请检查 LLM 设置后重试");
+
+      const llmData = await llmRes.json();
+      const content = llmData.choices?.[0]?.message?.content;
+      if (!content) throw new Error("AI 未返回有效内容");
+
+      // 手动解析 JSON
+      let scripts = [];
+      try {
+        const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*$/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        scripts = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        // 尝试用正则提取
+        const match = content.match(/\[[\s\S]*\]/);
+        if (match) scripts = JSON.parse(match[0]);
+        else throw new Error("AI 返回格式异常，请重试");
+      }
+
+      // 使用了模板时递增使用次数
 
       // 第4步：完成
       setProgress({ step: "done", percent: 100, message: "脚本生成完成！正在跳转..." });
