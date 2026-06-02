@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { projects, assets, compositions, videoClips, analyticsEvents } from "@/lib/db/schema";
