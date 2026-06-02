@@ -271,7 +271,15 @@ ${platforms.length ? `投放平台: ${platforms.join(",")}` : ""}
           model: llm.model,
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
+            {
+              role: "user",
+              content: paths.length > 0
+                ? [
+                    { type: "text", text: userPrompt },
+                    { type: "image_url", image_url: { url: paths[0], detail: "high" } },
+                  ]
+                : userPrompt,
+            },
           ],
           temperature: 0.8,
           max_tokens: 16000,
