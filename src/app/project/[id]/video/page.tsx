@@ -25,6 +25,8 @@ interface VideoClipItem {
   duration: number;
   voiceover: string;
   transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade";
+  url?: string;
+  status?: "pending" | "generating" | "done" | "failed";
 }
 
 // 合成配置
@@ -87,6 +89,7 @@ function getClipsFromSessionStorage(id: string): VideoClipItem[] | null {
       duration: shot.duration || 3,
       voiceover: shot.voiceover || "",
       transition: "ai_start_end" as const,
+      status: "pending" as const,
     }));
   } catch {
     return null;
@@ -255,11 +258,23 @@ export default function VideoPage() {
                     <Card className="glass-card">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
-                          {/* 缩略图 */}
-                          <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
-                            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 rounded-md flex items-center justify-center">
-                              <LuPlay className="w-4 h-4 text-primary/60" />
-                            </div>
+                          {/* 缩略图/视频 */}
+                          <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30 overflow-hidden">
+                            {clip.url ? (
+                              <video src={clip.url} controls className="w-full h-full object-cover" />
+                            ) : clip.status === "generating" ? (
+                              <div className="w-full h-full bg-gradient-to-br from-amber-500/20 to-amber-500/5 rounded-md flex items-center justify-center">
+                                <svg className="w-4 h-4 text-amber-500/60 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/></svg>
+                              </div>
+                            ) : clip.status === "failed" ? (
+                              <div className="w-full h-full bg-gradient-to-br from-red-500/20 to-red-500/5 rounded-md flex items-center justify-center">
+                                <span className="text-red-500/60 text-xs font-bold">✗</span>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 rounded-md flex items-center justify-center">
+                                <LuPlay className="w-4 h-4 text-primary/60" />
+                              </div>
+                            )}
                           </div>
 
                           {/* 信息 */}
