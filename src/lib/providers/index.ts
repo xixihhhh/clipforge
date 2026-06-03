@@ -13,6 +13,7 @@ import { SiliconFlowDigitalHuman } from './digital-human'
 import { SiliconFlowLipSync } from './lipsync'
 import { SiliconFlowVoiceClone } from './voice-clone'
 import { SiliconFlowBackground } from './background'
+import { AgnesProvider } from './agnes'
 
 // ==================== Provider 注册表 ====================
 
@@ -54,6 +55,14 @@ registerProvider({
   displayName: '阿里百炼',
   description: '阿里云百炼大模型平台，支持万相（Wan）视频生成和通义千问图片生成',
   factory: (config) => new AlibabaProvider(config),
+})
+
+registerProvider({
+  name: 'agnes',
+  displayName: 'Agnes AI (Sapiens AI)',
+  description: 'Sapiens AI 多模态 AI 平台，支持文本、图生图、文生视频、图生视频',
+  defaultConfig: { baseUrl: 'https://apihub.agnes-ai.com/v1' },
+  factory: (config) => new AgnesProvider(config),
 })
 
 registerProvider({
@@ -149,6 +158,7 @@ export { SiliconFlowProvider } from './siliconflow'
 export { SiliconFlowLipSync } from './lipsync'
 export { SiliconFlowVoiceClone } from './voice-clone'
 export { SiliconFlowBackground } from './background'
+export { AgnesProvider } from './agnes'
 
 // ==================== 数字人 Provider ====================
 registerProvider({
