@@ -116,6 +116,7 @@ export default function VideoPage() {
   const [isComposing, setIsComposing] = useState(false);
   const [composeProgress, setComposeProgress] = useState(0);
   const [composeDone, setComposeDone] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
   const llm = useSettingsStore((s) => s.llm);
 
   const totalDuration = clips.reduce((sum, c) => sum + c.duration, 0);
@@ -210,9 +211,12 @@ export default function VideoPage() {
           if (!videoUrl) {
             throw new Error("视频生成超时");
           }
-        } catch (e) {
+        } catch (e: any) {
           // 单个分镜失败，标记失败但不中断整体流程
+          const errMsg = e?.message || "生成失败";
           console.error(`分镜 ${i + 1} 生成失败:`, e);
+          setComposeError(`分镜 ${i + 1} (${clip.voiceover?.slice(0, 20) || ''}...) 生成失败: ${errMsg}`);
+          alert(`分镜 ${i + 1} 生成失败: ${errMsg}`);
           setClips((prev) =>
             prev.map((c) =>
               c.shotId === clip.shotId ? { ...c, status: "failed" as const } : c
@@ -228,7 +232,10 @@ export default function VideoPage() {
       setIsComposing(false);
       setComposeDone(true);
     } catch (e: any) {
+      const errMsg = e?.message || "视频合成失败";
       console.error("视频合成失败:", e);
+      setComposeError(errMsg);
+      alert("视频合成失败:\n" + errMsg);
       setIsComposing(false);
       setComposeProgress(0);
     }
@@ -518,6 +525,19 @@ export default function VideoPage() {
                   </>
                 )}
               </Button>
+
+              {composeError && (
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <div className="font-medium">⚠️ 合成失败</div>
+                  <div className="mt-1">{composeError}</div>
+                  <button
+                    className="mt-2 text-xs underline hover:no-underline"
+                    onClick={() => setComposeError(null)}
+                  >
+                    关闭提示
+                  </button>
+                </div>
+              )}
 
               {composeDone && (
                 <Link href={`/project/${id}/export`}>
