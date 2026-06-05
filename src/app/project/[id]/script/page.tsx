@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus} from "react-icons/lu";
+import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoader} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,7 @@ export default function ScriptPage() {
   const { id } = useParams<{ id: string }>();
   const [selectedScript, setSelectedScript] = useState(0);
   const [scripts, setScripts] = useState(mockScripts);
-  const [isGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     // 优先从 sessionStorage 读取生成的脚本（从新建页面跳转而来）
@@ -92,7 +92,7 @@ export default function ScriptPage() {
     } catch {}
     setScripts(mockScripts);
   }, [id]);
-  const currentScript = scripts[selectedScript];
+  const currentScript = scripts[Math.min(selectedScript, scripts.length - 1)];
 
   // 模板相关状态
   const { addTemplate } = useTemplateStore();
@@ -100,11 +100,30 @@ export default function ScriptPage() {
   const [templateName, setTemplateName] = useState("");
   const [savedTip, setSavedTip] = useState(false);
 
-  /** 点击"存为模板"按钮 */
-  const handleSaveAsTemplate = () => {
+  const handleSaveAsTemplate = useCallback(() => {
     setTemplateName("");
     setShowSaveDialog(true);
-  };
+  }, []);
+
+  const handleRegenerate = useCallback(async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/ai/script/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: id }),
+      });
+      if (!response.ok) throw new Error("生成失败");
+      const data = await response.json();
+      setScripts(data.scripts);
+      sessionStorage.setItem(`scripts_${id}`, JSON.stringify(data.scripts));
+    } catch (e) {
+      console.error("生成脚本失败:", e);
+      alert("生成失败，请重试");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [id]);
 
   /** 确认保存模板 */
   const doSaveTemplate = () => {
@@ -169,13 +188,22 @@ export default function ScriptPage() {
                 {savedTip && (
                   <span className="text-xs text-green-400 animate-in fade-in">已保存为模板</span>
                 )}
-                <Button variant="outline" size="sm" className="text-xs" onClick={handleSaveAsTemplate}>
+                <Button variant="outline" size="sm" className="text-xs" onClick={handleSaveAsTemplate} disabled={isGenerating}>
                   <LuBookmarkPlus className="w-3.5 h-3.5 mr-1" />
                   存为模板
                 </Button>
-                <Button variant="outline" size="sm" disabled={isGenerating} className="text-xs">
-                  <LuWand className="w-3.5 h-3.5 mr-1" />
-                  重新生成
+                <Button variant="outline" size="sm" className="text-xs" onClick={handleRegenerate} disabled={isGenerating}>
+                  {isGenerating ? (
+                    <>
+                      <LuLoader className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      生成中...
+                    </>
+                  ) : (
+                    <>
+                      <LuWand className="w-3.5 h-3.5 mr-1" />
+                      重新生成
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
