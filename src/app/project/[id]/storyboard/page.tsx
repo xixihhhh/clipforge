@@ -431,8 +431,33 @@ function ShotPreviewModal({
 export default function StoryboardPage() {
   const { id } = useParams<{ id: string }>();
 
-  // 分镜数据
-  const [shots, setShots] = useState<Shot[]>(initialShots);
+  // 分镜数据 — 优先从 sessionStorage 读取生成的脚本，否则用 mock 数据
+  const getInitialShots = (): Shot[] => {
+    try {
+      const stored = sessionStorage.getItem(`scripts_${id}`);
+      if (stored) {
+        const data = JSON.parse(stored);
+        const scripts = Array.isArray(data) ? data : [data];
+        const first = scripts[0];
+        if (first && first.shots) {
+          return first.shots.map((s: any, i: number) => ({
+            shotId: s.shotId || i + 1,
+            type: s.type || "hook",
+            duration: s.duration || 3,
+            description: s.description || "",
+            camera: s.camera || "",
+            visualSource: s.visualSource || "ai_generate",
+            transition: "ai_start_end",
+            voiceover: s.voiceover || "",
+            prompt: s.prompt || "",
+          }));
+        }
+      }
+    } catch {}
+    return initialShots;
+  };
+
+  const [shots, setShots] = useState<Shot[]>(getInitialShots);
 
   // 编辑弹窗
   const [editingShot, setEditingShot] = useState<Shot | null>(null);
