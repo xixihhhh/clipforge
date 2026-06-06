@@ -149,6 +149,33 @@ export default function VideoPage() {
     }
   };
 
+  // 下载合成视频（所有分镜合成的完整视频）
+  const [isDownloadingCompose, setIsDownloadingCompose] = useState(false);
+  const downloadComposedVideo = async () => {
+    const composedUrl = clips.find(c => c.status === 'done')?.url;
+    if (!composedUrl) {
+      alert('暂无合成视频');
+      return;
+    }
+    setIsDownloadingCompose(true);
+    try {
+      const res = await fetch(composedUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `合成视频_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(composedUrl, '_blank');
+    } finally {
+      setIsDownloadingCompose(false);
+    }
+  };
+
   // 逐分镜生成视频
   const startCompose = async () => {
     if (!llm.apiKey) return;
@@ -616,12 +643,31 @@ export default function VideoPage() {
               )}
 
               {composeDone && (
-                <Link href={`/project/${id}/export?videoUrl=${encodeURIComponent(clips.find(c => c.status === 'done')?.url || '')}`}>
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                <div className="space-y-2">
+                  <Button
+                    onClick={downloadComposedVideo}
+                    disabled={isDownloadingCompose}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {isDownloadingCompose ? (
+                      <>
+                        <LuLoader className="w-4 h-4 mr-2 animate-spin" />
+                        下载中...
+                      </>
+                    ) : (
+                      <>
+                        <LuDownload className="w-4 h-4 mr-2" />
+                        下载合成视频
+                      </>
+                    )}
+                  </Button>
+                  <Link href={`/project/${id}/export?videoUrl=${encodeURIComponent(clips.find(c => c.status === 'done')?.url || '')}`}>
+                    <Button className="w-full bg-secondary hover:bg-secondary/80">
                       下一步：导出视频
                       <LuArrowRight className="w-4 h-4 ml-1" />
                     </Button>
-                </Link>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
