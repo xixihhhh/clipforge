@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoader} from "react-icons/lu";
+import {LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoader, LuSave, LuEdit, LuCheck, LuX, LuTrash2} from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,11 @@ export default function ScriptPage() {
   const [selectedScript, setSelectedScript] = useState(0);
   const [scripts, setScripts] = useState(mockScripts);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingShot, setEditingShot] = useState<number | null>(null);
+  const [editDescriptions, setEditDescriptions] = useState<Record<number, string>>({});
+  const [editVoiceovers, setEditVoiceovers] = useState<Record<number, string>>({});
+  const [editScriptText, setEditScriptText] = useState("");
+  const [savedTip, setSavedTip] = useState(false);
 
   useEffect(() => {
     // 优先从 sessionStorage 读取生成的脚本（从新建页面跳转而来）
@@ -92,9 +97,75 @@ export default function ScriptPage() {
     } catch {}
     setScripts(mockScripts);
   }, [id]);
+
+  // 同步文案编辑textarea与当前脚本
+  useEffect(() => {
+    if (currentScript) {
+      setEditScriptText(currentScript.shots.map(s => s.voiceover).join("\n"));
+    }
+  }, [selectedScript, scripts]);
+
   const currentScript = scripts[Math.min(selectedScript, scripts.length - 1)];
 
-  // 模板相关状态
+  // ===== 编辑相关函数 =====
+  const startEditingShot = (shotId: number) => {
+    setEditingShot(shotId);
+    setEditDescriptions(prev => ({ ...prev, [shotId]: currentScript.shots.find(s => s.shotId === shotId)?.description || "" }));
+    setEditVoiceovers(prev => ({ ...prev, [shotId]: currentScript.shots.find(s => s.shotId === shotId)?.voiceover || "" }));
+  };
+
+  const cancelEditingShot = () => {
+    setEditingShot(null);
+    setEditDescriptions({});
+    setEditVoiceovers({});
+  };
+
+  const saveShotEdit = (shotId: number) => {
+    const desc = editDescriptions[shotId];
+    const voice = editVoiceovers[shotId];
+    if (!desc && !voice) {
+      cancelEditingShot();
+      return;
+    }
+    setScripts(prev => prev.map(script => ({
+      ...script,
+      shots: script.shots.map(shot =>
+        shot.shotId === shotId
+          ? { ...shot, description: desc, voiceover: voice }
+          : shot
+      )
+    })));
+    cancelEditingShot();
+    showSavedTip();
+  };
+
+  const showSavedTip = () => {
+    setSavedTip(true);
+    setTimeout(() => setSavedTip(false), 2000);
+  };
+
+  const saveAllScriptText = () => {
+    if (!currentScript) return;
+    const lines = editScriptText.split("\n").filter(l => l.trim());
+    setScripts(prev => prev.map((script, idx) => {
+      if (idx !== selectedScript) return script;
+      return {
+        ...script,
+        shots: script.shots.map((shot, i) => ({
+          ...shot,
+          voiceover: lines[i] || shot.voiceover
+        }))
+      };
+    }));
+    showSavedTip();
+  };
+
+  const saveEditedScript = () => {
+    sessionStorage.setItem(`scripts_${id}`, JSON.stringify(scripts));
+    showSavedTip();
+  };
+
+  // ===== 模板相关状态 =====
   const { addTemplate } = useTemplateStore();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
@@ -185,6 +256,10 @@ export default function ScriptPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold">脚本方案</h2>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="text-xs" onClick={saveEditedScript}>
+                  <LuSave className="w-3.5 h-3.5 mr-1" />
+                  保存编辑
+                </Button>
                 {savedTip && (
                   <span className="text-xs text-green-400 animate-in fade-in">已保存为模板</span>
                 )}
@@ -291,28 +366,70 @@ export default function ScriptPage() {
                             <div className="flex-1 p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1">
-                                  <p className="text-sm leading-relaxed mb-2">{shot.description}</p>
-                                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                      <LuClock className="w-3 h-3" />
-                                      {shot.camera}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                      {shot.visualSource === "product_image" ? "📷 商品原图" : shot.visualSource === "ai_generate" ? "✨ AI 生成" : "📁 用户上传"}
-                                    </span>
-                                  </div>
-                                </div>
-                                {/* 画面预览区 */}
-                                <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
-                                  {shot.visualSource === "product_image" ? (
-                                    <span className="text-[10px] text-muted-foreground">商品图</span>
+                                  {editingShot === shot.shotId ? (
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">画面描述</label>
+                                        <Textarea
+                                          value={editDescriptions[shot.shotId] || ""}
+                                          onChange={(e) => setEditDescriptions(prev => ({ ...prev, [shot.shotId]: e.target.value }))}
+                                          className="text-sm min-h-[60px]"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-muted-foreground mb-1 block">配音文案</label>
+                                        <Textarea
+                                          value={editVoiceovers[shot.shotId] || ""}
+                                          onChange={(e) => setEditVoiceovers(prev => ({ ...prev, [shot.shotId]: e.target.value }))}
+                                          className="text-sm min-h-[60px]"
+                                        />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button size="sm" onClick={() => saveShotEdit(shot.shotId)} className="text-xs bg-emerald-600 hover:bg-emerald-700">
+                                          <LuCheck className="w-3 h-3 mr-1" />
+                                          保存
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={cancelEditingShot} className="text-xs">
+                                          <LuX className="w-3 h-3 mr-1" />
+                                          取消
+                                        </Button>
+                                      </div>
+                                    </div>
                                   ) : (
-                                    <LuImage className="w-4 h-4 text-muted-foreground/40" />
+                                    <div className="space-y-2">
+                                      <p className="text-sm leading-relaxed">{shot.description}</p>
+                                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                          <LuClock className="w-3 h-3" />
+                                          {shot.camera}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          {shot.visualSource === "product_image" ? "📷 商品原图" : shot.visualSource === "ai_generate" ? "✨ AI 生成" : "📁 用户上传"}
+                                        </span>
+                                      </div>
+                                    </div>
                                   )}
+                                </div>
+                                {/* 编辑按钮和画面预览区 */}
+                                <div className="flex flex-col gap-2 shrink-0">
+                                  <button
+                                    onClick={() => startEditingShot(shot.shotId)}
+                                    className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                    title="编辑此分镜"
+                                  >
+                                    <LuEdit className="w-4 h-4" />
+                                  </button>
+                                  <div className="w-14 h-10 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
+                                    {shot.visualSource === "product_image" ? (
+                                      <span className="text-[8px] text-muted-foreground">商品图</span>
+                                    ) : (
+                                      <LuImage className="w-3 h-3 text-muted-foreground/40" />
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               {/* 配音文案 */}
-                              {shot.voiceover && (
+                              {shot.voiceover && editingShot !== shot.shotId && (
                                 <div className="mt-3 p-2.5 bg-muted/30 rounded-md">
                                   <p className="text-xs text-muted-foreground leading-relaxed">
                                     🎙 {shot.voiceover}
@@ -331,13 +448,20 @@ export default function ScriptPage() {
               <TabsContent value="text" className="mt-0">
                 <Card className="glass-card">
                   <CardContent className="p-6 space-y-4">
-                    <h3 className="font-medium text-sm mb-2">完整配音文案</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium text-sm">完整配音文案</h3>
+                      <Button size="sm" onClick={saveAllScriptText} className="text-xs bg-emerald-600 hover:bg-emerald-700">
+                        <LuSave className="w-3 h-3 mr-1" />
+                        保存文案
+                      </Button>
+                    </div>
                     <Textarea
+                      value={editScriptText}
+                      onChange={(e) => setEditScriptText(e.target.value)}
                       className="min-h-[300px] bg-background/50 text-sm leading-relaxed"
-                      defaultValue={currentScript?.shots.map((s) => s.voiceover).filter(Boolean).join("\n\n")}
                     />
                     <p className="text-xs text-muted-foreground">
-                      总字数：{currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0)} 字 ·
+                      总字数：{editScriptText.split("\n").filter(l => l.trim()).length} 行 ·
                       预计时长：{currentScript?.totalDuration}s ·
                       语速：约 {Math.round((currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0) || 0) / (currentScript?.totalDuration || 1) * 10) / 10} 字/秒
                     </p>
