@@ -605,9 +605,9 @@ export default function VideoPage() {
           className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setSelectedVideoUrl(null)}
         >
-          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-3xl w-full bg-black rounded-lg" onClick={(e) => e.stopPropagation()}>
             <button
-              className="absolute -top-10 right-0 text-white text-2xl hover:text-gray-300"
+              className="absolute -top-10 right-0 text-white text-2xl hover:text-gray-300 z-[101]"
               onClick={() => setSelectedVideoUrl(null)}
             >
               ✕
@@ -619,6 +619,49 @@ export default function VideoPage() {
               className="w-full rounded-lg"
               style={{ maxHeight: '80vh' }}
             />
+            {/* 下载按钮 */}
+            <div className="absolute bottom-4 right-4 flex gap-2 z-[101]">
+              <button
+                className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-white text-sm hover:bg-white/30 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const a = document.createElement('a');
+                  a.href = selectedVideoUrl;
+                  a.download = 'video-' + Date.now() + '.mp4';
+                  a.target = '_blank';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+              >
+                💾 下载视频
+              </button>
+              <button
+                className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-white text-sm hover:bg-white/30 transition-all"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const response = await fetch(selectedVideoUrl);
+                    const blob = await response.blob();
+                    if (navigator.share && navigator.canShare?.({ files: [new File([blob], 'video.mp4', { type: 'video/mp4' })] })) {
+                      await navigator.share({
+                        files: [new File([blob], 'video.mp4', { type: 'video/mp4' })],
+                        title: '分享视频',
+                      });
+                    } else {
+                      // 降级：打开新窗口
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                    }
+                  } catch (err) {
+                    console.error('保存失败:', err);
+                    window.open(selectedVideoUrl, '_blank');
+                  }
+                }}
+              >
+                📱 保存到相册
+              </button>
+            </div>
           </div>
         </div>
       )}
