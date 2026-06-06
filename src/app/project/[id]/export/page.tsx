@@ -48,6 +48,8 @@ const abVersions = [
   { id: "v3", name: "版本C - 悬念", hook: "预算投入深度测评商品，结果...", style: "悬念提问" },
 ]
 
+export const dynamic = 'force-dynamic'
+
 export default function ExportPage() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
