@@ -194,6 +194,37 @@ export default function VideoPage() {
       if (stored) productImage = stored;
     } catch {}
 
+    // 翻译prompt为英文
+    const translatePrompt = async (chinese: string): Promise<string> => {
+      if (!llm.apiKey) return chinese;
+      try {
+        const res = await fetch(`${llm.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${llm.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: llm.model || "qwen2.5-72b",
+            messages: [
+              { role: "system", content: "You are a professional video production prompt translator. Translate Chinese video generation prompts into detailed English. Only output the English prompt, no explanations. Include: camera angle, lighting, scene details, subject appearance, and movement. Make it visual and cinematic." },
+              { role: "user", content: chinese }
+            ],
+            max_tokens: 300,
+            temperature: 0.3,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const translated = data.choices?.[0]?.message?.content?.trim();
+          if (translated) return translated;
+        }
+      } catch {
+        // 翻译失败用原prompt
+      }
+      return chinese;
+    };
+
     try {
       const videoBaseUrl = (llm.baseUrl || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
       // 新接口 /agnesapi 固定使用根 URL，不走 /v1 前缀
@@ -204,11 +235,14 @@ export default function VideoPage() {
       for (let i = 0; i < clips.length; i++) {
         const clip = clips[i];
         // 组合 prompt：画面描述 + 镜头语言 + 配音文案
-        const clipPrompt = [
+        const chinesePrompt = [
           clip.description,
           clip.camera,
           clip.voiceover,
         ].filter(Boolean).join("，");
+        
+        // 翻译成英文让视频模型生成效果更好
+        const clipPrompt = chinesePrompt ? await translatePrompt(chinesePrompt) : chinesePrompt;
 
         // 标记当前分镜为生成中
         setClips((prev) =>
