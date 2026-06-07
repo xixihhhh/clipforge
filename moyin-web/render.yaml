@@ -1,3 +1,0 @@
-# 魔因漫创 - Render 部署配置
-# 将本文件放在 moyin-web/render.yaml
-# Render 上部署方式：新建一个 Web Service，指向 moyin-web 目录
