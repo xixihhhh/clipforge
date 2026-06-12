@@ -233,10 +233,16 @@ export async function POST(
       }
     }
 
+    // 背景音乐（可选）：本地路径转绝对路径，合成时混入并自动压低
+    const bgmLocal = body.bgmPath ? toLocalPath(body.bgmPath) : undefined;
+
     const config: ComposeConfig = {
       projectId: id,
       clips,
-      output: outputCfg,
+      output: {
+        ...outputCfg,
+        ...(bgmLocal && { bgmPath: bgmLocal, bgmVolume: 0.18 }),
+      },
       subtitle: subtitleTexts.length > 0 ? { texts: subtitleTexts, position: "bottom" } : undefined,
       overlays: overlays.length > 0 ? overlays : undefined,
     };

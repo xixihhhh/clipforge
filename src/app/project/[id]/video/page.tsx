@@ -87,6 +87,24 @@ export default function VideoPage() {
   const [composeDone, setComposeDone] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  // 背景音乐
+  const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
+  const [bgmUploading, setBgmUploading] = useState(false);
+  const uploadBgm = async (file: File) => {
+    setBgmUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/project/${id}/bgm`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "上传失败");
+      setBgm({ path: data.path, name: data.name });
+    } catch {
+      setBgm(null);
+    } finally {
+      setBgmUploading(false);
+    }
+  };
 
   // 载入真实分镜（已选脚本）+ 项目名 + 默认画面设置
   useEffect(() => {
@@ -168,6 +186,7 @@ export default function VideoPage() {
         body: JSON.stringify({
           resolution: config.resolution,
           aspectRatio: config.aspectRatio,
+          ...(bgm?.path && { bgmPath: bgm.path }),
           // 开启 TTS 时带上配音配置，合成会为每个分镜生成口播音轨
           ...(tts.enabled && tts.apiKey && tts.model && tts.voice && {
             ttsConfig: {
@@ -457,6 +476,21 @@ export default function VideoPage() {
 
             {/* 合成按钮 */}
             <div className="space-y-3">
+              {/* 背景音乐（可选，合成时混入并自动压低让位配音） */}
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">背景音乐（可选）</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{bgm ? `已选：${bgm.name}` : "上传 mp3，合成时自动压低让位配音"}</p>
+                </div>
+                <label className="shrink-0">
+                  <input type="file" accept="audio/*" className="hidden" disabled={isComposing || bgmUploading}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBgm(f); e.target.value = ""; }} />
+                  <span className={`inline-flex items-center h-8 px-3 rounded-md border border-border/60 text-xs cursor-pointer hover:border-primary/50 ${(isComposing || bgmUploading) ? "opacity-50 pointer-events-none" : ""}`}>
+                    {bgmUploading ? "上传中..." : bgm ? "更换" : "上传 BGM"}
+                  </span>
+                </label>
+              </div>
+
               {/* 合成进度 */}
               {(isComposing || composeDone) && (
                 <div>
