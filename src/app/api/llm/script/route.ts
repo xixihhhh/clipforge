@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
       platforms: body.platforms,
       usageAdvantage: body.usageAdvantage,
       targetAudience: body.targetAudience,
+      referenceStructure: body.referenceStructure,
       llmConfig,
     });
 

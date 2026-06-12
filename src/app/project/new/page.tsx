@@ -222,6 +222,16 @@ export default function NewProjectPage() {
         ? characters.find((c) => c.id === selectedCharacterId)
         : null;
 
+      // 套用模板：把选中模板的分镜结构拼成参考结构，让 AI 据此生成（真正消费模板，而非装饰）
+      const selectedTemplate = selectedTemplateId
+        ? templates.find((t) => t.id === selectedTemplateId)
+        : null;
+      const referenceStructure = selectedTemplate
+        ? selectedTemplate.shots
+            .map((s, i) => `${i + 1}. [${s.type}] ${s.duration}s ${s.camera ?? ""} 口播参考：「${s.voiceover ?? ""}」`)
+            .join("\n")
+        : undefined;
+
       const scriptRes = await fetch("/api/llm/script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -244,8 +254,9 @@ export default function NewProjectPage() {
           targetAudience: targetAudience.join(","),
           platforms: platforms.join(","),
           usageAdvantage,
-          // 传入选中的模板 ID
+          // 传入选中的模板 ID + 模板结构（让 AI 真正套用模板节奏）
           ...(selectedTemplateId && { templateId: selectedTemplateId }),
+          ...(referenceStructure && { referenceStructure }),
           ...(selectedCharacter && {
             character: {
               id: selectedCharacter.id,

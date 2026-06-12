@@ -409,6 +409,8 @@ export interface ScriptGenerationInput {
   videoMode?: "product_closeup" | "graphic_montage" | "scene_demo" | "live_presenter";
   /** 用户自定义要求 */
   customRequirements?: string;
+  /** 参考脚本结构（爆款模板的镜头节奏/类型/转化逻辑，用于"套用模板"生成） */
+  referenceStructure?: string;
   /** 出镜人物信息（仅 live_presenter 模式，用于注入 prompt 保持人物一致性） */
   character?: {
     id: string;
@@ -551,7 +553,11 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
 export function buildBatchPrompt(input: ScriptGenerationInput, count: number = 3): string {
   const basePrompt = buildUserPrompt(input);
 
-  return `${basePrompt}
+  const refBlock = input.referenceStructure
+    ? `\n\n【参考爆款结构】\n请参考以下经过验证的高转化分镜结构（镜头类型、节奏、转化逻辑），用本商品重新创作脚本（不要照搬文案，要贴合本商品卖点）：\n${input.referenceStructure}\n`
+    : "";
+
+  return `${basePrompt}${refBlock}
 
 【批量生成要求】
 请生成 ${count} 个不同风格/角度的脚本方案。每个方案的切入角度、开头策略、叙事节奏都要有明显差异。
