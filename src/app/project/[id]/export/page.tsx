@@ -113,6 +113,25 @@ export default function ExportPage() {
     };
   }, [composition?.url]);
 
+  // 多平台导出状态：platformId → { status, url }
+  const [platformExports, setPlatformExports] = useState<Record<string, { status: "idle" | "exporting" | "done" | "error"; url?: string }>>({});
+  const exportPlatform = async (platformId: string) => {
+    setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "exporting" } }));
+    try {
+      const res = await fetch(`/api/project/${id}/export-platform`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: platformId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "导出失败");
+      setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "done", url: data.url } }));
+    } catch (e) {
+      setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "error" } }));
+      showToast(e instanceof Error ? e.message : "导出失败");
+    }
+  };
+
   const handleCopyLink = async () => {
     if (!composition?.url) return;
     const full = `${window.location.origin}${composition.url}`;
@@ -279,36 +298,50 @@ export default function ExportPage() {
           </Button>
         </div>
 
-        {/* 多平台导出（规划中） */}
+        {/* 多平台导出（真实重编码） */}
         <Card className="glass-card mb-6">
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <LuSmartphone className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold">多平台导出</h3>
-              </div>
-              <Badge variant="secondary" className="text-xs">开发中</Badge>
+            <div className="flex items-center gap-2 mb-4">
+              <LuSmartphone className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold">多平台导出</h3>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">未来将一键生成适配各平台的视频版本（当前为规划展示）</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-60">
-              {platformConfigs.map(platform => (
-                <div key={platform.id} className="p-3 rounded-lg border border-border/50 bg-muted/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-6 h-6 rounded bg-gradient-to-br ${platform.color} flex items-center justify-center`}>
-                      <span className="text-[10px] text-white font-bold">{platform.name[0]}</span>
+            <p className="text-xs text-muted-foreground mb-4">一键重编码为各平台比例（模糊填充，不裁掉字幕/贴片）</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {platformConfigs.map(platform => {
+                const ex = platformExports[platform.id] ?? { status: "idle" as const };
+                return (
+                  <div key={platform.id} className="p-3 rounded-lg border border-border/50 bg-muted/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-6 h-6 rounded bg-gradient-to-br ${platform.color} flex items-center justify-center`}>
+                        <span className="text-[10px] text-white font-bold">{platform.name[0]}</span>
+                      </div>
+                      <span className="text-sm font-medium">{platform.name}</span>
                     </div>
-                    <span className="text-sm font-medium">{platform.name}</span>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>比例: {platform.ratio}</p>
+                      <p>分辨率: {platform.resolution}</p>
+                    </div>
+                    {ex.status === "done" && ex.url ? (
+                      <a href={`${ex.url}?download=1`} download>
+                        <Button variant="outline" size="sm" className="w-full mt-2 text-xs text-emerald-600">
+                          <LuDownload className="w-3 h-3 mr-1" />
+                          下载{platform.name}版
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2 text-xs"
+                        disabled={ex.status === "exporting"}
+                        onClick={() => exportPlatform(platform.id)}
+                      >
+                        {ex.status === "exporting" ? "导出中..." : ex.status === "error" ? "重试导出" : `导出${platform.name}版`}
+                      </Button>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5">
-                    <p>比例: {platform.ratio}</p>
-                    <p>分辨率: {platform.resolution}</p>
-                    <p>字幕: {platform.subtitle}</p>
-                  </div>
-                  <Button variant="outline" size="sm" disabled className="w-full mt-2 text-xs">
-                    敬请期待
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
