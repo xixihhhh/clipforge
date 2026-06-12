@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { join } from "path";
 import { existsSync } from "fs";
+import { mkdir, writeFile } from "fs/promises";
+import { generateSpeech, type TTSConfig } from "@/lib/tts";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -101,6 +103,28 @@ export async function POST(
       if (a.filePath) assetByShot.set(a.shotId, a.filePath);
     }
 
+    // 可选 TTS 配音配置（前端从设置带入）
+    const ttsConfig: TTSConfig | undefined =
+      body.ttsConfig?.baseUrl && body.ttsConfig?.apiKey && body.ttsConfig?.model && body.ttsConfig?.voice
+        ? body.ttsConfig
+        : undefined;
+    const ttsDir = join(process.cwd(), "data", "uploads", id, "tts");
+    if (ttsConfig) await mkdir(ttsDir, { recursive: true });
+
+    /** 为某分镜生成配音并落地为本地 mp3，返回绝对路径；失败返回 undefined（不阻断合成） */
+    async function buildVoiceover(shotId: number, text: string): Promise<string | undefined> {
+      if (!ttsConfig || !text) return undefined;
+      try {
+        const audio = await generateSpeech(text, ttsConfig);
+        const file = join(ttsDir, `shot-${shotId}.mp3`);
+        await writeFile(file, audio);
+        return file;
+      } catch (e) {
+        console.warn(`分镜 ${shotId} 配音生成失败（已跳过）:`, e);
+        return undefined;
+      }
+    }
+
     // 为每个分镜构建一个 image+motion 片段（用静态素材 + 运镜，避免 AI 篡改商品）
     const clips: ClipInput[] = [];
     const missing: number[] = [];
@@ -112,12 +136,14 @@ export async function POST(
         missing.push(shot.shotId);
         continue;
       }
+      const audioPath = shot.voiceover ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
       clips.push({
         type: "image",
         filePath: local,
         duration: shot.duration || 3,
         transition: shot.transition || "ai_start_end",
         motion: defaultMotion(shot),
+        ...(audioPath && { audioPath }),
       });
     }
 

@@ -79,6 +79,8 @@ export interface ClipInput {
   motion?: string; // 仅 image 类型，运动效果
   /** 该片段是否包含原生音频（模型生成的带配音视频） */
   hasAudio?: boolean;
+  /** 该片段的配音音频文件路径（TTS 生成）。会按片段时长对齐（不足补静音、超出截断） */
+  audioPath?: string;
 }
 
 // 分辨率映射
@@ -97,8 +99,10 @@ export function buildComposeCommand(config: ComposeConfig): string {
   const inputs: string[] = [];
   const filterParts: string[] = [];
 
-  // 判断是否有任何片段带音频
-  const hasAnyAudio = config.clips.some((c) => c.hasAudio);
+  // 判断是否有任何片段带音频（原生音频 或 TTS 配音）
+  const hasAnyAudio = config.clips.some(
+    (c) => (c.hasAudio && c.type === "video") || c.audioPath
+  );
 
   // 处理每个片段
   config.clips.forEach((clip, i) => {
@@ -117,11 +121,18 @@ export function buildComposeCommand(config: ComposeConfig): string {
     }
   });
 
-  // 音频处理：有原生音频的片段提取音轨，无音频的生成静音
+  // 音频处理：TTS 配音 > 视频原生音频 > 静音；每段都按片段时长对齐，保证音画同步
   const audioParts: string[] = [];
   if (hasAnyAudio) {
     config.clips.forEach((clip, i) => {
-      if (clip.hasAudio && clip.type === "video") {
+      if (clip.audioPath) {
+        // TTS 配音：作为额外输入加入，按片段时长补静音/截断对齐
+        const ai = inputs.length;
+        inputs.push(`-i "${escapeShellPath(clip.audioPath)}"`);
+        audioParts.push(
+          `[${ai}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`
+        );
+      } else if (clip.hasAudio && clip.type === "video") {
         // 提取该片段的原生音轨
         audioParts.push(`[${i}:a]asetpts=PTS-STARTPTS[a${i}]`);
       } else {
@@ -164,7 +175,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
 
   // BGM 混音：叠加在片段音频之上
   if (config.output.bgmPath) {
-    const bgmIndex = config.clips.length; // BGM 作为最后一个输入
+    const bgmIndex = inputs.length; // 动态取当前输入数（TTS 音频可能已占用若干输入）
     inputs.push(`-i "${escapeShellPath(config.output.bgmPath)}"`);
     const vol = config.output.bgmVolume ?? 0.3;
 

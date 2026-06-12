@@ -191,17 +191,38 @@ export default function SettingsPage() {
   const {
     providers,
     llm,
+    tts,
     defaultResolution,
     defaultAspectRatio,
     defaultImageModel,
     defaultVideoModel,
     setProvider,
     setLLM,
+    setTTS,
     setDefaultResolution,
     setDefaultAspectRatio,
     setDefaultImageModel,
     setDefaultVideoModel,
   } = useSettingsStore();
+
+  // TTS 试听状态
+  const [ttsTestStatus, setTtsTestStatus] = useState<"idle" | "testing" | "error">("idle");
+  const testTTS = async () => {
+    setTtsTestStatus("testing");
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "这款产品真的太好用了，赶紧下单试试吧！", ttsConfig: tts }),
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      new Audio(URL.createObjectURL(blob)).play();
+      setTtsTestStatus("idle");
+    } catch {
+      setTtsTestStatus("error");
+    }
+  };
 
   // 保存时的提示状态
   const [saved, setSaved] = useState(false);
@@ -549,6 +570,77 @@ export default function SettingsPage() {
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Separator />
+
+              {/* TTS 配音 */}
+              <Card className="glass-card">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 text-white">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          <line x1="12" y1="19" x2="12" y2="22" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">配音 TTS</h3>
+                        <p className="text-xs text-muted-foreground">开启后合成会为每个分镜生成口播配音（OpenAI 兼容 /audio/speech）</p>
+                      </div>
+                    </div>
+                    <Toggle checked={tts.enabled} onChange={(v) => setTTS({ ...tts, enabled: v })} />
+                  </div>
+
+                  {tts.enabled && (
+                    <div className="space-y-4">
+                      {/* 快捷预设 */}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">快捷预设（点击填入 baseUrl 和模型，还需填 API Key）：</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: "硅基流动 CosyVoice", baseUrl: "https://api.siliconflow.cn/v1", model: "FunAudioLLM/CosyVoice2-0.5B", voice: "FunAudioLLM/CosyVoice2-0.5B:alex" },
+                            { label: "OpenAI tts-1", baseUrl: "https://api.openai.com/v1", model: "tts-1", voice: "alloy" },
+                            { label: "火山方舟", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-tts", voice: "zh_female_cancan" },
+                          ].map((p) => (
+                            <button
+                              key={p.label}
+                              onClick={() => setTTS({ ...tts, baseUrl: p.baseUrl, model: p.model, voice: p.voice })}
+                              className="px-2.5 h-7 rounded-md border border-border/60 bg-muted/20 text-xs hover:border-primary/50 hover:text-primary transition-colors"
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
+                        <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder="https://api.siliconflow.cn/v1" className="font-mono text-xs" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">API Key</Label>
+                        <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 TTS API Key" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">模型</Label>
+                          <Input value={tts.model} onChange={(e) => setTTS({ ...tts, model: e.target.value })} placeholder="tts-1" className="font-mono text-xs" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">音色 voice</Label>
+                          <Input value={tts.voice} onChange={(e) => setTTS({ ...tts, voice: e.target.value })} placeholder="alloy" className="font-mono text-xs" />
+                        </div>
+                      </div>
+                      <div className="pt-3 mt-1 border-t border-border/50">
+                        <Button variant="outline" size="sm" onClick={testTTS} disabled={!tts.apiKey || !tts.baseUrl || !tts.model || !tts.voice || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
+                          {ttsTestStatus === "testing" ? "合成中..." : ttsTestStatus === "error" ? "试听失败 ✗" : "🔊 试听音色"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

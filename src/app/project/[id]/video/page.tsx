@@ -66,7 +66,7 @@ interface DbShot {
 
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>();
-  const { defaultResolution, defaultAspectRatio } = useSettingsStore();
+  const { defaultResolution, defaultAspectRatio, tts } = useSettingsStore();
   const [clips, setClips] = useState<VideoClipItem[]>([]);
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -164,7 +164,20 @@ export default function VideoPage() {
       const res = await fetch(`/api/project/${id}/compose`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resolution: config.resolution, aspectRatio: config.aspectRatio }),
+        body: JSON.stringify({
+          resolution: config.resolution,
+          aspectRatio: config.aspectRatio,
+          // 开启 TTS 时带上配音配置，合成会为每个分镜生成口播音轨
+          ...(tts.enabled && tts.apiKey && tts.model && tts.voice && {
+            ttsConfig: {
+              baseUrl: tts.baseUrl,
+              apiKey: tts.apiKey,
+              model: tts.model,
+              voice: tts.voice,
+              speed: tts.speed,
+            },
+          }),
+        }),
       });
       const data = await res.json();
       clearInterval(timer);
