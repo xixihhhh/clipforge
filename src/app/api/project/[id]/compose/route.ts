@@ -115,7 +115,7 @@ export async function POST(
     // 执行合成（FFmpeg）
     const outputPath = await composeVideo(config);
     const fileName = outputPath.split("/").pop() ?? "";
-    const publicUrl = `/api/files/../output/${id}/${fileName}`;
+    const publicUrl = `/api/output/${id}/${fileName}`;
 
     // 落库合成记录 + 更新项目状态
     await db.insert(compositions).values({

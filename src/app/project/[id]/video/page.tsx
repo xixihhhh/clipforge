@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight } from "react-icons/lu";
+import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight, LuLoaderCircle } from "react-icons/lu";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,18 +56,21 @@ const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
   cta: { label: "转化", color: "bg-amber-500/20 text-amber-400" },
 };
 
-// 模拟视频片段数据
-const initialClips: VideoClipItem[] = [
-  { shotId: 1, type: "hook", duration: 3, voiceover: "你还在用一擦就烂的纸巾？", transition: "ai_start_end" },
-  { shotId: 2, type: "pain_point", duration: 4, voiceover: "普通纸巾一沾水就烂，擦个嘴满脸纸屑", transition: "ai_start_end" },
-  { shotId: 3, type: "product_reveal", duration: 3, voiceover: "直到我发现了德宝", transition: "ai_start_end" },
-  { shotId: 4, type: "demo", duration: 5, voiceover: "湿水都不破！拉扯都不会烂", transition: "ai_start_end" },
-  { shotId: 5, type: "cta", duration: 3, voiceover: "限时特价！赶紧去抢！", transition: "direct_concat" },
-];
+interface DbShot {
+  shotId: number;
+  type: VideoClipItem["type"];
+  duration: number;
+  voiceover: string;
+  transition: VideoClipItem["transition"];
+}
 
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>();
-  const [clips, setClips] = useState<VideoClipItem[]>(initialClips);
+  const { defaultResolution, defaultAspectRatio } = useSettingsStore();
+  const [clips, setClips] = useState<VideoClipItem[]>([]);
+  const [projectName, setProjectName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [config, setConfig] = useState<ComposeConfig>({
     ttsEnabled: true,
     ttsVoice: "female-gentle",
@@ -81,6 +85,56 @@ export default function VideoPage() {
   const [isComposing, setIsComposing] = useState(false);
   const [composeProgress, setComposeProgress] = useState(0);
   const [composeDone, setComposeDone] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+
+  // 载入真实分镜（已选脚本）+ 项目名 + 默认画面设置
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [projectRes, scriptsRes] = await Promise.all([
+          fetch(`/api/project/${id}`),
+          fetch(`/api/project/${id}/scripts`),
+        ]);
+        const project = projectRes.ok ? await projectRes.json() : null;
+        const scripts = scriptsRes.ok ? await scriptsRes.json() : [];
+        if (cancelled) return;
+        if (project) setProjectName(project.name ?? project.productName ?? "");
+        const selected = Array.isArray(scripts)
+          ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
+          : null;
+        if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
+          setLoadError("尚未生成脚本，请先完成脚本与素材步骤");
+          setClips([]);
+        } else {
+          setClips(
+            (selected.shots as DbShot[]).map((s) => ({
+              shotId: s.shotId,
+              type: s.type,
+              duration: s.duration,
+              voiceover: s.voiceover ?? "",
+              transition: s.transition ?? "ai_start_end",
+            }))
+          );
+        }
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "加载失败");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // 用设置里的默认分辨率/比例初始化一次
+  useEffect(() => {
+    setConfig((c) => ({ ...c, resolution: defaultResolution, aspectRatio: defaultAspectRatio }));
+  }, [defaultResolution, defaultAspectRatio]);
 
   const totalDuration = clips.reduce((sum, c) => sum + c.duration, 0);
 
@@ -93,22 +147,38 @@ export default function VideoPage() {
     );
   };
 
-  // 模拟合成过程
-  const startCompose = () => {
+  // 真实合成：调用 compose API 跑 FFmpeg，配乐观进度动画，完成后拿到真实 mp4
+  const startCompose = async () => {
     setIsComposing(true);
+    setComposeError(null);
+    setComposeDone(false);
+    setOutputUrl(null);
     setComposeProgress(0);
 
-    const interval = setInterval(() => {
-      setComposeProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsComposing(false);
-          setComposeDone(true);
-          return 100;
-        }
-        return prev + 2;
+    // 乐观进度：先爬到 90%，等真实结果回来再到 100%
+    const timer = setInterval(() => {
+      setComposeProgress((prev) => (prev >= 90 ? 90 : prev + 3));
+    }, 200);
+
+    try {
+      const res = await fetch(`/api/project/${id}/compose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution: config.resolution, aspectRatio: config.aspectRatio }),
       });
-    }, 100);
+      const data = await res.json();
+      clearInterval(timer);
+      if (!res.ok) throw new Error(data.error || "合成失败");
+      setComposeProgress(100);
+      setOutputUrl(data.url ?? null);
+      setComposeDone(true);
+    } catch (e) {
+      clearInterval(timer);
+      setComposeError(e instanceof Error ? e.message : "合成失败");
+      setComposeProgress(0);
+    } finally {
+      setIsComposing(false);
+    }
   };
 
   return (
@@ -127,7 +197,7 @@ export default function VideoPage() {
               <span className="text-lg font-bold tracking-tight">带货剪手</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>
+            <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
           </div>
 
           {/* 步骤进度 */}
@@ -361,17 +431,29 @@ export default function VideoPage() {
                 </div>
               )}
 
+              {/* 合成失败提示 */}
+              {composeError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs text-destructive">⚠ {composeError}</p>
+                </div>
+              )}
+
+              {/* 成片预览 */}
+              {composeDone && outputUrl && (
+                <div className="rounded-lg overflow-hidden border border-border/50 bg-black">
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video src={outputUrl} controls className="w-full max-h-[360px]" />
+                </div>
+              )}
+
               <Button
                 onClick={startCompose}
-                disabled={isComposing}
+                disabled={isComposing || clips.length === 0}
                 className="w-full brand-gradient text-white"
               >
                 {isComposing ? (
                   <>
-                    <svg className="animate-spin mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                    <LuLoaderCircle className="animate-spin mr-2 h-4 w-4" />
                     合成中...
                   </>
                 ) : composeDone ? (
@@ -384,13 +466,18 @@ export default function VideoPage() {
                 )}
               </Button>
 
-              {composeDone && (
-                <Link href={`/project/${id}/export`}>
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                    下一步：导出视频
-                    <LuArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
+              {composeDone && outputUrl && (
+                <>
+                  <a href={`${outputUrl}?download=1`} download>
+                    <Button variant="outline" className="w-full">下载视频</Button>
+                  </a>
+                  <Link href={`/project/${id}/export`}>
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                      下一步：导出视频
+                      <LuArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </>
               )}
             </div>
           </div>
