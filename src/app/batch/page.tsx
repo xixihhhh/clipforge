@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   LuArrowLeft,
@@ -17,15 +17,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-
-// 模拟商品数据
-const mockProducts = [
-  { id: "p1", name: "德宝纸巾", category: "home", image: "" },
-  { id: "p2", name: "小米手环8", category: "tech", image: "" },
-  { id: "p3", name: "完美日记唇釉", category: "beauty", image: "" },
-  { id: "p4", name: "三只松鼠坚果", category: "food", image: "" },
-  { id: "p5", name: "优衣库联名T恤", category: "fashion", image: "" },
-];
+import { useProductLibraryStore } from "@/lib/stores/product-library-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // 视频模式选项
 const videoModeOptions = [
@@ -58,6 +51,16 @@ const categoryLabels: Record<string, string> = {
   beauty: "美妆护肤",
   food: "食品零食",
   fashion: "服饰鞋包",
+  other: "其他",
+};
+
+// 脚本风格值 → 后端 styleType 规范化
+const styleTypeMap: Record<string, string> = {
+  "pain-point": "pain_point",
+  scenario: "scene",
+  comparison: "comparison",
+  story: "story",
+  auto: "auto",
 };
 
 // 批量任务状态
@@ -67,6 +70,8 @@ interface BatchTask {
   id: string;
   productName: string;
   status: TaskStatus;
+  projectId?: string; // 生成成功后的项目 ID，用于跳转
+  error?: string;
 }
 
 // 任务状态标签
@@ -86,6 +91,12 @@ const statusColors: Record<TaskStatus, string> = {
 };
 
 export default function BatchPage() {
+  // 真实商品库 + LLM 配置
+  const { products, incrementVideoCount } = useProductLibraryStore();
+  const { llm } = useSettingsStore();
+  // 避免 SSR/水合不一致：挂载后再渲染列表
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   // 商品选择状态
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   // 配置状态
@@ -112,50 +123,103 @@ export default function BatchPage() {
     });
   }, []);
 
-  // 开始批量生成
+  // 配置缺失提示
+  const [configError, setConfigError] = useState("");
+
+  // 开始批量生成（真实：逐个创建项目 + 生成脚本，复用单品流程）
   const handleStartBatch = useCallback(async () => {
     if (selectedProducts.size === 0 || isGenerating) return;
+    if (!llm.apiKey) {
+      setConfigError("尚未配置 LLM，请先到「设置」填写 API Key");
+      return;
+    }
+    setConfigError("");
 
     abortRef.current = false;
     setIsGenerating(true);
     setIsComplete(false);
 
-    // 初始化任务列表
-    const tasks: BatchTask[] = Array.from(selectedProducts).map((id) => {
-      const product = mockProducts.find((p) => p.id === id);
-      return {
-        id,
-        productName: product?.name || "未知商品",
-        status: "pending" as TaskStatus,
-      };
-    });
+    const selected = products.filter((p) => selectedProducts.has(p.id));
+    const tasks: BatchTask[] = selected.map((p) => ({
+      id: p.id,
+      productName: p.name,
+      status: "pending" as TaskStatus,
+    }));
     setBatchTasks(tasks);
 
-    // 逐个生成，每个间隔 2 秒
-    for (let i = 0; i < tasks.length; i++) {
+    for (let i = 0; i < selected.length; i++) {
       if (abortRef.current) break;
+      const product = selected[i];
 
-      // 标记当前任务为生成中
       setBatchTasks((prev) =>
         prev.map((t, idx) => (idx === i ? { ...t, status: "generating" } : t))
       );
 
-      // 模拟生成耗时 2 秒
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        // 1) 创建项目
+        const projRes = await fetch("/api/project", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: `${product.name} 推广`,
+            productName: product.name,
+            productCategory: product.category,
+            productDescription: product.description ?? "",
+            productImages: product.images ?? [],
+            videoMode,
+          }),
+        });
+        if (!projRes.ok) throw new Error("项目创建失败");
+        const project = await projRes.json();
 
-      if (abortRef.current) break;
+        // 2) 生成脚本
+        const scriptRes = await fetch("/api/llm/script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: project.id,
+            productName: product.name,
+            category: product.category,
+            productDescription: product.description ?? "",
+            targetDuration: parseInt(duration),
+            styleType: styleTypeMap[scriptStyle] ?? "auto",
+            videoMode,
+            productImages: product.images ?? [],
+            llmConfig: {
+              baseUrl: llm.baseUrl,
+              apiKey: llm.apiKey,
+              model: llm.model,
+              visionModel: llm.visionModel,
+            },
+          }),
+        });
+        if (!scriptRes.ok) {
+          const e = await scriptRes.json().catch(() => ({}));
+          throw new Error(e.error || "脚本生成失败");
+        }
 
-      // 标记当前任务为已完成
-      setBatchTasks((prev) =>
-        prev.map((t, idx) => (idx === i ? { ...t, status: "done" } : t))
-      );
+        incrementVideoCount(product.id);
+        setBatchTasks((prev) =>
+          prev.map((t, idx) =>
+            idx === i ? { ...t, status: "done", projectId: project.id } : t
+          )
+        );
+      } catch (err) {
+        setBatchTasks((prev) =>
+          prev.map((t, idx) =>
+            idx === i
+              ? { ...t, status: "failed", error: err instanceof Error ? err.message : "生成失败" }
+              : t
+          )
+        );
+      }
     }
 
     if (!abortRef.current) {
       setIsComplete(true);
     }
     setIsGenerating(false);
-  }, [selectedProducts, isGenerating]);
+  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, incrementVideoCount]);
 
   // 已完成的任务数量
   const doneCount = batchTasks.filter((t) => t.status === "done").length;
@@ -211,11 +275,11 @@ export default function BatchPage() {
                   <span className="text-destructive ml-0.5">*</span>
                 </Label>
                 <span className="text-xs text-muted-foreground">
-                  已选 {selectedProducts.size}/{mockProducts.length} 个商品
+                  已选 {selectedProducts.size}/{products.length} 个商品
                 </span>
               </div>
 
-              {mockProducts.length === 0 ? (
+              {!mounted ? null : products.length === 0 ? (
                 /* 商品库为空的提示 */
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
@@ -233,7 +297,7 @@ export default function BatchPage() {
               ) : (
                 /* 商品列表（多选） */
                 <div className="space-y-2">
-                  {mockProducts.map((product) => {
+                  {products.map((product) => {
                     const isSelected = selectedProducts.has(product.id);
                     return (
                       <button
@@ -404,21 +468,33 @@ export default function BatchPage() {
                       key={task.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/30"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-muted/30 flex items-center justify-center">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded bg-muted/30 flex items-center justify-center shrink-0">
                           <LuPackage className="w-4 h-4 text-muted-foreground" />
                         </div>
-                        <span className="text-sm">{task.productName}</span>
+                        <div className="min-w-0">
+                          <span className="text-sm block truncate">{task.productName}</span>
+                          {task.status === "failed" && task.error && (
+                            <span className="text-xs text-red-400">{task.error}</span>
+                          )}
+                        </div>
                       </div>
-                      <Badge className={statusColors[task.status]}>
-                        {task.status === "generating" && (
-                          <LuLoader className="w-3 h-3 mr-1 animate-spin" />
+                      <div className="flex items-center gap-2 shrink-0">
+                        {task.status === "done" && task.projectId && (
+                          <Link href={`/project/${task.projectId}/script`}>
+                            <Button variant="outline" size="sm" className="text-xs h-7">查看</Button>
+                          </Link>
                         )}
-                        {task.status === "done" && (
-                          <LuCheck className="w-3 h-3 mr-1" />
-                        )}
-                        {statusLabels[task.status]}
-                      </Badge>
+                        <Badge className={statusColors[task.status]}>
+                          {task.status === "generating" && (
+                            <LuLoader className="w-3 h-3 mr-1 animate-spin" />
+                          )}
+                          {task.status === "done" && (
+                            <LuCheck className="w-3 h-3 mr-1" />
+                          )}
+                          {statusLabels[task.status]}
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -437,6 +513,9 @@ export default function BatchPage() {
 
           {/* 底部操作栏 */}
           <div className="pt-2 pb-10">
+            {configError && (
+              <p className="text-sm text-destructive text-center mb-3">{configError}</p>
+            )}
             <Button
               onClick={handleStartBatch}
               disabled={selectedProducts.size === 0 || isGenerating}
