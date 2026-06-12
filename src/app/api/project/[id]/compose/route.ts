@@ -111,6 +111,21 @@ export async function POST(
     const ttsDir = join(process.cwd(), "data", "uploads", id, "tts");
     if (ttsConfig) await mkdir(ttsDir, { recursive: true });
 
+    /** 探测视频文件是否带音轨（自带语音/音效的视频模型产出） */
+    async function videoHasAudio(filePath: string): Promise<boolean> {
+      try {
+        const { exec } = await import("child_process");
+        const { promisify } = await import("util");
+        const execAsync = promisify(exec);
+        const { stdout } = await execAsync(
+          `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${filePath}"`
+        );
+        return stdout.trim().length > 0;
+      } catch {
+        return false;
+      }
+    }
+
     /** 为某分镜生成配音并落地为本地 mp3，返回绝对路径；失败返回 undefined（不阻断合成） */
     async function buildVoiceover(shotId: number, text: string): Promise<string | undefined> {
       if (!ttsConfig || !text) return undefined;
@@ -136,13 +151,19 @@ export async function POST(
         missing.push(shot.shotId);
         continue;
       }
-      const audioPath = shot.voiceover ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
+      // 视频素材 vs 静态图：视频自带音轨时用模型原生语音，不再叠 TTS（避免双重声音）
+      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(local);
+      const nativeAudio = isVideo ? await videoHasAudio(local) : false;
+      // 仅静态图、或无音轨的视频，才生成 TTS 配音
+      const audioPath =
+        shot.voiceover && !nativeAudio ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
+
       clips.push({
-        type: "image",
+        type: isVideo ? "video" : "image",
         filePath: local,
         duration: shot.duration || 3,
         transition: shot.transition || "ai_start_end",
-        motion: defaultMotion(shot),
+        ...(isVideo ? { hasAudio: nativeAudio } : { motion: defaultMotion(shot) }),
         ...(audioPath && { audioPath }),
       });
     }

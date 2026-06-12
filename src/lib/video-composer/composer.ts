@@ -122,9 +122,9 @@ export function buildComposeCommand(config: ComposeConfig): string {
       // 因此先 trim 取首帧，再用 zoompan 的 d=duration*fps 控制总输出帧数。
       filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},setpts=PTS-STARTPTS[v${i}]`);
     } else {
-      // 视频片段
+      // 视频片段：缩放铺满 + 按分镜时长裁剪，保证与音轨/字幕时间轴对齐
       inputs.push(`-i "${escapeShellPath(clip.filePath)}"`);
-      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setpts=PTS-STARTPTS[v${i}]`);
+      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30,trim=duration=${clip.duration},setpts=PTS-STARTPTS[v${i}]`);
     }
   });
 
@@ -140,8 +140,8 @@ export function buildComposeCommand(config: ComposeConfig): string {
           `[${ai}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`
         );
       } else if (clip.hasAudio && clip.type === "video") {
-        // 提取该片段的原生音轨
-        audioParts.push(`[${i}:a]asetpts=PTS-STARTPTS[a${i}]`);
+        // 提取该片段的原生音轨（模型自带语音/音效），按分镜时长补齐/裁剪对齐
+        audioParts.push(`[${i}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`);
       } else {
         // 生成等时长的静音音轨（使用 lavfi 虚拟输入）
         audioParts.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`);

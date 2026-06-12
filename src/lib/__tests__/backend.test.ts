@@ -147,9 +147,25 @@ describe("buildComposeCommand", () => {
       ],
     };
     const cmd = buildComposeCommand(config);
-    // 第一个片段有音频，应提取音轨
-    expect(cmd).toContain("[0:a]asetpts=PTS-STARTPTS[a0]");
+    // 第一个片段有原生音频，应提取并按时长对齐
+    expect(cmd).toContain("[0:a]aresample=44100,apad,atrim=duration=3,asetpts=PTS-STARTPTS[a0]");
     // 第二个片段无音频，应生成静音
+    expect(cmd).toContain("anullsrc");
+  });
+
+  it("TTS 配音片段优先于原生音频，作为额外输入按时长对齐", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      clips: [
+        { type: "image", filePath: "/data/img1.jpg", duration: 4, transition: "direct_concat", motion: "static", audioPath: "/data/tts1.mp3" },
+        { type: "image", filePath: "/data/img2.jpg", duration: 3, transition: "direct_concat", motion: "static" },
+      ],
+    };
+    const cmd = buildComposeCommand(config);
+    // TTS 音频作为额外输入（索引 2，排在两个图片输入之后），apad/atrim 对齐到 4s
+    expect(cmd).toContain('-i "/data/tts1.mp3"');
+    expect(cmd).toContain("apad,atrim=duration=4");
+    // 第二个无配音片段生成静音
     expect(cmd).toContain("anullsrc");
   });
 
