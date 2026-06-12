@@ -32,6 +32,9 @@ export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
     label: "AI 智能过渡",
     description: "提取前一片段最后一帧和后一片段首帧，用 AI 生成自然转场视频",
     supportedModels: [
+      // Seedance 2.0（支持首帧 image + 尾帧 last_image）
+      "bytedance/seedance-2.0/image-to-video",
+      "bytedance/seedance-2.0-fast/image-to-video",
       // Vidu Q3 系列
       "vidu/q3-pro/start-end-to-video",
       "vidu/q3-turbo/start-end-to-video",
@@ -55,6 +58,9 @@ export const TRANSITIONS: Record<TransitionMode, TransitionConfig> = {
       // Vidu
       "vidu/reference-to-video-q1",
       "vidu/reference-to-video-2.0",
+      // Seedance 2.0（多模态参考生视频）
+      "bytedance/seedance-2.0/reference-to-video",
+      "bytedance/seedance-2.0-fast/reference-to-video",
       // Seedance v1.5
       "bytedance/seedance-v1.5-pro/image-to-video",
       // Wan 2.6
