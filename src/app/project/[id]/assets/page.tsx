@@ -41,12 +41,29 @@ interface ImageModelTarget {
   baseUrl?: string;
 }
 
+// 会"展示商品"的分镜类型：开启商品保真时，这些 AI 分镜走 image-to-image（用商品图重绘，锁定主体）
+const PRODUCT_SHOT_TYPES = new Set(["product_reveal", "demo", "cta"]);
+
+// 把文生图模型映射到对应的编辑/图生图变体（商品保真重绘）
+function toEditVariant(modelId: string): string {
+  if (modelId === "openai/gpt-image-2") return "openai/gpt-image-2/image-to-image";
+  if (modelId === "fal-ai/gpt-image-1.5") return "fal-ai/gpt-image-1.5/edit";
+  // Replicate FLUX 文生图 → Kontext 编辑模型
+  if (modelId.startsWith("black-forest-labs/flux") && !modelId.includes("kontext")) {
+    return "black-forest-labs/flux-kontext-pro";
+  }
+  // 其余模型（Seedream/通义万相等）多数原生支持参考图 image-to-image，沿用原模型
+  return modelId;
+}
+
 export default function AssetsPage() {
   const { id } = useParams<{ id: string }>();
   const { providers, defaultImageModel } = useSettingsStore();
 
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [productImages, setProductImages] = useState<string[]>([]);
+  // 商品保真：AI 生成展示商品的分镜时，用商品原图作参考重绘，避免 AI 篡改商品（带货命门）
+  const [productSafe, setProductSafe] = useState(true);
   const [projectName, setProjectName] = useState("");
   const [modelTarget, setModelTarget] = useState<ImageModelTarget | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,17 +216,28 @@ export default function AssetsPage() {
 
       setAssets((prev) => prev.map((a) => (a.shotId === shotId ? { ...a, status: "generating", error: undefined } : a)));
 
+      // 商品保真：展示商品的 AI 分镜 + 有商品图 + 开关开 → 用商品图重绘（image-to-image，锁定商品主体）
+      const useProductSafe =
+        productSafe && !!productImages[0] && PRODUCT_SHOT_TYPES.has(asset.type);
+      const genModel = useProductSafe ? toEditVariant(modelTarget.model) : modelTarget.model;
+      const genMode = useProductSafe ? "image-to-image" : "text-to-image";
+      const basePrompt = asset.prompt || asset.description;
+      const genPrompt = useProductSafe
+        ? `${basePrompt}。严格保持商品的外观、包装、颜色、logo 和文字完全不变，只重绘符合描述的场景、背景与光线。`
+        : basePrompt;
+
       try {
         const res = await fetch("/api/ai/image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             provider: modelTarget.provider,
-            model: modelTarget.model,
+            model: genModel,
             apiKey: modelTarget.apiKey,
             baseUrl: modelTarget.baseUrl,
-            mode: "text-to-image",
-            prompt: asset.prompt || asset.description,
+            mode: genMode,
+            prompt: genPrompt,
+            ...(useProductSafe && { imageUrl: productImages[0] }),
           }),
         });
         const data = await res.json();
@@ -224,7 +252,7 @@ export default function AssetsPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               shotId, type: "ai_generate", sourceUrl: url,
-              prompt: asset.prompt, provider: modelTarget.provider, model: modelTarget.model,
+              prompt: asset.prompt, provider: modelTarget.provider, model: genModel,
             }),
           });
           if (saveRes.ok) {
@@ -245,7 +273,7 @@ export default function AssetsPage() {
         );
       }
     },
-    [assets, modelTarget, productImages]
+    [assets, modelTarget, productImages, productSafe]
   );
 
   // 一键全部生成（串行，避免并发打满平台限流）
@@ -305,6 +333,21 @@ export default function AssetsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {productImages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setProductSafe((v) => !v)}
+                title="展示商品的 AI 分镜将用你的商品图重绘，锁定商品外观，避免 AI 篡改"
+                className={`flex items-center gap-1.5 rounded-full border px-3 h-8 text-xs font-medium transition-all ${
+                  productSafe
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/60 bg-muted/20 text-muted-foreground"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${productSafe ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                商品保真{productSafe ? "·开" : "·关"}
+              </button>
+            )}
             <Link href={`/project/${id}/script`}>
               <Button variant="outline" size="sm" className="text-xs">
                 <LuArrowLeft className="w-3.5 h-3.5 mr-1" />
