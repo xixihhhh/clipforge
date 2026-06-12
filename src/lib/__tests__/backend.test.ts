@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUserPrompt } from "@/lib/script-engine/prompts";
+import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
 import { buildComposeCommand, type ComposeConfig } from "@/lib/video-composer/composer";
@@ -13,6 +13,15 @@ describe("buildUserPrompt", () => {
     styleType: "pain_point",
     targetDuration: 25,
   };
+
+  it("套用模板时 prompt 含参考爆款结构块", () => {
+    const withRef = buildBatchPrompt({ ...baseInput, referenceStructure: "1. [hook] 3s 口播参考：「你还在...」" }, 3);
+    expect(withRef).toContain("参考爆款结构");
+    expect(withRef).toContain("你还在...");
+    // 未传模板时不应出现该块
+    const noRef = buildBatchPrompt(baseInput, 3);
+    expect(noRef).not.toContain("参考爆款结构");
+  });
 
   it("基础参数生成正确的 prompt", () => {
     const prompt = buildUserPrompt(baseInput);
