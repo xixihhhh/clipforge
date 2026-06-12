@@ -81,49 +81,66 @@ export abstract class BaseProvider implements AIProvider {
       ...headers,
     }
 
-    // 构建 AbortController 用于超时控制
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), requestTimeout)
+    // 瞬时错误自动重试（429 限流、5xx、网络异常、超时），最多 2 次重试，指数退避
+    const maxRetries = 2
+    let lastError: unknown
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeout)
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: mergedHeaders,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        })
 
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: mergedHeaders,
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '')
+          // 429/5xx 属可重试瞬时错误
+          if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
+            lastError = new ProviderError(
+              `API 请求失败: ${response.status} ${response.statusText}`,
+              'API_ERROR',
+              this.name,
+              response.status
+            )
+            await this.sleep(500 * Math.pow(2, attempt))
+            continue
+          }
+          throw new ProviderError(
+            `API 请求失败: ${response.status} ${response.statusText} - ${errorBody}`,
+            'API_ERROR',
+            this.name,
+            response.status
+          )
+        }
 
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '')
-        throw new ProviderError(
-          `API 请求失败: ${response.status} ${response.statusText} - ${errorBody}`,
-          'API_ERROR',
-          this.name,
-          response.status
-        )
+        return (await response.json()) as T
+      } catch (error) {
+        clearTimeout(timeoutId)
+        // 4xx 等非瞬时错误：直接抛出不重试
+        if (error instanceof ProviderError && error.statusCode && error.statusCode < 500 && error.statusCode !== 429) {
+          throw error
+        }
+        const isTimeout = error instanceof DOMException && error.name === 'AbortError'
+        lastError = isTimeout
+          ? new ProviderError(`请求超时（${requestTimeout}ms）`, 'TIMEOUT', this.name)
+          : error instanceof ProviderError
+            ? error
+            : new ProviderError(`网络请求异常: ${error instanceof Error ? error.message : String(error)}`, 'NETWORK_ERROR', this.name)
+        // 网络/超时/瞬时错误：还有重试机会就退避后重试
+        if (attempt < maxRetries) {
+          await this.sleep(500 * Math.pow(2, attempt))
+          continue
+        }
+        throw lastError
+      } finally {
+        clearTimeout(timeoutId)
       }
-
-      const data = await response.json() as T
-      return data
-    } catch (error) {
-      if (error instanceof ProviderError) {
-        throw error
-      }
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new ProviderError(
-          `请求超时（${requestTimeout}ms）`,
-          'TIMEOUT',
-          this.name
-        )
-      }
-      throw new ProviderError(
-        `网络请求异常: ${error instanceof Error ? error.message : String(error)}`,
-        'NETWORK_ERROR',
-        this.name
-      )
-    } finally {
-      clearTimeout(timeoutId)
     }
+    // 理论不会走到，兜底
+    throw lastError instanceof Error ? lastError : new ProviderError('请求失败', 'UNKNOWN', this.name)
   }
 
   /**
