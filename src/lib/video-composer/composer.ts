@@ -1,7 +1,30 @@
 import { join } from "path";
 import { mkdir } from "fs/promises";
+import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
 import { MOTIONS } from "./motions";
+
+/**
+ * 探测一个可用的中文字体文件路径
+ * drawtext 不指定 fontfile 时，默认字体不含中文字形，中文字幕会渲染成方块/空白
+ * 优先项目内置字体（部署可控），再回退到 macOS / Linux 常见中文字体
+ */
+function resolveChineseFontFile(): string | undefined {
+  const candidates = [
+    // 项目内置字体（推荐：把一个中文 ttf 放到 public/fonts 保证部署一致）
+    join(process.cwd(), "public", "fonts", "subtitle.ttf"),
+    join(process.cwd(), "public", "fonts", "subtitle.otf"),
+    // macOS 常见中文字体
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Medium.ttc",
+    "/Library/Fonts/Arial Unicode.ttf",
+    // Linux 常见中文字体（服务器部署）
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+  ];
+  return candidates.find((p) => existsSync(p));
+}
 
 /**
  * 转义 FFmpeg drawtext 滤镜中的特殊字符
@@ -38,6 +61,8 @@ export interface ComposeConfig {
   subtitle?: {
     texts: { text: string; startTime: number; endTime: number }[];
     fontFamily?: string;
+    /** 中文字体文件绝对路径（不指定则自动探测系统中文字体） */
+    fontFile?: string;
     fontSize?: number;
     color?: string;
     strokeColor?: string;
@@ -162,10 +187,14 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const borderW = config.subtitle.strokeWidth || 2;
     const yPos = config.subtitle.position === "top" ? "h*0.1" : config.subtitle.position === "center" ? "(h-text_h)/2" : "h*0.85";
 
+    // 中文字幕必须显式指定中文字体文件，否则渲染为方块
+    const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
+    const fontFileArg = fontFile ? `fontfile='${escapeDrawText(fontFile)}':` : "";
+
     const drawTexts = config.subtitle.texts
       .map(
         (t) =>
-          `drawtext=text='${escapeDrawText(t.text)}':fontsize=${fontSize}:fontcolor=${fontColor}:borderw=${borderW}:x=(w-text_w)/2:y=${yPos}:enable='between(t,${t.startTime},${t.endTime})'`
+          `drawtext=${fontFileArg}text='${escapeDrawText(t.text)}':fontsize=${fontSize}:fontcolor=${fontColor}:borderw=${borderW}:x=(w-text_w)/2:y=${yPos}:enable='between(t,${t.startTime},${t.endTime})'`
       )
       .join(",");
 
