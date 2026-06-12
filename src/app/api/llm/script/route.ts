@@ -4,6 +4,12 @@ import { join } from "path";
 import { generateScript, analyzeProduct } from "@/lib/script-engine/generator";
 import type { ScriptStyleType } from "@/lib/script-engine/prompts";
 import type { ProductCategory } from "@/lib/script-engine/templates";
+import { getDb } from "@/lib/db";
+import { scripts as scriptsTable, projects } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+/** scripts 表 styleType 列允许的枚举值 */
+const VALID_SCRIPT_STYLE = new Set(["pain_point", "scene", "comparison", "story", "custom"]);
 
 /** 将本地图片路径转为 base64 data URI，供 LLM 视觉模型使用 */
 async function imagePathToBase64(imagePath: string): Promise<string> {
@@ -37,18 +43,50 @@ async function imagePathToBase64(imagePath: string): Promise<string> {
   }
 }
 
+/** 将前端品类值规范化为引擎支持的 ProductCategory */
+function normalizeCategory(raw: unknown): ProductCategory {
+  const map: Record<string, ProductCategory> = {
+    beauty: "beauty",
+    food: "food",
+    home: "home",
+    fashion: "fashion",
+    tech: "tech",
+    digital: "tech", // 前端"数码3C"用 digital
+    "3c": "tech",
+    other: "beauty", // 其他类回退
+  };
+  return map[String(raw ?? "").toLowerCase()] ?? "beauty";
+}
+
+/** 将前端脚本风格值规范化为引擎支持的 ScriptStyleType */
+function normalizeStyle(raw: unknown): ScriptStyleType {
+  const map: Record<string, ScriptStyleType> = {
+    pain_point: "pain_point",
+    "pain-point": "pain_point",
+    scene: "scene",
+    scenario: "scene", // 前端"场景安利"用 scenario
+    comparison: "comparison",
+    story: "story",
+    custom: "custom",
+    auto: "pain_point", // 智能推荐默认按痛点种草起手
+  };
+  return map[String(raw ?? "").toLowerCase()] ?? "pain_point";
+}
+
 // 生成带货脚本
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     productImages,
     productName,
-    productCategory,
     productDescription,
-    styleType,
-    duration,
     llmConfig,
   } = body;
+
+  // 兼容前端两种字段命名：category/productCategory、targetDuration/duration
+  const category = normalizeCategory(body.category ?? body.productCategory);
+  const styleType = normalizeStyle(body.styleType);
+  const duration = body.targetDuration ?? body.duration ?? 30;
 
   if (!productName) {
     return NextResponse.json({ error: "请填写商品名称" }, { status: 400 });
@@ -73,18 +111,65 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 生成脚本
+    // 生成脚本（category/styleType/duration 已在上方规范化）
     const scripts = await generateScript({
       productName,
-      category: (productCategory || "beauty") as ProductCategory,
+      category,
       productDescription,
       productAnalysis: analysis,
-      styleType: (styleType || "pain_point") as ScriptStyleType,
-      targetDuration: duration || 30,
+      styleType,
+      targetDuration: duration,
+      videoMode: body.videoMode,
+      priceRange: body.priceRange,
+      platforms: body.platforms,
+      usageAdvantage: body.usageAdvantage,
+      targetAudience: body.targetAudience,
       llmConfig,
     });
 
-    return NextResponse.json({ scripts, analysis });
+    // 落库：把生成的脚本写入 scripts 表，供脚本页/素材页按 projectId 读取
+    let savedScripts = scripts;
+    const projectId = body.projectId;
+    if (projectId) {
+      try {
+        const db = getDb();
+        // 先清掉该项目旧脚本（重新生成时覆盖）
+        await db.delete(scriptsTable).where(eq(scriptsTable.projectId, projectId));
+        const rows = await db
+          .insert(scriptsTable)
+          .values(
+            scripts.map((s, i) => ({
+              projectId,
+              version: 1,
+              styleType: (VALID_SCRIPT_STYLE.has(s.styleType) ? s.styleType : "custom") as
+                | "pain_point" | "scene" | "comparison" | "story" | "custom",
+              title: s.title,
+              totalDuration: s.totalDuration,
+              shots: s.shots,
+              selected: i === 0, // 默认选中第一套
+            }))
+          )
+          .returning();
+        savedScripts = rows.map((r) => ({
+          id: r.id,
+          title: r.title ?? "",
+          styleType: r.styleType,
+          totalDuration: r.totalDuration ?? 0,
+          shots: r.shots ?? [],
+          selected: r.selected ?? false,
+        })) as typeof scripts;
+        // 同步项目状态与分析结果
+        await db
+          .update(projects)
+          .set({ status: "scripting", ...(analysis && { productAnalysis: analysis }), updatedAt: new Date() })
+          .where(eq(projects.id, projectId));
+      } catch (e) {
+        // 落库失败不阻塞返回（前端仍可拿到脚本），但记录日志
+        console.error("脚本落库失败:", e);
+      }
+    }
+
+    return NextResponse.json({ scripts: savedScripts, analysis });
   } catch (error) {
     console.error("脚本生成失败:", error);
     const errMsg = error instanceof Error ? error.message : String(error);

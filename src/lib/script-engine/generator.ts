@@ -126,6 +126,8 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
   const validTransitions: Shot["transition"][] = ["ai_start_end", "ai_reference", "direct_concat", "ffmpeg_fade"];
   const validSources: Shot["visualSource"][] = ["ai_generate", "product_image", "user_upload"];
 
+  const validMotions: NonNullable<Shot["motion"]>[] = ["zoom_in_slow", "pan_left", "pan_right", "ken_burns", "static"];
+
   return {
     shotId: shot.shotId || index + 1,
     type: validTypes.includes(shot.type as Shot["type"]) ? (shot.type as Shot["type"]) : "demo",
@@ -133,9 +135,19 @@ function validateShot(shot: Partial<Shot>, index: number): Shot {
     description: shot.description || "",
     camera: shot.camera || "固定镜头",
     visualSource: validSources.includes(shot.visualSource as Shot["visualSource"]) ? (shot.visualSource as Shot["visualSource"]) : "ai_generate",
-    transition: validTransitions.includes(shot.transition as Shot["transition"]) ? (shot.transition as Shot["transition"]) : "direct_concat",
+    // 默认转场与 schema(videoClips.transitionType) 及 UI 默认保持一致（ai_start_end）
+    transition: validTransitions.includes(shot.transition as Shot["transition"]) ? (shot.transition as Shot["transition"]) : "ai_start_end",
     voiceover: shot.voiceover || "",
     prompt: shot.prompt || undefined,
+    // 透传 LLM 按视频模式生成的扩展字段，避免被静默丢弃
+    ...(shot.characterId && { characterId: shot.characterId }),
+    ...(validMotions.includes(shot.motion as NonNullable<Shot["motion"]>) && { motion: shot.motion }),
+    ...(shot.textOverlay?.text && {
+      textOverlay: {
+        text: shot.textOverlay.text,
+        style: shot.textOverlay.style ?? "subtitle",
+      },
+    }),
   };
 }
 

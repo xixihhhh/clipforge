@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus } from "react-icons/lu";
+import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoaderCircle } from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,11 +73,70 @@ const styleLabels: Record<string, string> = {
   story: "剧情故事",
 };
 
+// 后端 scripts 表返回的脚本结构
+interface DbScript {
+  id: string;
+  title: string | null;
+  styleType: string;
+  totalDuration: number | null;
+  shots: Shot[];
+  selected: boolean | null;
+}
+
 export default function ScriptPage() {
   const { id } = useParams<{ id: string }>();
   const [selectedScript, setSelectedScript] = useState(0);
-  const [scripts] = useState(mockScripts);
+  const [scripts, setScripts] = useState<
+    { id: string; title: string; styleType: string; totalDuration: number; shots: Shot[] }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [projectName, setProjectName] = useState("");
   const [isGenerating] = useState(false);
+
+  // 按 projectId 拉取真实脚本（落库于 scripts 表）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [scriptsRes, projectRes] = await Promise.all([
+          fetch(`/api/project/${id}/scripts`),
+          fetch(`/api/project/${id}`),
+        ]);
+        const dbScripts: DbScript[] = scriptsRes.ok ? await scriptsRes.json() : [];
+        if (projectRes.ok) {
+          const proj = await projectRes.json();
+          if (!cancelled) setProjectName(proj.name ?? proj.productName ?? "");
+        }
+        if (cancelled) return;
+        if (Array.isArray(dbScripts) && dbScripts.length > 0) {
+          setScripts(
+            dbScripts.map((s) => ({
+              id: s.id,
+              title: s.title ?? "未命名脚本",
+              styleType: s.styleType,
+              totalDuration: s.totalDuration ?? 0,
+              shots: s.shots ?? [],
+            }))
+          );
+          // 默认选中已标记 selected 的方案
+          const selIdx = dbScripts.findIndex((s) => s.selected);
+          setSelectedScript(selIdx >= 0 ? selIdx : 0);
+        } else {
+          // 无真实脚本时回退到示例数据，避免空白页（开发态/未生成场景）
+          setScripts(mockScripts as never);
+        }
+      } catch {
+        if (!cancelled) setScripts(mockScripts as never);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   const currentScript = scripts[selectedScript];
 
   // 模板相关状态
@@ -125,7 +184,7 @@ export default function ScriptPage() {
               <span className="text-lg font-bold tracking-tight">带货剪手</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">Tempo 德宝纸巾推广</span>
+            <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
           </div>
 
           {/* 步骤进度 */}

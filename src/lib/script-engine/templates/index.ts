@@ -37,7 +37,7 @@ const categoryMap = {
   tech: { templates: techTemplates, directive: techPromptDirective },
 } as const;
 
-/** 根据品类获取对应模板和 prompt 指令 */
+/** 根据品类获取对应模板和 prompt 指令（未知品类回退到 beauty，避免崩溃） */
 export function getTemplatesByCategory(category: ProductCategory) {
-  return categoryMap[category];
+  return categoryMap[category] ?? categoryMap.beauty;
 }

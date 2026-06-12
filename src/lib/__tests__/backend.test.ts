@@ -299,8 +299,8 @@ describe("parseScriptResponse", () => {
     expect(shot.duration).toBe(3);
     // 无效的 visualSource 应该回退到 "ai_generate"
     expect(shot.visualSource).toBe("ai_generate");
-    // 无效的 transition 应该回退到 "direct_concat"
-    expect(shot.transition).toBe("direct_concat");
+    // 无效的 transition 应该回退到 "ai_start_end"（与 schema 默认及 UI 默认一致）
+    expect(shot.transition).toBe("ai_start_end");
   });
 
   it("totalDuration 缺失时自动从 shots 累加计算", () => {
