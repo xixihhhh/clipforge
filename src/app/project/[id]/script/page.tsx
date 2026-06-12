@@ -12,49 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import type { Shot } from "@/lib/db/schema";
 import { useTemplateStore } from "@/lib/stores/template-store";
-
-// 模拟生成的脚本数据
-const mockScripts = [
-  {
-    id: "s1",
-    title: "湿水不破的秘密",
-    styleType: "pain_point",
-    totalDuration: 25,
-    shots: [
-      { shotId: 1, type: "hook" as const, duration: 3, description: "手持手机第一人称视角，快步走进房间，画面略有晃动", camera: "手持跟拍", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "你还在用一擦就烂的纸巾？", prompt: "First person POV walking into a bright modern room, slightly shaky handheld camera, cinematic" },
-      { shotId: 2, type: "pain_point" as const, duration: 4, description: "桌上一堆廉价纸巾碎屑，手拿普通纸巾沾水后碎裂", camera: "俯拍特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "普通纸巾一沾水就烂，擦个嘴满脸纸屑，太尴尬了", prompt: "Close-up overhead shot of cheap tissue paper disintegrating in water on a clean white table, dramatic lighting" },
-      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "德宝纸巾包装正面特写，缓慢推进", camera: "缓慢推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "直到我发现了德宝", prompt: "" },
-      { shotId: 4, type: "demo" as const, duration: 5, description: "手拿德宝纸巾浸入水中，拉扯展示韧性", camera: "中景固定", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "湿水都不破！自己一直在用这个！拉扯都不会烂", prompt: "Hands holding premium tissue paper submerged in clear water, pulling and stretching to show strength, bright studio lighting" },
-      { shotId: 5, type: "cta" as const, duration: 3, description: "商品包装+价格标签+购物车图标", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "限时特价！赶紧去抢！", prompt: "" },
-    ],
-  },
-  {
-    id: "s2",
-    title: "办公室纸巾测评",
-    styleType: "comparison",
-    totalDuration: 28,
-    shots: [
-      { shotId: 1, type: "hook" as const, duration: 3, description: "办公桌上并排放着5款不同品牌的纸巾", camera: "俯拍全景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "花了200块买了5款纸巾，就为了告诉你哪款最值", prompt: "Overhead shot of 5 different tissue paper brands arranged neatly on a modern office desk, clean aesthetic" },
-      { shotId: 2, type: "demo" as const, duration: 8, description: "逐一测试每款纸巾的湿水强度", camera: "特写对比", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "第一款，一碰水就烂...第二款也不行...这个居然还行？", prompt: "Split screen comparison of tissue papers being tested with water, some breaking apart, dramatic close-up" },
-      { shotId: 3, type: "product_reveal" as const, duration: 4, description: "德宝纸巾特写展示", camera: "推进", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "最后赢家就是它——德宝！完胜其他四款", prompt: "" },
-      { shotId: 4, type: "social_proof" as const, duration: 5, description: "展示销量数据和好评截图", camera: "固定", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "月销50万+，好评率99%，不是没有原因的", prompt: "Clean data visualization showing sales numbers and positive reviews, modern UI style, dark background" },
-      { shotId: 5, type: "cta" as const, duration: 3, description: "商品展示+限时优惠信息", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "链接在小黄车，今天下单还送湿巾！", prompt: "" },
-    ],
-  },
-  {
-    id: "s3",
-    title: "约会救星",
-    styleType: "story",
-    totalDuration: 22,
-    shots: [
-      { shotId: 1, type: "hook" as const, duration: 3, description: "女生精心化好妆准备约会，镜头前自信微笑", camera: "正面中景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "上周约会前发生了一件超尴尬的事", prompt: "Young Asian woman smiling confidently at camera after finishing makeup, warm bedroom lighting, cinematic" },
-      { shotId: 2, type: "pain_point" as const, duration: 4, description: "餐厅里擦嘴后脸上满是纸屑的尴尬特写", camera: "特写", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "用餐厅的纸巾擦了一下嘴...脸上全是纸屑碎片", prompt: "Close-up of a woman's face with tiny paper residue near lips, embarrassed expression, restaurant lighting" },
-      { shotId: 3, type: "product_reveal" as const, duration: 3, description: "从包里掏出德宝纸巾的动作", camera: "特写", visualSource: "product_image" as const, transition: "ai_start_end" as const, voiceover: "还好我包里有德宝", prompt: "" },
-      { shotId: 4, type: "demo" as const, duration: 5, description: "用德宝纸巾优雅擦拭，纸巾完整不掉屑", camera: "中景", visualSource: "ai_generate" as const, transition: "ai_start_end" as const, voiceover: "擦完妆都没花，纸巾完整不掉渣，约会继续！", prompt: "Woman elegantly using premium tissue, clean result, confident smile, warm restaurant ambiance" },
-      { shotId: 5, type: "cta" as const, duration: 2, description: "商品展示+下单引导", camera: "固定", visualSource: "product_image" as const, transition: "direct_concat" as const, voiceover: "姐妹们快囤起来！", prompt: "" },
-    ],
-  },
-];
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 // 镜头类型标签
 const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
@@ -91,9 +49,105 @@ export default function ScriptPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [projectName, setProjectName] = useState("");
-  const [isGenerating] = useState(false);
+  // 项目元信息：空态「重新生成脚本」时复用
+  const [projectMeta, setProjectMeta] = useState<{
+    productName: string;
+    category: string;
+    description: string;
+    productImages: string[];
+    videoMode: string;
+  } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const { llm } = useSettingsStore();
 
   // 按 projectId 拉取真实脚本（落库于 scripts 表）
+  const loadScripts = async () => {
+    setLoading(true);
+    try {
+      const [scriptsRes, projectRes] = await Promise.all([
+        fetch(`/api/project/${id}/scripts`),
+        fetch(`/api/project/${id}`),
+      ]);
+      const dbScripts: DbScript[] = scriptsRes.ok ? await scriptsRes.json() : [];
+      if (projectRes.ok) {
+        const proj = await projectRes.json();
+        setProjectName(proj.name ?? proj.productName ?? "");
+        setProjectMeta({
+          productName: proj.productName ?? "",
+          category: proj.productCategory ?? "",
+          description: proj.productDescription ?? "",
+          productImages: Array.isArray(proj.productImages) ? proj.productImages : [],
+          videoMode: proj.videoMode ?? "product_closeup",
+        });
+      }
+      if (Array.isArray(dbScripts) && dbScripts.length > 0) {
+        setScripts(
+          dbScripts.map((s) => ({
+            id: s.id,
+            title: s.title ?? "未命名脚本",
+            styleType: s.styleType,
+            totalDuration: s.totalDuration ?? 0,
+            shots: s.shots ?? [],
+          }))
+        );
+        const selIdx = dbScripts.findIndex((s) => s.selected);
+        setSelectedScript(selIdx >= 0 ? selIdx : 0);
+      } else {
+        // 无真实脚本：保持空，由渲染层显示「去生成」空态
+        // （修复 issue #3：旧逻辑回退到德宝示例数据，导致用户进自己项目却看到别人的 demo，
+        //  误以为「找不到我自己创建的任务」）
+        setScripts([]);
+      }
+    } catch {
+      setScripts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 空态点击「生成脚本」：用项目已存的商品信息 + 设置里的 LLM 重新生成
+  const handleGenerate = async () => {
+    if (!projectMeta) return;
+    if (!llm.apiKey) {
+      setGenError("尚未配置 LLM，请先到「设置」填写 API Key");
+      return;
+    }
+    setIsGenerating(true);
+    setGenError("");
+    try {
+      const res = await fetch("/api/llm/script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          productName: projectMeta.productName,
+          category: projectMeta.category,
+          productDescription: projectMeta.description,
+          targetDuration: 30,
+          styleType: "auto",
+          videoMode: projectMeta.videoMode,
+          productImages: projectMeta.productImages,
+          llmConfig: {
+            baseUrl: llm.baseUrl,
+            apiKey: llm.apiKey,
+            model: llm.model,
+            visionModel: llm.visionModel,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "脚本生成失败，请检查 LLM 设置");
+      }
+      await loadScripts();
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "脚本生成失败");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -106,7 +160,16 @@ export default function ScriptPage() {
         const dbScripts: DbScript[] = scriptsRes.ok ? await scriptsRes.json() : [];
         if (projectRes.ok) {
           const proj = await projectRes.json();
-          if (!cancelled) setProjectName(proj.name ?? proj.productName ?? "");
+          if (!cancelled) {
+            setProjectName(proj.name ?? proj.productName ?? "");
+            setProjectMeta({
+              productName: proj.productName ?? "",
+              category: proj.productCategory ?? "",
+              description: proj.productDescription ?? "",
+              productImages: Array.isArray(proj.productImages) ? proj.productImages : [],
+              videoMode: proj.videoMode ?? "product_closeup",
+            });
+          }
         }
         if (cancelled) return;
         if (Array.isArray(dbScripts) && dbScripts.length > 0) {
@@ -123,11 +186,13 @@ export default function ScriptPage() {
           const selIdx = dbScripts.findIndex((s) => s.selected);
           setSelectedScript(selIdx >= 0 ? selIdx : 0);
         } else {
-          // 无真实脚本时回退到示例数据，避免空白页（开发态/未生成场景）
-          setScripts(mockScripts as never);
+          // 无真实脚本：保持空，由渲染层显示「去生成」空态
+          // （修复 issue #3：旧逻辑回退到德宝示例数据，导致用户进自己项目却看到别人的 demo，
+          //  误以为「找不到我自己创建的任务」）
+          setScripts([]);
         }
       } catch {
-        if (!cancelled) setScripts(mockScripts as never);
+        if (!cancelled) setScripts([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -167,6 +232,79 @@ export default function ScriptPage() {
     setSavedTip(true);
     setTimeout(() => setSavedTip(false), 3000);
   };
+
+  // 顶部导航（空态/正常态共用）
+  const headerBar = (
+    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg brand-gradient">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold tracking-tight">带货剪手</span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+        </div>
+      </div>
+    </header>
+  );
+
+  // 加载中
+  if (loading) {
+    return (
+      <div className="min-h-screen grid-bg">
+        {headerBar}
+        <div className="flex flex-col items-center justify-center py-32 text-muted-foreground">
+          <LuLoaderCircle className="w-8 h-8 animate-spin mb-3" />
+          <p className="text-sm">正在加载脚本...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 空态：该项目还没有真实脚本（修复 #3：不再展示德宝示例，给出可恢复的「生成脚本」入口）
+  if (scripts.length === 0) {
+    return (
+      <div className="min-h-screen grid-bg">
+        {headerBar}
+        <div className="mx-auto max-w-md flex flex-col items-center justify-center py-28 px-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40 mb-5">
+            <LuWand className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold mb-2">还没有生成脚本</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            「{projectName || "该项目"}」尚未生成脚本，或上次生成失败。点击下方按钮，AI 将根据你的商品信息重新生成。
+          </p>
+          {genError && (
+            <p className="text-sm text-destructive mb-4">{genError}</p>
+          )}
+          <div className="flex items-center gap-3">
+            <Button onClick={handleGenerate} disabled={isGenerating} className="brand-gradient text-white">
+              {isGenerating ? (
+                <>
+                  <LuLoaderCircle className="w-4 h-4 mr-2 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <LuWand className="w-4 h-4 mr-2" />
+                  生成脚本
+                </>
+              )}
+            </Button>
+            <Link href="/">
+              <Button variant="outline">返回项目列表</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen grid-bg">

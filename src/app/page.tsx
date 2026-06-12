@@ -1,30 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { LuSettings, LuPlus, LuZap, LuVideo, LuFilm, LuPackage, LuTriangleAlert } from "react-icons/lu";
+import { useState, useEffect } from "react";
+import { LuSettings, LuPlus, LuZap, LuVideo, LuFilm, LuPackage, LuTriangleAlert, LuLoaderCircle } from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 
-// 模拟项目数据（后续接数据库）
-const mockProjects = [
-  {
-    id: "1",
-    name: "Tempo 德宝纸巾推广",
-    productName: "德宝纸巾",
-    status: "video" as const,
-    updatedAt: new Date("2026-03-20"),
-  },
-  {
-    id: "2",
-    name: "小米手环8测评",
-    productName: "小米手环8",
-    status: "done" as const,
-    updatedAt: new Date("2026-03-19"),
-  },
-];
+// 首页项目列表项（来自 GET /api/project，updatedAt 经 JSON 序列化为字符串）
+interface ProjectItem {
+  id: string;
+  name: string;
+  productName: string | null;
+  status: string;
+  updatedAt: string | null;
+}
 
 const statusMap: Record<string, { label: string; color: string }> = {
   draft: { label: "草稿", color: "bg-zinc-500/20 text-zinc-400" },
@@ -36,7 +27,27 @@ const statusMap: Record<string, { label: string; color: string }> = {
 };
 
 export default function HomePage() {
-  const [projects] = useState(mockProjects);
+  // 拉取真实项目列表（修复 issue #3：旧版写死 mock，用户创建后回首页永远找不到自己的项目）
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/project");
+        const data = res.ok ? await res.json() : [];
+        if (!cancelled) setProjects(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 检查是否已配置 API 服务
   const { llm, providers } = useSettingsStore();
@@ -198,7 +209,14 @@ export default function HomePage() {
             <span className="text-sm text-muted-foreground">{projects.length} 个项目</span>
           </div>
 
-          {projects.length === 0 ? (
+          {loadingProjects ? (
+            <Card className="glass-card">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <LuLoaderCircle className="w-7 h-7 text-muted-foreground animate-spin mb-3" />
+                <p className="text-muted-foreground text-sm">正在加载项目...</p>
+              </CardContent>
+            </Card>
+          ) : projects.length === 0 ? (
             <Card className="glass-card">
               <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
@@ -213,7 +231,10 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((project) => {
-                const status = statusMap[project.status];
+                const status = statusMap[project.status] ?? statusMap.draft;
+                const dateStr = project.updatedAt
+                  ? new Date(project.updatedAt).toLocaleDateString("zh-CN")
+                  : "";
                 return (
                   <Link key={project.id} href={`/project/${project.id}/script`}>
                     <Card className="card-hover glass-card cursor-pointer group">
@@ -233,7 +254,7 @@ export default function HomePage() {
                             {project.name}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {project.productName} · {project.updatedAt.toLocaleDateString("zh-CN")}
+                            {project.productName || "未命名商品"}{dateStr ? ` · ${dateStr}` : ""}
                           </p>
                         </div>
                       </CardContent>
