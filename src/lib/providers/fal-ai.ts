@@ -67,32 +67,40 @@ export class FalAIProvider extends BaseProvider {
    * 生成图片
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
-    // GPT Image 系列只接受枚举字符串 image_size（1024x1024 / 1536x1024 / 1024x1536），
-    // 不接受 {width,height} 对象；按宽高比映射到最接近的枚举
+    const w = options.width ?? 0
+    const h = options.height ?? 0
+    // GPT Image 系列不吃 negative_prompt / guidance / steps
     const isGptImage = options.modelId.includes('gpt-image')
-    const gptImageSize = (() => {
-      const w = options.width ?? 0
-      const h = options.height ?? 0
-      if (w > h) return '1536x1024'
-      if (h > w) return '1024x1536'
-      return '1024x1024'
+    // gpt-image-1.5：image_size 只接受字符串枚举（1024x1024 / 1536x1024 / 1024x1536）
+    const isGptImage15 = options.modelId.includes('gpt-image-1.5')
+    // gpt-image-2：image_size 接受 {width,height}（需 16 的倍数）或预设名
+    const isGptImage2 = options.modelId.includes('gpt-image-2')
+    // 编辑/图生图端点：gpt-image-1.5/edit、seedream/edit 用 image_urls；gpt-image-2/image-to-image 同样支持 image_urls
+    const isEdit = options.modelId.includes('/edit') || options.modelId.includes('/image-to-image')
+
+    const round16 = (n: number) => Math.max(16, Math.round(n / 16) * 16)
+    const imageSize = (() => {
+      if (isGptImage15) {
+        if (w > h) return '1536x1024'
+        if (h > w) return '1024x1536'
+        return '1024x1024'
+      }
+      if (!w || !h) return undefined
+      // gpt-image-2 要求宽高为 16 的倍数
+      return isGptImage2
+        ? { width: round16(w), height: round16(h) }
+        : { width: w, height: h }
     })()
-    // 编辑类端点用 image_urls 数组（gpt-image/edit、seedream/edit 等）
-    const isEdit = options.modelId.includes('/edit')
 
     const body = {
       prompt: options.prompt,
       negative_prompt: isGptImage ? undefined : options.negativePrompt,
-      image_size: isGptImage
-        ? gptImageSize
-        : options.width && options.height
-        ? { width: options.width, height: options.height }
-        : undefined,
+      image_size: imageSize,
       num_images: options.count ?? 1,
       guidance_scale: isGptImage ? undefined : options.guidanceScale,
       num_inference_steps: isGptImage ? undefined : options.steps,
       seed: options.seed,
-      // 编辑模式：多图输入用 image_urls；普通图生图用 image_url
+      // 编辑/图生图：多图端点用 image_urls 数组；普通图生图用 image_url
       ...(options.referenceImageUrl && isEdit && {
         image_urls: [options.referenceImageUrl],
       }),
@@ -221,20 +229,29 @@ export class FalAIProvider extends BaseProvider {
     // 基于 fal.ai 官方平台确认的模型列表（2026-03）
     const models: Model[] = [
       // ==================== 图片生成 ====================
-      // OpenAI GPT Image（fal 上 OpenAI 最新图像模型为 gpt-image-1.5，强提示词遵循）
+      // OpenAI GPT Image 2（fal 端点为 openai/gpt-image-2，强提示词遵循、商品质感好）
       {
-        id: 'fal-ai/gpt-image-1.5',
-        name: 'GPT Image 1.5',
-        description: 'OpenAI 图像模型，强提示词遵循、构图与细节保真（带货商品主图首选）',
+        id: 'openai/gpt-image-2',
+        name: 'GPT Image 2',
+        description: 'OpenAI 最新图像模型，强提示词遵循、构图与细节保真（带货商品主图首选）',
         modes: ['text-to-image'],
         mediaType: 'image',
         provider: this.name,
       },
       {
-        id: 'fal-ai/gpt-image-1.5/edit',
-        name: 'GPT Image 1.5 Edit',
-        description: 'OpenAI 图像编辑，多图输入精修，适合商品保真重绘',
+        id: 'openai/gpt-image-2/image-to-image',
+        name: 'GPT Image 2 Edit',
+        description: 'GPT Image 2 编辑，精确局部重绘/扩图，适合商品保真',
         modes: ['image-to-image'],
+        mediaType: 'image',
+        provider: this.name,
+      },
+      // 兼容保留上一代 gpt-image-1.5
+      {
+        id: 'fal-ai/gpt-image-1.5',
+        name: 'GPT Image 1.5',
+        description: 'OpenAI 图像模型上一代，强提示词遵循',
+        modes: ['text-to-image'],
         mediaType: 'image',
         provider: this.name,
       },
