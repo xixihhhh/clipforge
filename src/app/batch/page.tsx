@@ -167,14 +167,9 @@ export default function BatchPage() {
     }));
     setBatchTasks(tasks);
 
-    for (let i = 0; i < selected.length; i++) {
-      if (abortRef.current) break;
-      const product = selected[i];
-
-      setBatchTasks((prev) =>
-        prev.map((t, idx) => (idx === i ? { ...t, status: "generating" } : t))
-      );
-
+    // 处理单个商品（按 task.id 更新，支持乱序并发）
+    const processOne = async (product: (typeof selected)[number]) => {
+      setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "generating" } : t)));
       try {
         // 1) 创建项目
         const projRes = await fetch("/api/project", {
@@ -219,21 +214,25 @@ export default function BatchPage() {
         }
 
         incrementVideoCount(product.id);
-        setBatchTasks((prev) =>
-          prev.map((t, idx) =>
-            idx === i ? { ...t, status: "done", projectId: project.id } : t
-          )
-        );
+        setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "done", projectId: project.id } : t)));
       } catch (err) {
         setBatchTasks((prev) =>
-          prev.map((t, idx) =>
-            idx === i
-              ? { ...t, status: "failed", error: err instanceof Error ? err.message : "生成失败" }
-              : t
-          )
+          prev.map((t) => (t.id === product.id ? { ...t, status: "failed", error: err instanceof Error ? err.message : "生成失败" } : t))
         );
       }
-    }
+    };
+
+    // 并发池：最多 3 个同时跑，加速批量出片
+    const CONCURRENCY = 3;
+    let cursor = 0;
+    const worker = async () => {
+      while (!abortRef.current) {
+        const idx = cursor++;
+        if (idx >= selected.length) break;
+        await processOne(selected[idx]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, selected.length) }, worker));
 
     if (!abortRef.current) {
       setIsComplete(true);
