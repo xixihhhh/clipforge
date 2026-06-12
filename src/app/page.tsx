@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { exampleShowcase } from "@/lib/examples";
 
 // 首页项目列表项（来自 GET /api/project，updatedAt 经 JSON 序列化为字符串）
 interface ProjectItem {
@@ -264,6 +265,45 @@ export default function HomePage() {
               })}
             </div>
           )}
+        </div>
+
+        {/* 示例作品（与「我的项目」分离，明确标注示例，帮助新手理解能做出什么） */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">示例作品</h2>
+              <Badge variant="secondary" className="text-[10px]">示例</Badge>
+            </div>
+            <span className="text-sm text-muted-foreground">看看能做出什么</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link href="/examples/showcase">
+              <Card className="card-hover glass-card cursor-pointer group">
+                <CardContent className="p-0">
+                  <div className="relative aspect-video bg-muted/30 rounded-t-lg overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={exampleShowcase.cover} alt={exampleShowcase.title} className="h-full w-full object-cover" />
+                    <div className="absolute top-2 left-2">
+                      <Badge className="bg-black/60 text-white border-0 text-xs">示例</Badge>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-0.5"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                      {exampleShowcase.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {exampleShowcase.styleLabel} · {exampleShowcase.shots.length} 个镜头 · {exampleShowcase.totalDuration}s
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
         </div>
       </main>
     </div>

@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark } from "react-icons/lu";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
+import { exampleProducts, type ExampleProduct } from "@/lib/examples";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -146,6 +148,25 @@ export default function NewProjectPage() {
       if (target) URL.revokeObjectURL(target.url);
       return prev.filter((img) => img.id !== id);
     });
+  }, []);
+
+  // 一键填充示例商品（含真实示例图），方便新手零门槛试用
+  const fillExample = useCallback(async (ex: ExampleProduct) => {
+    setProductName(ex.name);
+    setCategory(ex.category);
+    setSellingPoints(ex.sellingPoints);
+    try {
+      const res = await fetch(ex.image);
+      const blob = await res.blob();
+      const file = new File([blob], `${ex.id}.png`, { type: blob.type || "image/png" });
+      // 释放旧的预览 URL，避免内存泄漏
+      setImages((prev) => {
+        prev.forEach((img) => URL.revokeObjectURL(img.url));
+        return [{ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }];
+      });
+    } catch {
+      // 取示例图失败也无妨，文字已填好，用户可自行上传
+    }
   }, []);
 
   // 表单校验
@@ -306,6 +327,35 @@ export default function NewProjectPage() {
         )}
 
         <div className="space-y-6">
+          {/* 快速开始：示例商品一键填充（新手零门槛试用） */}
+          <Card className="glass-card border-primary/20">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <LuZap className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">快速开始</span>
+                <Badge variant="secondary" className="text-[10px]">示例</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">没有素材？点一个示例商品，自动填好商品信息和示例图，直接体验生成流程。</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {exampleProducts.map((ex) => (
+                  <button
+                    key={ex.id}
+                    type="button"
+                    onClick={() => fillExample(ex)}
+                    className="group flex items-center gap-3 p-2.5 rounded-lg border border-border/50 bg-muted/10 text-left hover:border-primary/50 hover:bg-primary/5 transition-all"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ex.image} alt={ex.name} className="h-12 w-12 shrink-0 rounded-md object-cover border border-border/30" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{ex.name}</p>
+                      <p className="text-xs text-muted-foreground">¥{ex.price}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* 商品图片上传区域 */}
           <Card className="glass-card">
             <CardContent className="p-5">

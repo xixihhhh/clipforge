@@ -20,6 +20,7 @@ import {
   useProductLibraryStore,
   type ProductItem,
 } from "@/lib/stores/product-library-store";
+import { exampleProducts } from "@/lib/examples";
 
 // 品类选项
 const categoryOptions = [
@@ -49,6 +50,25 @@ const categoryLabelMap: Record<string, string> = Object.fromEntries(
 export default function ProductsPage() {
   const { products, addProduct, updateProduct, removeProduct } =
     useProductLibraryStore();
+
+  // 一键导入示例商品（方便新手快速体验批量出片/爆款复刻）
+  const importExamples = useCallback(() => {
+    const existingNames = new Set(products.map((p) => p.name));
+    exampleProducts.forEach((ex) => {
+      if (existingNames.has(ex.name)) return;
+      addProduct({
+        id: crypto.randomUUID(),
+        name: ex.name,
+        category: ex.category,
+        description: ex.sellingPoints,
+        images: [ex.image],
+        price: ex.price,
+        targetAudience: "",
+        videoCount: 0,
+        createdAt: new Date(),
+      });
+    });
+  }, [products, addProduct]);
 
   // 表单状态
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -464,16 +484,22 @@ export default function ProductsPage() {
               <p className="text-muted-foreground mb-4">
                 还没有商品，添加你的第一个商品
               </p>
-              <Button
-                className="brand-gradient text-white"
-                onClick={() => {
-                  resetForm();
-                  setIsFormOpen(true);
-                }}
-              >
-                <LuPlus className="w-4 h-4 mr-1.5" />
-                添加商品
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  className="brand-gradient text-white"
+                  onClick={() => {
+                    resetForm();
+                    setIsFormOpen(true);
+                  }}
+                >
+                  <LuPlus className="w-4 h-4 mr-1.5" />
+                  添加商品
+                </Button>
+                <Button variant="outline" onClick={importExamples}>
+                  导入示例商品
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">没有现成商品？先导入 3 个示例商品试试批量出片</p>
             </CardContent>
           </Card>
         ) : (

@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useProductLibraryStore } from "@/lib/stores/product-library-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { exampleProducts } from "@/lib/examples";
 
 // 视频模式选项
 const videoModeOptions = [
@@ -92,8 +93,27 @@ const statusColors: Record<TaskStatus, string> = {
 
 export default function BatchPage() {
   // 真实商品库 + LLM 配置
-  const { products, incrementVideoCount } = useProductLibraryStore();
+  const { products, incrementVideoCount, addProduct } = useProductLibraryStore();
   const { llm } = useSettingsStore();
+
+  // 一键导入示例商品
+  const importExamples = useCallback(() => {
+    const existing = new Set(products.map((p) => p.name));
+    exampleProducts.forEach((ex) => {
+      if (existing.has(ex.name)) return;
+      addProduct({
+        id: crypto.randomUUID(),
+        name: ex.name,
+        category: ex.category,
+        description: ex.sellingPoints,
+        images: [ex.image],
+        price: ex.price,
+        targetAudience: "",
+        videoCount: 0,
+        createdAt: new Date(),
+      });
+    });
+  }, [products, addProduct]);
   // 避免 SSR/水合不一致：挂载后再渲染列表
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -286,13 +306,18 @@ export default function BatchPage() {
                     <LuPackage className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">
-                    请先在商品库中添加商品
+                    商品库还是空的，导入示例商品即可马上体验批量出片
                   </p>
-                  <Link href="/products">
-                    <Button variant="outline" size="sm">
-                      前往商品库
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" className="brand-gradient text-white" onClick={importExamples}>
+                      导入示例商品
                     </Button>
-                  </Link>
+                    <Link href="/products">
+                      <Button variant="outline" size="sm">
+                        前往商品库
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 /* 商品列表（多选） */
