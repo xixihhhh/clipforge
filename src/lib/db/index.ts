@@ -30,12 +30,16 @@ export const db = drizzle(sqlite, { schema });
 
 // 开箱即用：启动时自动应用迁移，确保全新克隆/空库也能建好所有表
 // （修复 issue #2「no such table: projects」——data/ 被 gitignore，开箱无表）
-try {
-  if (fs.existsSync(MIGRATIONS_DIR)) {
-    migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+// 跳过 next build 阶段：构建时多 worker 并发导入本模块会同时 migrate 同一空库，
+// 触发竞态（"duplicate column" 等）。迁移只需在运行时（next start / Electron）执行一次。
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  try {
+    if (fs.existsSync(MIGRATIONS_DIR)) {
+      migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    }
+  } catch (err) {
+    console.error("数据库迁移失败:", err);
   }
-} catch (err) {
-  console.error("数据库迁移失败:", err);
 }
 
 // 兼容函数式调用

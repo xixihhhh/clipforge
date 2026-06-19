@@ -20,7 +20,7 @@
     "electron": "electron .",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
     "pack:dir": "next build && pnpm bundle:standalone && electron-builder --dir",
-    "dist": "next build && pnpm bundle:standalone && electron-builder"
+    "dist": "next build && pnpm bundle:standalone && electron-builder --publish never"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
