@@ -4,6 +4,7 @@
 
 <p align="center">
   <img src="https://github.com/xixihhhh/daihuo-jianshou/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/badge/License-AGPL%20v3-blue?style=flat-square" alt="License: AGPL v3" />
   <img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" alt="React 19" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript" alt="TypeScript 5" />
@@ -333,4 +334,6 @@ pnpm build
 
 ## License
 
-MIT
+[AGPL-3.0](LICENSE) © 2026 xixihhhh
+
+修改 / 再发布（含 SaaS）须开源并保留署名。
