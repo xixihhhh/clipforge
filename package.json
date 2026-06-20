@@ -75,13 +75,16 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.video",
-      "identity": null
+      "identity": null,
+      "icon": "electron/icon.png"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "electron/icon.png"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "electron/icon.png"
     }
   },
   "devDependencies": {

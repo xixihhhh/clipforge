@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="ClipForge — 一句话/商品图成片，面向 TikTok、Reels、Shorts 的 AI 短视频工具" width="820"/></p>
+
 # ClipForge — AI 短视频创作工具
 
 > **AI Short-Video Creator** | 一句话主题、或一张商品图 → AI 写脚本、自动配画面、免费配音 → 一键产出竖屏短视频

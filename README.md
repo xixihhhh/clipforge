@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="ClipForge — AI short-video generator for TikTok, Reels and Shorts" width="820"/></p>
+
 # ClipForge — Open-Source AI Short-Video Generator
 
 > **Turn one sentence — or a single product photo — into a ready-to-post vertical video for TikTok, Reels & YouTube Shorts.** AI writes the script, auto-fills the footage, adds a voiceover and subtitles, and renders it in one click. Free, self-hosted, no watermark.
