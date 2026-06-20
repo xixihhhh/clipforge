@@ -349,6 +349,7 @@ pnpm dist       # 出 .dmg 安装包
 - [x] 无商品「一句话主题成片」闭环（一句话主题→去商品化旁白脚本→英文检索词→免费素材自动配齐→FFmpeg 合成竖屏成片，已端到端实测 13s/720×1280）
 - [x] 免费 edge-tts 配音兜底 + 音色试听（零 Key 也能出声）——自研零依赖 keyless Edge TTS 客户端（Node 内置 WebSocket + Sec-MS-GEC 令牌），合成页未配付费 TTS 时默认启用，5 款中文音色可试听，已端到端实测出有声成片
 - [x] **Electron 一键桌面包**：mac 打包 App 实测可启动 + DB 路由 200（better-sqlite3 切 Electron ABI、数据落 userData、内置 ffmpeg）。待办：CI 矩阵出 .dmg/.exe 发 Releases + GUI 真机实测
+- [x] **渲染质量预设 快速/标准/高清**：一键在出片速度与清晰度/体积间取舍，映射真实 FFmpeg 编码（分辨率 + x264 -preset + -crf，白名单防注入）；合成页选择器，已端到端实测 fast→720p / hd→1080p
 
 **规划（真正的 AI 剪辑能力）**
 - [ ] 自动字幕 ASR（whisper / transformers.js）→ 烧录字幕
