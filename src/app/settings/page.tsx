@@ -21,6 +21,19 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useCharacterStore, type Character } from "@/lib/stores/project-store";
 import { useBrandStore } from "@/lib/stores/brand-store";
 
+// 默认分辨率选项
+const resolutionOptions = [
+  { value: "720p", label: "720p (1280x720)" },
+  { value: "1080p", label: "1080p (1920x1080)" },
+];
+
+// 默认画面比例选项
+const aspectRatioOptions = [
+  { value: "9:16", label: "9:16 竖屏" },
+  { value: "16:9", label: "16:9 横屏" },
+  { value: "1:1", label: "1:1 方形" },
+];
+
 // AI 平台配置信息
 const AI_PROVIDERS = [
   {
@@ -684,11 +697,17 @@ export default function SettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue />
+                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                          <SelectValue>
+                            {(value: string) => resolutionOptions.find((o) => o.value === value)?.label ?? value}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="720p">720p (1280x720)</SelectItem>
-                          <SelectItem value="1080p">1080p (1920x1080)</SelectItem>
+                          {resolutionOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -707,12 +726,17 @@ export default function SettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue />
+                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                          <SelectValue>
+                            {(value: string) => aspectRatioOptions.find((o) => o.value === value)?.label ?? value}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="9:16">9:16 竖屏</SelectItem>
-                          <SelectItem value="16:9">16:9 横屏</SelectItem>
-                          <SelectItem value="1:1">1:1 方形</SelectItem>
+                          {aspectRatioOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -728,7 +752,13 @@ export default function SettingsPage() {
                         disabled={imageModels.length === 0}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder={modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生图模型"} />
+                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
+                          <SelectValue>
+                            {(value: string) =>
+                              imageModels.find((m) => m.id === value)?.name ??
+                              (modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生图模型")
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {imageModels.map((m) => (
@@ -751,7 +781,13 @@ export default function SettingsPage() {
                         disabled={videoModels.length === 0}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder={modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生视频模型"} />
+                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
+                          <SelectValue>
+                            {(value: string) =>
+                              videoModels.find((m) => m.id === value)?.name ??
+                              (modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生视频模型")
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {videoModels.map((m) => (

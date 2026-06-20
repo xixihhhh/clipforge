@@ -301,7 +301,10 @@ export default function ProductsPage() {
                   }
                 >
                   <SelectTrigger className="w-full bg-muted/30 border-border/50">
-                    <SelectValue placeholder="选择商品品类" />
+                    {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                    <SelectValue>
+                      {(value: string) => categoryLabelMap[value] ?? "选择商品品类"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((opt) => (

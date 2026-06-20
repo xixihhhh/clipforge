@@ -38,6 +38,23 @@ interface ComposeConfig {
   resolution: "720p" | "1080p";
 }
 
+// 配音音色选项
+const ttsVoiceOptions = [
+  { value: "female-gentle", label: "女声 - 温柔" },
+  { value: "female-energetic", label: "女声 - 活力" },
+  { value: "male-warm", label: "男声 - 温暖" },
+  { value: "male-pro", label: "男声 - 专业" },
+];
+
+// 背景音乐选项
+const bgmOptions = [
+  { value: "none", label: "无背景音乐" },
+  { value: "upbeat", label: "轻快节奏" },
+  { value: "chill", label: "舒缓放松" },
+  { value: "energetic", label: "动感活力" },
+  { value: "emotional", label: "情感温暖" },
+];
+
 // 转场标签
 const transitionLabels: Record<string, string> = {
   ai_start_end: "AI 智能过渡",
@@ -375,13 +392,17 @@ export default function VideoPage() {
                 {config.ttsEnabled && (
                   <Select value={config.ttsVoice} onValueChange={(v) => setConfig((c) => ({ ...c, ttsVoice: v ?? c.ttsVoice }))}>
                     <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
-                      <SelectValue />
+                      {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                      <SelectValue>
+                        {(value: string) => ttsVoiceOptions.find((o) => o.value === value)?.label ?? value}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="female-gentle">女声 - 温柔</SelectItem>
-                      <SelectItem value="female-energetic">女声 - 活力</SelectItem>
-                      <SelectItem value="male-warm">男声 - 温暖</SelectItem>
-                      <SelectItem value="male-pro">男声 - 专业</SelectItem>
+                      {ttsVoiceOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
@@ -394,14 +415,17 @@ export default function VideoPage() {
                 <Label className="text-sm font-medium">背景音乐</Label>
                 <Select value={config.bgm} onValueChange={(v) => setConfig((c) => ({ ...c, bgm: v ?? c.bgm }))}>
                   <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
-                    <SelectValue />
+                    {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                    <SelectValue>
+                      {(value: string) => bgmOptions.find((o) => o.value === value)?.label ?? value}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">无背景音乐</SelectItem>
-                    <SelectItem value="upbeat">轻快节奏</SelectItem>
-                    <SelectItem value="chill">舒缓放松</SelectItem>
-                    <SelectItem value="energetic">动感活力</SelectItem>
-                    <SelectItem value="emotional">情感温暖</SelectItem>
+                    {bgmOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </CardContent>
