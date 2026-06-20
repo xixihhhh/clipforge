@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
 /** 分镜卡片数据 */
 interface StoryboardCard {
@@ -27,6 +29,7 @@ interface ProductImage {
 }
 
 export default function ClonePage() {
+  const t = useT("clone");
   const router = useRouter();
   const { llm } = useSettingsStore();
 
@@ -60,21 +63,21 @@ export default function ClonePage() {
     setStoryboards([]);
     await new Promise((resolve) => setTimeout(resolve, 600));
     setStoryboards([
-      { id: 1, title: "开场吸引", description: "产品特写 + 痛点提问，黄金3秒抓住注意力", duration: "0-3s" },
-      { id: 2, title: "痛点放大", description: "展示使用前的痛点场景，引起共鸣", duration: "3-8s" },
-      { id: 3, title: "产品展示", description: "多角度展示外观、包装与核心卖点", duration: "8-15s" },
-      { id: 4, title: "使用演示", description: "真实场景使用演示，突出效果与便捷", duration: "15-25s" },
-      { id: 5, title: "效果对比", description: "使用前后效果对比，增强说服力", duration: "25-35s" },
-      { id: 6, title: "促销转化", description: "限时优惠 + 购买引导，促成下单", duration: "35-40s" },
+      { id: 1, title: t("shot1Title"), description: t("shot1Desc"), duration: "0-3s" },
+      { id: 2, title: t("shot2Title"), description: t("shot2Desc"), duration: "3-8s" },
+      { id: 3, title: t("shot3Title"), description: t("shot3Desc"), duration: "8-15s" },
+      { id: 4, title: t("shot4Title"), description: t("shot4Desc"), duration: "15-25s" },
+      { id: 5, title: t("shot5Title"), description: t("shot5Desc"), duration: "25-35s" },
+      { id: 6, title: t("shot6Title"), description: t("shot6Desc"), duration: "35-40s" },
     ]);
     setIsAnalyzing(false);
-  }, [videoUrl]);
+  }, [videoUrl, t]);
 
   /** 开始复刻生成：创建 clone 项目 + 真实生成脚本，然后跳转 */
   const handleGenerate = useCallback(async () => {
     if (isGenerating) return;
     if (!llm.apiKey) {
-      setGenError("尚未配置 LLM，请先到「设置」填写 API Key");
+      setGenError(t("errorNoLlm"));
       return;
     }
     setGenError("");
@@ -85,7 +88,7 @@ export default function ClonePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `${productName} 复刻`,
+          name: t("projectNameSuffix", { name: productName }),
           productName,
           productDescription: productFeatures,
           productImages: [],
@@ -93,7 +96,7 @@ export default function ClonePage() {
           sourceVideoUrl: videoUrl,
         }),
       });
-      if (!projRes.ok) throw new Error("项目创建失败");
+      if (!projRes.ok) throw new Error(t("errorProjectCreate"));
       const project = await projRes.json();
 
       // 2) 生成脚本（参考爆款通用结构 + 商品信息）
@@ -119,16 +122,16 @@ export default function ClonePage() {
       });
       if (!scriptRes.ok) {
         const e = await scriptRes.json().catch(() => ({}));
-        throw new Error(e.error || "脚本生成失败，请检查 LLM 设置");
+        throw new Error(e.error || t("errorScriptGen"));
       }
 
       // 3) 跳转到脚本页
       router.push(`/project/${project.id}/script`);
     } catch (err) {
-      setGenError(err instanceof Error ? err.message : "复刻生成失败");
+      setGenError(err instanceof Error ? err.message : t("errorCloneFailed"));
       setIsGenerating(false);
     }
-  }, [isGenerating, llm, productName, productFeatures, videoUrl, router]);
+  }, [isGenerating, llm, productName, productFeatures, videoUrl, router, t]);
 
   /** 处理文件选择/上传 */
   const handleFiles = useCallback(
@@ -236,6 +239,9 @@ export default function ClonePage() {
             </div>
             <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </div>
+          <div className="flex items-center gap-1">
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 
@@ -243,10 +249,10 @@ export default function ClonePage() {
         {/* 页面标题 */}
         <div className="mb-10 text-center">
           <h1 className="text-3xl font-bold tracking-tight mb-3">
-            <span className="brand-gradient-text">爆款复刻</span>
+            <span className="brand-gradient-text">{t("heroTitle")}</span>
           </h1>
           <p className="text-muted-foreground text-base max-w-lg mx-auto">
-            输入爆款视频链接，AI 提取脚本逻辑并用你的商品重新生成
+            {t("heroSubtitle")}
           </p>
         </div>
 
@@ -256,18 +262,18 @@ export default function ClonePage() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full brand-gradient text-sm font-bold text-white">
               1
             </div>
-            <h2 className="text-lg font-semibold">输入爆款视频</h2>
+            <h2 className="text-lg font-semibold">{t("step1Title")}</h2>
           </div>
 
           <Card className="glass-card card-hover">
             <CardContent className="p-6 space-y-5">
               {/* 视频链接输入 */}
               <div className="space-y-2">
-                <Label htmlFor="video-url">视频链接</Label>
+                <Label htmlFor="video-url">{t("videoUrlLabel")}</Label>
                 <div className="flex gap-3">
                   <Input
                     id="video-url"
-                    placeholder="粘贴抖音 / 快手 / 小红书视频链接"
+                    placeholder={t("videoUrlPlaceholder")}
                     value={videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
                     className="flex-1"
@@ -299,15 +305,15 @@ export default function ClonePage() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                           />
                         </svg>
-                        分析中...
+                        {t("analyzing")}
                       </span>
                     ) : (
-                      "分析视频"
+                      t("analyze")
                     )}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  支持抖音、快手、小红书平台的视频链接
+                  {t("videoUrlHint")}
                 </p>
               </div>
 
@@ -316,14 +322,14 @@ export default function ClonePage() {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-foreground">
-                      爆款通用结构（参考）
+                      {t("structureTitle")}
                     </h3>
                     <Badge variant="secondary" className="text-xs">
-                      {storyboards.length} 个分镜
+                      {t("storyboardCount", { n: storyboards.length })}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground -mt-1">
-                    暂不支持解析视频画面内容，以下为高转化带货视频的通用结构；AI 将据此并结合你的商品真实生成脚本。
+                    {t("structureHint")}
                   </p>
 
                   {/* 分镜卡片列表 */}
@@ -373,7 +379,7 @@ export default function ClonePage() {
                 hasAnalysis ? "" : "text-muted-foreground"
               }`}
             >
-              上传你的商品
+              {t("step2Title")}
             </h2>
           </div>
 
@@ -386,9 +392,9 @@ export default function ClonePage() {
               {/* 商品图片拖拽上传 */}
               <div className="space-y-2">
                 <Label>
-                  商品图片{" "}
+                  {t("productImageLabel")}{" "}
                   <span className="text-muted-foreground font-normal">
-                    (1-5张)
+                    {t("productImageRange")}
                   </span>
                 </Label>
                 <div
@@ -439,10 +445,10 @@ export default function ClonePage() {
                         </svg>
                       </div>
                       <p className="text-sm text-muted-foreground mb-1">
-                        拖拽图片到此处，或点击上传
+                        {t("uploadHint")}
                       </p>
                       <p className="text-xs text-muted-foreground/70">
-                        支持 JPG、PNG 格式，最多 5 张
+                        {t("uploadFormatHint")}
                       </p>
                     </div>
                   ) : (
@@ -457,7 +463,7 @@ export default function ClonePage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={img.previewUrl}
-                              alt="商品图片"
+                              alt={t("productImageAlt")}
                               className="h-full w-full object-cover"
                             />
                             {/* 删除按钮 */}
@@ -512,10 +518,10 @@ export default function ClonePage() {
 
               {/* 商品名称 */}
               <div className="space-y-2">
-                <Label htmlFor="product-name">商品名称</Label>
+                <Label htmlFor="product-name">{t("productNameLabel")}</Label>
                 <Input
                   id="product-name"
-                  placeholder="输入你的商品名称"
+                  placeholder={t("productNamePlaceholder")}
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                 />
@@ -523,10 +529,10 @@ export default function ClonePage() {
 
               {/* 商品卖点 */}
               <div className="space-y-2">
-                <Label htmlFor="product-features">商品卖点</Label>
+                <Label htmlFor="product-features">{t("productFeaturesLabel")}</Label>
                 <Textarea
                   id="product-features"
-                  placeholder="描述商品的核心卖点、优势特性等..."
+                  placeholder={t("productFeaturesPlaceholder")}
                   rows={4}
                   value={productFeatures}
                   onChange={(e) => setProductFeatures(e.target.value)}
@@ -553,7 +559,7 @@ export default function ClonePage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                复刻生成中...
+                {t("cloning")}
               </>
             ) : (
               <>
@@ -570,7 +576,7 @@ export default function ClonePage() {
                 >
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
-                开始复刻生成
+                {t("startClone")}
               </>
             )}
           </Button>

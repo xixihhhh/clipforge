@@ -2,6 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
 import { DEFAULT_TTS_PROVIDER, type TTSProvider } from "@/lib/tts-presets";
+import {
+  DEFAULT_IMAGE_PARAMS,
+  DEFAULT_VIDEO_PARAMS,
+  type CustomModel,
+  type ImageGenParams,
+  type VideoGenParams,
+} from "@/lib/gen-params";
 
 // AI Provider 配置
 export interface ProviderSetting {
@@ -48,6 +55,12 @@ interface SettingsState {
   defaultResolution: "720p" | "1080p";
   // 默认画面比例
   defaultAspectRatio: "9:16" | "16:9" | "1:1";
+  // 用户自定义模型（挂在已有平台上的任意 model id）
+  customModels: CustomModel[];
+  // 图片生成全局默认参数
+  imageParams: ImageGenParams;
+  // 视频生成全局默认参数
+  videoParams: VideoGenParams;
   // 界面语言（中文默认，可切 English）
   locale: Locale;
 
@@ -60,6 +73,10 @@ interface SettingsState {
   setDefaultVideoModel: (model: string) => void;
   setDefaultResolution: (resolution: "720p" | "1080p") => void;
   setDefaultAspectRatio: (ratio: "9:16" | "16:9" | "1:1") => void;
+  addCustomModel: (model: CustomModel) => void;
+  removeCustomModel: (id: string) => void;
+  setImageParams: (params: ImageGenParams) => void;
+  setVideoParams: (params: VideoGenParams) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -93,6 +110,9 @@ export const useSettingsStore = create<SettingsState>()(
       defaultVideoModel: "",
       defaultResolution: "1080p",
       defaultAspectRatio: "9:16",
+      customModels: [],
+      imageParams: DEFAULT_IMAGE_PARAMS,
+      videoParams: DEFAULT_VIDEO_PARAMS,
       locale: DEFAULT_LOCALE,
 
       setLocale: (locale) => set({ locale }),
@@ -106,6 +126,12 @@ export const useSettingsStore = create<SettingsState>()(
       setDefaultVideoModel: (model) => set({ defaultVideoModel: model }),
       setDefaultResolution: (resolution) => set({ defaultResolution: resolution }),
       setDefaultAspectRatio: (ratio) => set({ defaultAspectRatio: ratio }),
+      addCustomModel: (model) =>
+        set((state) => ({ customModels: [...state.customModels, model] })),
+      removeCustomModel: (id) =>
+        set((state) => ({ customModels: state.customModels.filter((m) => m.id !== id) })),
+      setImageParams: (params) => set({ imageParams: params }),
+      setVideoParams: (params) => set({ videoParams: params }),
     }),
     {
       name: "daihuo-jianshou-settings",

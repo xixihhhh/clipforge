@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 import {
   Select,
   SelectContent,
@@ -42,39 +44,40 @@ interface ComposeConfig {
 }
 
 // 免费配音音色（微软 Edge keyless TTS，无需 Key）——与后端 FREE_TTS_VOICES 对应
+// label 改为 i18n key，渲染时经 t() 取对应语言文案
 const freeVoiceOptions = [
-  { value: "zh-CN-XiaoxiaoNeural", label: "晓晓 · 温柔女声" },
-  { value: "zh-CN-XiaoyiNeural", label: "晓伊 · 活泼女声" },
-  { value: "zh-CN-YunxiNeural", label: "云希 · 阳光男声" },
-  { value: "zh-CN-YunyangNeural", label: "云扬 · 专业播报男声" },
-  { value: "zh-CN-YunjianNeural", label: "云健 · 沉稳解说男声" },
+  { value: "zh-CN-XiaoxiaoNeural", labelKey: "freeVoiceXiaoxiao" },
+  { value: "zh-CN-XiaoyiNeural", labelKey: "freeVoiceXiaoyi" },
+  { value: "zh-CN-YunxiNeural", labelKey: "freeVoiceYunxi" },
+  { value: "zh-CN-YunyangNeural", labelKey: "freeVoiceYunyang" },
+  { value: "zh-CN-YunjianNeural", labelKey: "freeVoiceYunjian" },
 ];
 
-// 背景音乐选项
+// 背景音乐选项（label 改为 i18n key）
 const bgmOptions = [
-  { value: "none", label: "无背景音乐" },
-  { value: "upbeat", label: "轻快节奏" },
-  { value: "chill", label: "舒缓放松" },
-  { value: "energetic", label: "动感活力" },
-  { value: "emotional", label: "情感温暖" },
+  { value: "none", labelKey: "bgmNone" },
+  { value: "upbeat", labelKey: "bgmUpbeat" },
+  { value: "chill", labelKey: "bgmChill" },
+  { value: "energetic", labelKey: "bgmEnergetic" },
+  { value: "emotional", labelKey: "bgmEmotional" },
 ];
 
-// 转场标签
+// 转场标签（值为 i18n key）
 const transitionLabels: Record<string, string> = {
-  ai_start_end: "AI 智能过渡",
-  ai_reference: "AI 参考过渡",
-  direct_concat: "直接拼接",
-  ffmpeg_fade: "渐变过渡",
+  ai_start_end: "transitionAiStartEnd",
+  ai_reference: "transitionAiReference",
+  direct_concat: "transitionDirectConcat",
+  ffmpeg_fade: "transitionFfmpegFade",
 };
 
-// 镜头类型标签
-const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
-  hook: { label: "钩子", color: "bg-red-500/20 text-red-400" },
-  pain_point: { label: "痛点", color: "bg-orange-500/20 text-orange-400" },
-  product_reveal: { label: "产品", color: "bg-blue-500/20 text-blue-400" },
-  demo: { label: "演示", color: "bg-green-500/20 text-green-400" },
-  social_proof: { label: "背书", color: "bg-purple-500/20 text-purple-400" },
-  cta: { label: "转化", color: "bg-amber-500/20 text-amber-400" },
+// 镜头类型标签（labelKey 为 i18n key）
+const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> = {
+  hook: { labelKey: "shotHook", color: "bg-red-500/20 text-red-400" },
+  pain_point: { labelKey: "shotPainPoint", color: "bg-orange-500/20 text-orange-400" },
+  product_reveal: { labelKey: "shotProductReveal", color: "bg-blue-500/20 text-blue-400" },
+  demo: { labelKey: "shotDemo", color: "bg-green-500/20 text-green-400" },
+  social_proof: { labelKey: "shotSocialProof", color: "bg-purple-500/20 text-purple-400" },
+  cta: { labelKey: "shotCta", color: "bg-amber-500/20 text-amber-400" },
 };
 
 interface DbShot {
@@ -86,6 +89,7 @@ interface DbShot {
 }
 
 export default function VideoPage() {
+  const t = useT("video");
   const { id } = useParams<{ id: string }>();
   const { defaultResolution, defaultAspectRatio, tts, providers } = useSettingsStore();
   const [clips, setClips] = useState<VideoClipItem[]>([]);
@@ -125,9 +129,9 @@ export default function VideoPage() {
       const res = await fetch("/api/tts/free", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voice: config.freeVoice, text: "在家也能泡出一杯好咖啡，慢下来享受这一刻。" }),
+        body: JSON.stringify({ voice: config.freeVoice, text: t("ttsPreviewText") }),
       });
-      if (!res.ok) throw new Error("试听失败");
+      if (!res.ok) throw new Error(t("errorPreviewFailed"));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
@@ -146,7 +150,7 @@ export default function VideoPage() {
       fd.append("file", file);
       const res = await fetch(`/api/project/${id}/bgm`, { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "上传失败");
+      if (!res.ok) throw new Error(data.error || t("errorUploadFailed"));
       setBgm({ path: data.path, name: data.name });
     } catch {
       setBgm(null);
@@ -174,7 +178,7 @@ export default function VideoPage() {
           ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
           : null;
         if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
-          setLoadError("尚未生成脚本，请先完成脚本与素材步骤");
+          setLoadError(t("errorNoScript"));
           setClips([]);
         } else {
           setClips(
@@ -188,7 +192,7 @@ export default function VideoPage() {
           );
         }
       } catch (e) {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : "加载失败");
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : t("errorLoadFailed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -247,7 +251,7 @@ export default function VideoPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "合成失败");
+      if (!res.ok) throw new Error(data.error || t("errorComposeFailed"));
 
       // 轮询合成状态，直到 done / failed（后台任务，避免长视频请求超时）
       const url: string = await new Promise((resolve, reject) => {
@@ -262,7 +266,7 @@ export default function VideoPage() {
               resolve(c.url);
             } else if (c.status === "failed") {
               clearInterval(poll);
-              reject(new Error("合成失败，请检查素材后重试"));
+              reject(new Error(t("errorComposeAssets")));
             }
           } catch {
             // 单次轮询失败忽略，继续重试
@@ -271,7 +275,7 @@ export default function VideoPage() {
         // 兜底超时：5 分钟
         setTimeout(() => {
           clearInterval(poll);
-          reject(new Error("合成超时，请稍后在导出页查看"));
+          reject(new Error(t("errorComposeTimeout")));
         }, 300000);
       });
 
@@ -281,7 +285,7 @@ export default function VideoPage() {
       setComposeDone(true);
     } catch (e) {
       clearInterval(timer);
-      setComposeError(e instanceof Error ? e.message : "合成失败");
+      setComposeError(e instanceof Error ? e.message : t("errorComposeFailed"));
       setComposeProgress(0);
     } finally {
       setIsComposing(false);
@@ -304,12 +308,13 @@ export default function VideoPage() {
               <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+            <span className="text-sm text-muted-foreground">{projectName || t("defaultProjectName")}</span>
           </div>
 
           {/* 步骤进度 */}
           <div className="flex items-center gap-1">
-            {["脚本", "素材", "视频", "导出"].map((step, i) => (
+            <LanguageToggle />
+            {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
                 <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 2 ? "bg-primary text-primary-foreground" : i < 2 ? "text-primary" : "text-muted-foreground"}`}>
                   <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 2 ? "bg-white/20" : i < 2 ? "bg-primary/20" : "bg-muted"}`}>
@@ -330,13 +335,13 @@ export default function VideoPage() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-semibold">视频时间线</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{clips.length} 个片段 · 总时长 {totalDuration}s</p>
+                <h2 className="text-base font-semibold">{t("timelineTitle")}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("timelineMeta", { count: clips.length, duration: totalDuration })}</p>
               </div>
               <Link href={`/project/${id}/assets`}>
                 <Button variant="outline" size="sm" className="text-xs">
                   <LuArrowLeft className="w-3.5 h-3.5 mr-1" />
-                  返回素材
+                  {t("backToAssets")}
                 </Button>
               </Link>
             </div>
@@ -361,7 +366,7 @@ export default function VideoPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <Badge className={`${typeInfo.color} border-0 text-[10px]`}>
-                                {typeInfo.label}
+                                {t(typeInfo.labelKey)}
                               </Badge>
                               <span className="text-xs text-muted-foreground">{clip.duration}s</span>
                             </div>
@@ -388,10 +393,10 @@ export default function VideoPage() {
                             onChange={(e) => updateTransition(clip.shotId, e.target.value)}
                             className="text-[11px] text-muted-foreground bg-transparent border-none outline-none cursor-pointer"
                           >
-                            <option value="ai_start_end">{transitionLabels.ai_start_end}</option>
-                            <option value="ai_reference">{transitionLabels.ai_reference}</option>
-                            <option value="direct_concat">{transitionLabels.direct_concat}</option>
-                            <option value="ffmpeg_fade">{transitionLabels.ffmpeg_fade}</option>
+                            <option value="ai_start_end">{t(transitionLabels.ai_start_end)}</option>
+                            <option value="ai_reference">{t(transitionLabels.ai_reference)}</option>
+                            <option value="direct_concat">{t(transitionLabels.direct_concat)}</option>
+                            <option value="ffmpeg_fade">{t(transitionLabels.ffmpeg_fade)}</option>
                           </select>
                         </div>
                       </div>
@@ -404,19 +409,19 @@ export default function VideoPage() {
 
           {/* 右侧：合成配置 */}
           <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-base font-semibold">合成设置</h2>
+            <h2 className="text-base font-semibold">{t("composeSettings")}</h2>
 
             {/* 配音设置 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">配音 (TTS)</Label>
+                  <Label className="text-sm font-medium">{t("ttsLabel")}</Label>
                   {!paidTtsReady && (
-                    <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-500">免费 · 无需 Key</span>
+                    <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-500">{t("ttsFreeBadge")}</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">启用自动配音</span>
+                  <span className="text-xs text-muted-foreground">{t("ttsEnableLabel")}</span>
                   <button
                     onClick={() => setConfig((c) => ({ ...c, ttsEnabled: !c.ttsEnabled }))}
                     className={`relative w-10 h-5 rounded-full transition-colors ${config.ttsEnabled ? "bg-primary" : "bg-muted"}`}
@@ -426,7 +431,7 @@ export default function VideoPage() {
                 </div>
                 {config.ttsEnabled && paidTtsReady && (
                   <p className="text-[11px] text-muted-foreground">
-                    使用已配置的付费 TTS（{getTTSProviderMeta(tts.provider).label}）。如需免费配音，可在「设置」关闭 TTS。
+                    {t("ttsPaidHint", { provider: getTTSProviderMeta(tts.provider).label })}
                   </p>
                 )}
                 {config.ttsEnabled && !paidTtsReady && (
@@ -435,13 +440,16 @@ export default function VideoPage() {
                       <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
                         {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
                         <SelectValue>
-                          {(value: string) => freeVoiceOptions.find((o) => o.value === value)?.label ?? value}
+                          {(value: string) => {
+                            const o = freeVoiceOptions.find((o) => o.value === value);
+                            return o ? t(o.labelKey) : value;
+                          }}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {freeVoiceOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                            {t(o.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -451,7 +459,7 @@ export default function VideoPage() {
                       disabled={previewingVoice}
                       className="text-[11px] text-primary hover:underline disabled:opacity-50"
                     >
-                      {previewingVoice ? "试听中…" : "▶ 试听这个音色"}
+                      {previewingVoice ? t("ttsPreviewing") : t("ttsPreviewCta")}
                     </button>
                   </div>
                 )}
@@ -461,18 +469,21 @@ export default function VideoPage() {
             {/* 背景音乐 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-3">
-                <Label className="text-sm font-medium">背景音乐</Label>
+                <Label className="text-sm font-medium">{t("bgmSectionLabel")}</Label>
                 <Select value={config.bgm} onValueChange={(v) => setConfig((c) => ({ ...c, bgm: v ?? c.bgm }))}>
                   <SelectTrigger className="bg-muted/30 border-border/50 text-xs">
                     {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
                     <SelectValue>
-                      {(value: string) => bgmOptions.find((o) => o.value === value)?.label ?? value}
+                      {(value: string) => {
+                        const o = bgmOptions.find((o) => o.value === value);
+                        return o ? t(o.labelKey) : value;
+                      }}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {bgmOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {t(o.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -483,7 +494,7 @@ export default function VideoPage() {
             {/* 字幕设置 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-3">
-                <Label className="text-sm font-medium">字幕</Label>
+                <Label className="text-sm font-medium">{t("subtitleLabel")}</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {(["bottom", "center", "top"] as const).map((pos) => (
                     <button
@@ -495,7 +506,7 @@ export default function VideoPage() {
                           : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
                       }`}
                     >
-                      {pos === "bottom" ? "底部" : pos === "center" ? "居中" : "顶部"}
+                      {pos === "bottom" ? t("subtitleBottom") : pos === "center" ? t("subtitleCenter") : t("subtitleTop")}
                     </button>
                   ))}
                 </div>
@@ -505,10 +516,10 @@ export default function VideoPage() {
             {/* 画面设置 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-4">
-                <Label className="text-sm font-medium">画面设置</Label>
+                <Label className="text-sm font-medium">{t("canvasLabel")}</Label>
                 {/* 比例 */}
                 <div className="space-y-2">
-                  <span className="text-xs text-muted-foreground">画面比例</span>
+                  <span className="text-xs text-muted-foreground">{t("aspectRatioLabel")}</span>
                   <div className="grid grid-cols-3 gap-2">
                     {(["9:16", "16:9", "1:1"] as const).map((ratio) => (
                       <button
@@ -520,14 +531,14 @@ export default function VideoPage() {
                             : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
                         }`}
                       >
-                        {ratio === "9:16" ? "竖屏" : ratio === "16:9" ? "横屏" : "方形"}
+                        {ratio === "9:16" ? t("aspectVertical") : ratio === "16:9" ? t("aspectHorizontal") : t("aspectSquare")}
                       </button>
                     ))}
                   </div>
                 </div>
                 {/* 分辨率 */}
                 <div className="space-y-2">
-                  <span className="text-xs text-muted-foreground">分辨率</span>
+                  <span className="text-xs text-muted-foreground">{t("resolutionLabel")}</span>
                   <div className="grid grid-cols-2 gap-2">
                     {(["720p", "1080p"] as const).map((res) => (
                       <button
@@ -552,14 +563,14 @@ export default function VideoPage() {
               {/* 背景音乐（可选，合成时混入并自动压低让位配音） */}
               <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-muted/10">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium">背景音乐（可选）</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{bgm ? `已选：${bgm.name}` : "上传 mp3，合成时自动压低让位配音"}</p>
+                  <p className="text-xs font-medium">{t("bgmOptionalTitle")}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{bgm ? t("bgmSelected", { name: bgm.name }) : t("bgmUploadHint")}</p>
                 </div>
                 <label className="shrink-0">
                   <input type="file" accept="audio/*" className="hidden" disabled={isComposing || bgmUploading}
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBgm(f); e.target.value = ""; }} />
                   <span className={`inline-flex items-center h-8 px-3 rounded-md border border-border/60 text-xs cursor-pointer hover:border-primary/50 ${(isComposing || bgmUploading) ? "opacity-50 pointer-events-none" : ""}`}>
-                    {bgmUploading ? "上传中..." : bgm ? "更换" : "上传 BGM"}
+                    {bgmUploading ? t("bgmUploading") : bgm ? t("bgmReplace") : t("bgmUploadCta")}
                   </span>
                 </label>
               </div>
@@ -574,7 +585,7 @@ export default function VideoPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground text-center mt-2">
-                    {composeDone ? "合成完成！" : `正在合成视频... ${composeProgress}%`}
+                    {composeDone ? t("composeDoneMsg") : t("composingMsg", { progress: composeProgress })}
                   </p>
                 </div>
               )}
@@ -602,14 +613,14 @@ export default function VideoPage() {
                 {isComposing ? (
                   <>
                     <LuLoaderCircle className="animate-spin mr-2 h-4 w-4" />
-                    合成中...
+                    {t("composing")}
                   </>
                 ) : composeDone ? (
-                  "重新合成"
+                  t("composeRedo")
                 ) : (
                   <>
                     <LuPlay className="w-4 h-4 mr-1" />
-                    开始合成
+                    {t("composeStart")}
                   </>
                 )}
               </Button>
@@ -617,11 +628,11 @@ export default function VideoPage() {
               {composeDone && outputUrl && (
                 <>
                   <a href={`${outputUrl}?download=1`} download>
-                    <Button variant="outline" className="w-full">下载视频</Button>
+                    <Button variant="outline" className="w-full">{t("downloadVideo")}</Button>
                   </a>
                   <Link href={`/project/${id}/export`}>
                     <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                      下一步：导出视频
+                      {t("nextExport")}
                       <LuArrowRight className="w-4 h-4 ml-1" />
                     </Button>
                   </Link>

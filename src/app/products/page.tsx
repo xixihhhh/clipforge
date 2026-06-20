@@ -21,15 +21,17 @@ import {
   type ProductItem,
 } from "@/lib/stores/product-library-store";
 import { exampleProducts } from "@/lib/examples";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
-// 品类选项
+// 品类选项（label 用 i18n key，运行时经 t() 取对应语言文案）
 const categoryOptions = [
-  { value: "beauty", label: "美妆护肤" },
-  { value: "food", label: "食品零食" },
-  { value: "home", label: "家居日用" },
-  { value: "fashion", label: "服饰鞋包" },
-  { value: "tech", label: "数码3C" },
-  { value: "other", label: "其他" },
+  { value: "beauty", labelKey: "categoryBeauty" },
+  { value: "food", labelKey: "categoryFood" },
+  { value: "home", labelKey: "categoryHome" },
+  { value: "fashion", labelKey: "categoryFashion" },
+  { value: "tech", labelKey: "categoryTech" },
+  { value: "other", labelKey: "categoryOther" },
 ] as const;
 
 // 品类颜色映射
@@ -42,12 +44,13 @@ const categoryColorMap: Record<string, string> = {
   other: "bg-zinc-500/20 text-zinc-400",
 };
 
-// 品类中文名映射
-const categoryLabelMap: Record<string, string> = Object.fromEntries(
-  categoryOptions.map((opt) => [opt.value, opt.label])
+// 品类 value → i18n key 映射
+const categoryLabelKeyMap: Record<string, string> = Object.fromEntries(
+  categoryOptions.map((opt) => [opt.value, opt.labelKey])
 );
 
 export default function ProductsPage() {
+  const t = useT("products");
   const { products, addProduct, updateProduct, removeProduct } =
     useProductLibraryStore();
 
@@ -228,18 +231,21 @@ export default function ProductsPage() {
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             </div>
-            <span className="text-lg font-bold tracking-tight">商品库</span>
+            <span className="text-lg font-bold tracking-tight">{t("navTitle")}</span>
           </div>
-          <Link href="/">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LuArrowLeft className="w-4 h-4" />
-              <span className="ml-1.5">返回首页</span>
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1">
+            <LanguageToggle />
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LuArrowLeft className="w-4 h-4" />
+                <span className="ml-1.5">{t("backHome")}</span>
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -248,10 +254,10 @@ export default function ProductsPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              <span className="brand-gradient-text">商品库</span>管理
+              <span className="brand-gradient-text">{t("pageTitleAccent")}</span>{t("pageTitleRest")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              集中管理你的商品信息，创建项目时可快速选用
+              {t("pageSubtitle")}
             </p>
           </div>
           {!isFormOpen && (
@@ -263,7 +269,7 @@ export default function ProductsPage() {
               }}
             >
               <LuPlus className="w-4 h-4 mr-1.5" />
-              添加商品
+              {t("addProduct")}
             </Button>
           )}
         </div>
@@ -273,18 +279,18 @@ export default function ProductsPage() {
           <Card className="glass-card ring-1 ring-primary/30 mb-8">
             <CardContent className="p-5 space-y-5">
               <h3 className="text-sm font-semibold">
-                {editingId ? "编辑商品" : "添加商品"}
+                {editingId ? t("formEditTitle") : t("formAddTitle")}
               </h3>
 
               {/* 商品名称 */}
               <div className="space-y-2">
                 <Label htmlFor="productName" className="text-sm font-medium">
-                  商品名称
+                  {t("fieldName")}
                   <span className="text-destructive ml-0.5">*</span>
                 </Label>
                 <Input
                   id="productName"
-                  placeholder="例如：小米手环8 NFC版"
+                  placeholder={t("namePlaceholder")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="bg-muted/30 border-border/50 focus:border-primary"
@@ -293,7 +299,7 @@ export default function ProductsPage() {
 
               {/* 品类选择 */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">商品品类</Label>
+                <Label className="text-sm font-medium">{t("fieldCategory")}</Label>
                 <Select
                   value={category}
                   onValueChange={(val) =>
@@ -303,13 +309,17 @@ export default function ProductsPage() {
                   <SelectTrigger className="w-full bg-muted/30 border-border/50">
                     {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
                     <SelectValue>
-                      {(value: string) => categoryLabelMap[value] ?? "选择商品品类"}
+                      {(value: string) =>
+                        categoryLabelKeyMap[value]
+                          ? t(categoryLabelKeyMap[value])
+                          : t("categoryPlaceholder")
+                      }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -320,13 +330,13 @@ export default function ProductsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="description" className="text-sm font-medium">
-                    卖点描述
+                    {t("fieldDescription")}
                   </Label>
-                  <span className="text-xs text-muted-foreground">选填</span>
+                  <span className="text-xs text-muted-foreground">{t("optional")}</span>
                 </div>
                 <Textarea
                   id="description"
-                  placeholder="描述商品的核心卖点、独特优势..."
+                  placeholder={t("descriptionPlaceholder")}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
@@ -337,9 +347,9 @@ export default function ProductsPage() {
               {/* 商品图片上传 */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium">商品图片</Label>
+                  <Label className="text-sm font-medium">{t("fieldImages")}</Label>
                   <span className="text-xs text-muted-foreground">
-                    {images.length}/5 张
+                    {t("imageCount", { n: images.length })}
                   </span>
                 </div>
 
@@ -373,13 +383,13 @@ export default function ProductsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium">
-                          拖拽图片到这里，或{" "}
+                          {t("dropHintPrefix")}
                           <span className="brand-gradient-text font-semibold">
-                            点击上传
+                            {t("dropHintClick")}
                           </span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          支持 JPG / PNG / WebP，最多 5 张
+                          {t("dropHintFormats")}
                         </p>
                       </div>
                     </div>
@@ -401,7 +411,7 @@ export default function ProductsPage() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={img.url}
-                          alt="商品图片"
+                          alt={t("imageAlt")}
                           className="h-full w-full object-cover"
                         />
                         {/* 删除按钮 */}
@@ -424,13 +434,13 @@ export default function ProductsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="price" className="text-sm font-medium">
-                      价格信息
+                      {t("fieldPrice")}
                     </Label>
-                    <span className="text-xs text-muted-foreground">选填</span>
+                    <span className="text-xs text-muted-foreground">{t("optional")}</span>
                   </div>
                   <Input
                     id="price"
-                    placeholder="例如：¥199"
+                    placeholder={t("pricePlaceholder")}
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="bg-muted/30 border-border/50 focus:border-primary"
@@ -444,13 +454,13 @@ export default function ProductsPage() {
                       htmlFor="targetAudience"
                       className="text-sm font-medium"
                     >
-                      目标人群
+                      {t("fieldAudience")}
                     </Label>
-                    <span className="text-xs text-muted-foreground">选填</span>
+                    <span className="text-xs text-muted-foreground">{t("optional")}</span>
                   </div>
                   <Input
                     id="targetAudience"
-                    placeholder="例如：18-35岁女性"
+                    placeholder={t("audiencePlaceholder")}
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value)}
                     className="bg-muted/30 border-border/50 focus:border-primary"
@@ -461,7 +471,7 @@ export default function ProductsPage() {
               {/* 保存/取消按钮 */}
               <div className="flex items-center justify-end gap-2 pt-2">
                 <Button variant="outline" size="sm" onClick={resetForm}>
-                  取消
+                  {t("cancel")}
                 </Button>
                 <Button
                   size="sm"
@@ -469,7 +479,7 @@ export default function ProductsPage() {
                   onClick={handleSave}
                   disabled={!name.trim()}
                 >
-                  {editingId ? "保存修改" : "添加商品"}
+                  {editingId ? t("saveEdit") : t("addProduct")}
                 </Button>
               </div>
             </CardContent>
@@ -485,7 +495,7 @@ export default function ProductsPage() {
                 <LuPackage className="w-7 h-7 text-muted-foreground" />
               </div>
               <p className="text-muted-foreground mb-4">
-                还没有商品，添加你的第一个商品
+                {t("emptyText")}
               </p>
               <div className="flex items-center gap-3">
                 <Button
@@ -496,22 +506,22 @@ export default function ProductsPage() {
                   }}
                 >
                   <LuPlus className="w-4 h-4 mr-1.5" />
-                  添加商品
+                  {t("addProduct")}
                 </Button>
                 <Button variant="outline" onClick={importExamples}>
-                  导入示例商品
+                  {t("importExamples")}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-3">没有现成商品？先导入 3 个示例商品试试批量出片</p>
+              <p className="text-xs text-muted-foreground mt-3">{t("emptyHint")}</p>
             </CardContent>
           </Card>
         ) : (
           products.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold">全部商品</h2>
+                <h2 className="text-lg font-semibold">{t("allProducts")}</h2>
                 <span className="text-sm text-muted-foreground">
-                  {products.length} 个商品
+                  {t("productCount", { n: products.length })}
                 </span>
               </div>
 
@@ -543,7 +553,7 @@ export default function ProductsPage() {
                               categoryColorMap[product.category] || categoryColorMap.other
                             } border-0 text-xs`}
                           >
-                            {categoryLabelMap[product.category] || "其他"}
+                            {t(categoryLabelKeyMap[product.category] || "categoryOther")}
                           </Badge>
                         </div>
                         {/* 悬浮操作按钮 */}
@@ -580,7 +590,7 @@ export default function ProductsPage() {
                             </span>
                           )}
                           <span className="text-xs text-muted-foreground ml-auto">
-                            {product.videoCount} 个视频
+                            {t("videoCount", { n: product.videoCount })}
                           </span>
                         </div>
                       </div>

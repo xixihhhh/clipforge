@@ -1,9 +1,11 @@
-# 带货剪手 - AI 电商短视频自动生成工具
+# ClipForge — AI 短视频创作工具
 
-> **AI E-commerce Video Generator** | 上传商品图，自动生成抖音/快手/小红书带货短视频
+> **AI Short-Video Creator** | 一句话主题、或一张商品图 → AI 写脚本、自动配画面、免费配音 → 一键产出竖屏短视频
+
+<p align="right"><strong>中文</strong> · <a href="README.en.md">English</a></p>
 
 <p align="center">
-  <img src="https://github.com/xixihhhh/daihuo-jianshou/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://github.com/xixihhhh/clipforge/actions/workflows/ci.yml/badge.svg" alt="CI" />
   <img src="https://img.shields.io/badge/License-AGPL%20v3-blue?style=flat-square" alt="License: AGPL v3" />
   <img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" alt="React 19" />
@@ -13,11 +15,16 @@
   <img src="https://img.shields.io/badge/AI-多模型聚合-FF6F00?style=flat-square" alt="AI Multi-Model" />
 </p>
 
-**带货剪手**是一款面向电商卖家和短视频运营的 AI 视频生成工具。只需上传商品图片，AI 自动分析卖点、生成带货脚本、逐镜头生成素材、合成完整视频，一键导出到抖音、快手、小红书等平台。
+**ClipForge** 是一款本地优先、开源的 AI 短视频创作工具，**界面支持中文 / English 一键切换**。两条零门槛路径：
 
-> 🚀 **正在升级为通用 AI 短视频创作平台**：在带货之外，新增 **一句话主题成片**（无需商品，输入一句话→自动写脚本→免费素材自动配画面→合成，已端到端打通）与 **多源免费素材引擎**（Openverse 免 Key / Pixabay / Pexels），目标是让不懂技术的人零配置也能成片；并在推进 **Electron 一键桌面包**（Win/Mac 双击即用）。带货是其中最强的高转化模板，而非唯一前提。详见 [Roadmap](#roadmap)。
+- **一句话主题成片**（无需任何商品、无需任何 API Key）：输入一句话主题 → AI 写旁白脚本 → 从免费素材库（Openverse 免 Key）自动配齐画面 → 免费 AI 配音（微软 Edge keyless TTS）→ FFmpeg 合成竖屏成片。
+- **商品带货成片**：上传商品图 → AI 分析卖点、生成多套脚本 → 逐镜头生成素材 → 合成 → 一键导出抖音 / 快手 / 小红书 / TikTok 等平台版本。
 
-**关键词**: AI 视频生成 / 电商带货 / 短视频自动化 / AI 脚本生成 / 抖音视频制作 / 快手带货 / 小红书种草视频 / AIGC / Seedance 2.0 / GPT Image 2 / Kling 3.0 / Veo 3 / Nano Banana 2 / FLUX / Vidu / Hailuo
+带货只是其中转化最强的一种模板，而非唯一前提——ClipForge 面向全球任意主题的短视频创作。
+
+> 🌍 全球化 & 通用化：多语言 UI、多源免费素材、免费配音兜底，目标是让不懂技术的人零配置也能成片；并在推进 **Electron 一键桌面包**（Win/Mac 双击即用）。详见 [Roadmap](#roadmap)。
+
+**关键词**: AI video generator / short-video automation / AI script / text-to-video / 电商带货 / 抖音 / 快手 / 小红书 / TikTok / AIGC / Seedance 2.0 / GPT Image 2 / Kling 3.0 / Veo 3 / FLUX / Edge TTS / Openverse
 
 ---
 
@@ -33,9 +40,9 @@
 
 ---
 
-## 为什么选择带货剪手？
+## 为什么选择ClipForge？
 
-| 痛点 | 传统方式 | 带货剪手 |
+| 痛点 | 传统方式 | ClipForge |
 |------|---------|---------|
 | **脚本创作** | 编导写脚本 1-2 小时 | AI 30 秒生成 3 套脚本 |
 | **素材制作** | 拍摄+修图 1-3 天 | AI 生图/生视频，分钟级出片 |
@@ -155,8 +162,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/xixihhhh/daihuo-jianshou.git
-cd daihuo-jianshou
+git clone https://github.com/xixihhhh/clipforge.git
+cd clipforge
 
 # 安装依赖（必须用 pnpm）
 pnpm install
@@ -338,6 +345,7 @@ pnpm dist       # 出 .dmg 安装包
 - [x] **多源免费素材引擎**（Openverse 免 Key / Pixabay / Pexels，聚合检索 + 合规署名）
 
 **进行中（通用化 + 桌面分发）**
+- [x] **品牌升级 ClipForge + 多语言 UI**（零依赖前端国际化，中文默认 / English 一键切换，全站页面国际化；面向全球任意主题，不止带货）
 - [x] 无商品「一句话主题成片」闭环（一句话主题→去商品化旁白脚本→英文检索词→免费素材自动配齐→FFmpeg 合成竖屏成片，已端到端实测 13s/720×1280）
 - [x] 免费 edge-tts 配音兜底 + 音色试听（零 Key 也能出声）——自研零依赖 keyless Edge TTS 客户端（Node 内置 WebSocket + Sec-MS-GEC 令牌），合成页未配付费 TTS 时默认启用，5 款中文音色可试听，已端到端实测出有声成片
 - [x] **Electron 一键桌面包**：mac 打包 App 实测可启动 + DB 路由 200（better-sqlite3 切 Electron ABI、数据落 userData、内置 ffmpeg）。待办：CI 矩阵出 .dmg/.exe 发 Releases + GUI 真机实测

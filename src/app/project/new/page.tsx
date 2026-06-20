@@ -21,35 +21,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
-// 商品品类选项
+// 商品品类选项（label 改为 i18n key，渲染时经 t() 转换）
 const categoryOptions = [
-  { value: "beauty", label: "美妆护肤" },
-  { value: "food", label: "食品零食" },
-  { value: "home", label: "家居日用" },
-  { value: "fashion", label: "服饰鞋包" },
-  { value: "digital", label: "数码3C" },
-  { value: "other", label: "其他" },
+  { value: "beauty", labelKey: "categoryBeauty" },
+  { value: "food", labelKey: "categoryFood" },
+  { value: "home", labelKey: "categoryHome" },
+  { value: "fashion", labelKey: "categoryFashion" },
+  { value: "digital", labelKey: "categoryDigital" },
+  { value: "other", labelKey: "categoryOther" },
 ];
 
-// 目标时长选项
+// 目标时长选项（label 为纯单位文案，无需翻译）
 const durationOptions = [
   { value: "15", label: "15s" },
   { value: "30", label: "30s" },
   { value: "60", label: "60s" },
 ];
 
-// 脚本风格选项
+// 脚本风格选项（label/desc 改为 i18n key，渲染时经 t() 转换）
 const styleOptions = [
-  { value: "pain-point", label: "痛点种草", desc: "直击用户痛点，激发购买欲" },
-  { value: "scenario", label: "场景安利", desc: "真实场景展示，沉浸式种草" },
-  { value: "comparison", label: "对比测评", desc: "横向对比突出优势" },
-  { value: "story", label: "剧情故事", desc: "故事化包装，增强代入感" },
-  { value: "auto", label: "智能推荐", desc: "AI 根据商品特性自动推荐" },
+  { value: "pain-point", labelKey: "stylePainPointLabel", descKey: "stylePainPointDesc" },
+  { value: "scenario", labelKey: "styleScenarioLabel", descKey: "styleScenarioDesc" },
+  { value: "comparison", labelKey: "styleComparisonLabel", descKey: "styleComparisonDesc" },
+  { value: "story", labelKey: "styleStoryLabel", descKey: "styleStoryDesc" },
+  { value: "auto", labelKey: "styleAutoLabel", descKey: "styleAutoDesc" },
 ];
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const t = useT("newProject");
+  const tc = useT("common");
 
   // 检查 LLM API 配置状态
   const { llm, providers } = useSettingsStore();
@@ -181,7 +185,7 @@ export default function NewProjectPage() {
 
     try {
       // 第1步：创建项目（先拿到 projectId）
-      setProgress({ step: "creating", percent: 15, message: "正在创建项目..." });
+      setProgress({ step: "creating", percent: 15, message: t("progressCreating") });
       const projectRes = await fetch("/api/project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -193,18 +197,18 @@ export default function NewProjectPage() {
           productImages: [],
         }),
       });
-      if (!projectRes.ok) throw new Error("项目创建失败，请重试");
+      if (!projectRes.ok) throw new Error(t("errorCreateFailed"));
       const project = await projectRes.json();
 
       // 第2步：上传图片（携带 projectId）
-      setProgress({ step: "uploading", percent: 35, message: "正在上传商品图片..." });
+      setProgress({ step: "uploading", percent: 35, message: t("progressUploading") });
       const formData = new FormData();
       images.forEach((img) => formData.append("files", img.file));
       formData.append("projectId", project.id);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       if (!uploadRes.ok) {
         const errData = await uploadRes.json().catch(() => ({}));
-        throw new Error(errData.error || "图片上传失败，请检查网络后重试");
+        throw new Error(errData.error || t("errorUploadFailed"));
       }
       const { paths } = await uploadRes.json();
 
@@ -216,7 +220,7 @@ export default function NewProjectPage() {
       });
 
       // 第3步：生成脚本
-      setProgress({ step: "generating", percent: 60, message: "AI 正在分析商品并生成脚本..." });
+      setProgress({ step: "generating", percent: 60, message: t("progressGenerating") });
       // 如果选了出镜人物，附带人物信息
       const selectedCharacter = selectedCharacterId
         ? characters.find((c) => c.id === selectedCharacterId)
@@ -272,14 +276,14 @@ export default function NewProjectPage() {
       if (selectedTemplateId) {
         incrementUseCount(selectedTemplateId);
       }
-      if (!scriptRes.ok) throw new Error("脚本生成失败，请检查 LLM 设置后重试");
+      if (!scriptRes.ok) throw new Error(t("errorScriptFailed"));
 
       // 第4步：完成
-      setProgress({ step: "done", percent: 100, message: "脚本生成完成！正在跳转..." });
+      setProgress({ step: "done", percent: 100, message: t("progressDone") });
       await new Promise((r) => setTimeout(r, 800));
       router.push(`/project/${project.id}/script`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "操作失败，请重试");
+      setError(err instanceof Error ? err.message : t("errorGeneric"));
       setIsSubmitting(false);
       setProgress(null);
     }
@@ -295,7 +299,7 @@ export default function NewProjectPage() {
             <Link href="/">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground -ml-2">
                 <LuArrowLeft className="w-4 h-4" />
-                <span className="ml-1">返回</span>
+                <span className="ml-1">{tc("back")}</span>
               </Button>
             </Link>
             <div className="h-5 w-px bg-border/50" />
@@ -310,6 +314,7 @@ export default function NewProjectPage() {
               <span className="text-sm font-semibold tracking-tight">ClipForge</span>
             </div>
           </div>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -317,10 +322,10 @@ export default function NewProjectPage() {
         {/* 页面标题 */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
-            新建<span className="brand-gradient-text">带货项目</span>
+            {t("pageTitlePrefix")}<span className="brand-gradient-text">{t("pageTitleAccent")}</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5">
-            上传商品图片并填写信息，AI 将为你生成专业的带货脚本
+            {t("pageSubtitle")}
           </p>
         </div>
 
@@ -330,8 +335,8 @@ export default function NewProjectPage() {
             <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 cursor-pointer hover:bg-amber-100 transition-colors">
               <LuCircleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-amber-900">请先配置 LLM 服务</p>
-                <p className="text-xs text-amber-700 mt-0.5">脚本生成需要 LLM（如 GPT-4o），请先在设置中配置 API Key。<span className="underline">前往设置 →</span></p>
+                <p className="text-sm font-medium text-amber-900">{t("llmWarnTitle")}</p>
+                <p className="text-xs text-amber-700 mt-0.5">{t("llmWarnDesc")}<span className="underline">{t("llmWarnCta")}</span></p>
               </div>
             </div>
           </Link>
@@ -343,10 +348,10 @@ export default function NewProjectPage() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-1">
                 <LuZap className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold">快速开始</span>
-                <Badge variant="secondary" className="text-[10px]">示例</Badge>
+                <span className="text-sm font-semibold">{t("quickStartTitle")}</span>
+                <Badge variant="secondary" className="text-[10px]">{t("exampleBadge")}</Badge>
               </div>
-              <p className="text-xs text-muted-foreground mb-4">没有素材？点一个示例商品，自动填好商品信息和示例图，直接体验生成流程。</p>
+              <p className="text-xs text-muted-foreground mb-4">{t("quickStartDesc")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {exampleProducts.map((ex) => (
                   <button
@@ -372,15 +377,15 @@ export default function NewProjectPage() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
-                <span className="text-sm font-semibold">上传商品图片</span>
+                <span className="text-sm font-semibold">{t("stepUploadTitle")}</span>
               </div>
               <div className="flex items-center justify-between mb-4">
                 <Label className="text-sm font-medium">
-                  商品图片
+                  {t("imageLabel")}
                   <span className="text-destructive ml-0.5">*</span>
                 </Label>
                 <span className="text-xs text-muted-foreground">
-                  {images.length}/5 张
+                  {t("imageCount", { n: images.length })}
                 </span>
               </div>
 
@@ -414,11 +419,11 @@ export default function NewProjectPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">
-                        拖拽图片到这里，或{" "}
-                        <span className="brand-gradient-text font-semibold">点击上传</span>
+                        {t("dropHintPrefix")}
+                        <span className="brand-gradient-text font-semibold">{t("dropHintClick")}</span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        支持 JPG / PNG / WebP，最多 5 张
+                        {t("dropHintFormats")}
                       </p>
                     </div>
                   </div>
@@ -436,7 +441,7 @@ export default function NewProjectPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={img.url}
-                        alt="商品图片"
+                        alt={t("imageAlt")}
                         className="h-full w-full object-cover"
                       />
                       {/* 删除按钮 */}
@@ -460,17 +465,17 @@ export default function NewProjectPage() {
             <CardContent className="p-5 space-y-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
-                <span className="text-sm font-semibold">填写商品信息</span>
+                <span className="text-sm font-semibold">{t("stepInfoTitle")}</span>
               </div>
               {/* 商品名称 */}
               <div className="space-y-2">
                 <Label htmlFor="productName" className="text-sm font-medium">
-                  商品名称
+                  {t("productNameLabel")}
                   <span className="text-destructive ml-0.5">*</span>
                 </Label>
                 <Input
                   id="productName"
-                  placeholder="例如：小米手环8 NFC版"
+                  placeholder={t("productNamePlaceholder")}
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   className="bg-muted/30 border-border/50 focus:border-primary"
@@ -479,18 +484,21 @@ export default function NewProjectPage() {
 
               {/* 商品品类 */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">商品品类</Label>
+                <Label className="text-sm font-medium">{t("categoryLabel")}</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val ?? "")}>
                   <SelectTrigger className="w-full bg-muted/30 border-border/50">
                     {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
                     <SelectValue>
-                      {(value: string) => categoryOptions.find((o) => o.value === value)?.label ?? "选择商品品类"}
+                      {(value: string) => {
+                        const opt = categoryOptions.find((o) => o.value === value);
+                        return opt ? t(opt.labelKey) : t("categoryPlaceholder");
+                      }}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -501,13 +509,13 @@ export default function NewProjectPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="sellingPoints" className="text-sm font-medium">
-                    商品卖点
+                    {t("sellingPointsLabel")}
                   </Label>
-                  <span className="text-xs text-muted-foreground">选填</span>
+                  <span className="text-xs text-muted-foreground">{t("optional")}</span>
                 </div>
                 <Textarea
                   id="sellingPoints"
-                  placeholder="描述商品的核心卖点、独特优势，AI 将据此生成更精准的脚本..."
+                  placeholder={t("sellingPointsPlaceholder")}
                   value={sellingPoints}
                   onChange={(e) => setSellingPoints(e.target.value)}
                   rows={3}
@@ -517,13 +525,13 @@ export default function NewProjectPage() {
 
               {/* 价格定位 */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">价格定位</Label>
+                <Label className="text-sm font-medium">{t("priceLabel")}</Label>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { value: "0-50", label: "50元以下" },
-                    { value: "50-200", label: "50-200元" },
-                    { value: "200-500", label: "200-500元" },
-                    { value: "500+", label: "500元以上" },
+                    { value: "0-50", labelKey: "priceUnder50" },
+                    { value: "50-200", labelKey: "price50to200" },
+                    { value: "200-500", labelKey: "price200to500" },
+                    { value: "500+", labelKey: "price500plus" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -534,7 +542,7 @@ export default function NewProjectPage() {
                           : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -542,21 +550,29 @@ export default function NewProjectPage() {
 
               {/* 目标人群（多选标签） */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">目标人群</Label>
+                <Label className="text-sm font-medium">{t("audienceLabel")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    "学生党", "上班族", "宝妈", "精致白领", "中年群体", "男性用户", "健身人群", "数码爱好者"
+                    // value 为传给 API 的原始标签（不翻译），labelKey 仅用于展示
+                    { value: "学生党", labelKey: "audienceStudent" },
+                    { value: "上班族", labelKey: "audienceWorker" },
+                    { value: "宝妈", labelKey: "audienceMom" },
+                    { value: "精致白领", labelKey: "audienceWhiteCollar" },
+                    { value: "中年群体", labelKey: "audienceMiddleAge" },
+                    { value: "男性用户", labelKey: "audienceMale" },
+                    { value: "健身人群", labelKey: "audienceFitness" },
+                    { value: "数码爱好者", labelKey: "audienceTechFan" },
                   ].map((tag) => (
                     <button
-                      key={tag}
-                      onClick={() => toggleAudience(tag)}
+                      key={tag.value}
+                      onClick={() => toggleAudience(tag.value)}
                       className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                        targetAudience.includes(tag)
+                        targetAudience.includes(tag.value)
                           ? "bg-primary/15 text-primary border-primary/30"
                           : "bg-muted/20 text-muted-foreground border-border/50 hover:border-primary/30"
                       }`}
                     >
-                      {tag}
+                      {t(tag.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -564,12 +580,12 @@ export default function NewProjectPage() {
 
               {/* 投放平台（多选） */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">投放平台</Label>
+                <Label className="text-sm font-medium">{t("platformLabel")}</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: "douyin", label: "抖音" },
-                    { value: "kuaishou", label: "快手" },
-                    { value: "xiaohongshu", label: "小红书" },
+                    { value: "douyin", labelKey: "platformDouyin" },
+                    { value: "kuaishou", labelKey: "platformKuaishou" },
+                    { value: "xiaohongshu", labelKey: "platformXiaohongshu" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -580,7 +596,7 @@ export default function NewProjectPage() {
                           : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -589,12 +605,12 @@ export default function NewProjectPage() {
               {/* 用法与优势 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="usageAdvantage" className="text-sm font-medium">用法与优势</Label>
-                  <span className="text-xs text-muted-foreground">选填</span>
+                  <Label htmlFor="usageAdvantage" className="text-sm font-medium">{t("usageLabel")}</Label>
+                  <span className="text-xs text-muted-foreground">{t("optional")}</span>
                 </div>
                 <Textarea
                   id="usageAdvantage"
-                  placeholder="描述产品的使用方法、独特优势、和竞品的差异化等..."
+                  placeholder={t("usagePlaceholder")}
                   value={usageAdvantage}
                   onChange={(e) => setUsageAdvantage(e.target.value)}
                   rows={3}
@@ -609,11 +625,11 @@ export default function NewProjectPage() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
-                <span className="text-sm font-semibold">选择视频配置</span>
+                <span className="text-sm font-semibold">{t("stepConfigTitle")}</span>
               </div>
 
               {/* 目标时长 */}
-              <Label className="text-sm font-medium mb-3 block">目标时长</Label>
+              <Label className="text-sm font-medium mb-3 block">{t("durationLabel")}</Label>
               <div className="grid grid-cols-3 gap-3">
                 {durationOptions.map((opt) => (
                   <button
@@ -640,13 +656,13 @@ export default function NewProjectPage() {
               <div className="my-5 border-t border-border/40" />
 
               {/* 视频模式 */}
-              <Label className="text-sm font-medium mb-3 block">视频模式</Label>
+              <Label className="text-sm font-medium mb-3 block">{t("videoModeLabel")}</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { value: "product_closeup", label: "产品特写", desc: "商品原图为主，真实感最高", icon: LuBox },
-                  { value: "graphic_montage", label: "图文混剪", desc: "快节奏图文卡片，适合快消品", icon: LuLayoutGrid },
-                  { value: "scene_demo", label: "场景演示", desc: "AI 生成使用场景，不含人脸", icon: LuEye },
-                  { value: "live_presenter", label: "真人出镜", desc: "人物出镜讲解（需要角色或素材）", icon: LuVideo },
+                  { value: "product_closeup", labelKey: "modeCloseupLabel", descKey: "modeCloseupDesc", icon: LuBox },
+                  { value: "graphic_montage", labelKey: "modeMontageLabel", descKey: "modeMontageDesc", icon: LuLayoutGrid },
+                  { value: "scene_demo", labelKey: "modeSceneLabel", descKey: "modeSceneDesc", icon: LuEye },
+                  { value: "live_presenter", labelKey: "modePresenterLabel", descKey: "modePresenterDesc", icon: LuVideo },
                 ].map((opt) => {
                   const Icon = opt.icon;
                   return (
@@ -668,9 +684,9 @@ export default function NewProjectPage() {
                       <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${videoMode === opt.value ? "text-primary" : "text-muted-foreground"}`} />
                       <div>
                         <span className={`text-sm font-medium ${videoMode === opt.value ? "text-primary" : "text-foreground"}`}>
-                          {opt.label}
+                          {t(opt.labelKey)}
                         </span>
-                        <span className="text-xs text-muted-foreground mt-0.5 block">{opt.desc}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5 block">{t(opt.descKey)}</span>
                       </div>
                       {videoMode === opt.value && (
                         <div className="absolute top-2.5 right-2.5">
@@ -691,10 +707,10 @@ export default function NewProjectPage() {
                 <div className="mb-3">
                   <Label className="text-sm font-medium flex items-center gap-1.5">
                     <LuBookmark className="w-4 h-4 text-primary" />
-                    使用爆款模板
+                    {t("templateTitle")}
                   </Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    选择已保存的成功脚本结构，自动套用到新商品
+                    {t("templateDesc")}
                   </p>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
@@ -708,9 +724,9 @@ export default function NewProjectPage() {
                     }`}
                   >
                     <span className={`text-sm font-medium ${selectedTemplateId === null ? "text-primary" : "text-foreground"}`}>
-                      不使用模板
+                      {t("templateNone")}
                     </span>
-                    <span className="text-[11px] text-muted-foreground mt-0.5">AI 自由生成</span>
+                    <span className="text-[11px] text-muted-foreground mt-0.5">{t("templateNoneDesc")}</span>
                   </button>
                   {/* 模板列表 */}
                   {templates.map((tpl) => (
@@ -727,7 +743,7 @@ export default function NewProjectPage() {
                         {tpl.name}
                       </span>
                       <span className="text-[11px] text-muted-foreground mt-0.5">
-                        {tpl.category || tpl.styleType || "通用"} · 已用 {tpl.useCount} 次
+                        {tpl.category || tpl.styleType || t("templateGeneric")} · {t("templateUsedCount", { n: tpl.useCount })}
                       </span>
                     </button>
                   ))}
@@ -741,9 +757,9 @@ export default function NewProjectPage() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
-                <span className="text-sm font-semibold">选择脚本风格</span>
+                <span className="text-sm font-semibold">{t("stepStyleTitle")}</span>
               </div>
-              <Label className="text-sm font-medium mb-3 block">脚本风格</Label>
+              <Label className="text-sm font-medium mb-3 block">{t("scriptStyleLabel")}</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {styleOptions.map((opt) => (
                   <button
@@ -760,10 +776,10 @@ export default function NewProjectPage() {
                         scriptStyle === opt.value ? "text-primary" : "text-foreground"
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </span>
                     <span className="text-xs text-muted-foreground mt-0.5">
-                      {opt.desc}
+                      {t(opt.descKey)}
                     </span>
                     {/* 选中指示器 */}
                     {scriptStyle === opt.value && (
@@ -785,8 +801,8 @@ export default function NewProjectPage() {
             <Card className="glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium">出镜人物</Label>
-                  <span className="text-xs text-muted-foreground">可选</span>
+                  <Label className="text-sm font-medium">{t("characterTitle")}</Label>
+                  <span className="text-xs text-muted-foreground">{t("characterOptional")}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {/* 不使用人物 */}
@@ -800,8 +816,8 @@ export default function NewProjectPage() {
                   >
                     <LuUserX className="w-5 h-5 text-muted-foreground shrink-0" />
                     <div>
-                      <span className="text-sm font-medium block">不使用</span>
-                      <span className="text-[11px] text-muted-foreground">纯产品展示</span>
+                      <span className="text-sm font-medium block">{t("characterNone")}</span>
+                      <span className="text-[11px] text-muted-foreground">{t("characterNoneDesc")}</span>
                     </div>
                   </button>
 
@@ -870,22 +886,22 @@ export default function NewProjectPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  {progress?.message || "处理中..."}
+                  {progress?.message || t("submitProcessing")}
                 </>
               ) : (
                 <>
                   <LuZap className="w-5 h-5 mr-2" />
-                  开始生成脚本
+                  {t("submitGenerate")}
                 </>
               )}
             </Button>
             {!isSubmitting && (
               <p className="text-xs text-muted-foreground text-center mt-3">
                 {!isLLMConfigured
-                  ? "请先在设置中配置 LLM API Key"
+                  ? t("hintNeedLlm")
                   : !isValid
-                    ? "请上传至少一张商品图并填写商品名称"
-                    : "AI 将分析商品图片和卖点，生成多套专业带货脚本供你选择"}
+                    ? t("hintNeedInput")
+                    : t("hintReady")}
               </p>
             )}
           </div>

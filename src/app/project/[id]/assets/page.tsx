@@ -8,7 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { mergeCustomModels, buildImageOptions, buildVideoOptions } from "@/lib/gen-params";
 import type { Shot } from "@/lib/db/schema";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
 // 素材项（由真实脚本分镜派生）
 interface AssetItem {
@@ -25,14 +28,14 @@ interface AssetItem {
   isVideo?: boolean;
 }
 
-// 镜头类型标签
-const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
-  hook: { label: "钩子", color: "bg-red-500/20 text-red-400" },
-  pain_point: { label: "痛点", color: "bg-orange-500/20 text-orange-400" },
-  product_reveal: { label: "产品", color: "bg-blue-500/20 text-blue-400" },
-  demo: { label: "演示", color: "bg-green-500/20 text-green-400" },
-  social_proof: { label: "背书", color: "bg-purple-500/20 text-purple-400" },
-  cta: { label: "转化", color: "bg-amber-500/20 text-amber-400" },
+// 镜头类型标签（label 改为 assets 命名空间的词条 key，按语言取）
+const shotTypeLabels: Record<Shot["type"], { key: string; color: string }> = {
+  hook: { key: "shotTypeHook", color: "bg-red-500/20 text-red-400" },
+  pain_point: { key: "shotTypePainPoint", color: "bg-orange-500/20 text-orange-400" },
+  product_reveal: { key: "shotTypeProductReveal", color: "bg-blue-500/20 text-blue-400" },
+  demo: { key: "shotTypeDemo", color: "bg-green-500/20 text-green-400" },
+  social_proof: { key: "shotTypeSocialProof", color: "bg-purple-500/20 text-purple-400" },
+  cta: { key: "shotTypeCta", color: "bg-amber-500/20 text-amber-400" },
 };
 
 // 默认生图模型对应的平台信息（用于发起生成请求）
@@ -59,8 +62,10 @@ function toEditVariant(modelId: string): string {
 }
 
 export default function AssetsPage() {
+  const t = useT("assets");
+  const tc = useT("common");
   const { id } = useParams<{ id: string }>();
-  const { providers, defaultImageModel, defaultVideoModel } = useSettingsStore();
+  const { providers, defaultImageModel, defaultVideoModel, customModels, imageParams, videoParams } = useSettingsStore();
 
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [productImages, setProductImages] = useState<string[]>([]);
@@ -117,7 +122,7 @@ export default function AssetsPage() {
 
         if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
           setAssets([]);
-          setLoadError("尚未生成脚本，请先返回脚本步骤生成分镜");
+          setLoadError(t("errorNoScript"));
           return;
         }
 
@@ -140,7 +145,7 @@ export default function AssetsPage() {
           })
         );
       } catch (e) {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : "加载失败");
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : t("errorLoadFailed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -169,7 +174,9 @@ export default function AssetsPage() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        const model = (data.models ?? []).find((m: { id: string }) => m.id === defaultImageModel);
+        // 并入用户自定义模型，使自定义生图模型也能被解析到对应平台
+        const merged = mergeCustomModels(data.models ?? [], customModels, "image", new Set(enabled.map((e) => e.name)));
+        const model = merged.find((m) => m.id === defaultImageModel);
         if (cancelled || !model) return;
         const prov = enabled.find((e) => e.name === model.provider);
         if (prov) {
@@ -182,7 +189,7 @@ export default function AssetsPage() {
     return () => {
       cancelled = true;
     };
-  }, [providers, defaultImageModel]);
+  }, [providers, defaultImageModel, customModels]);
 
   // 解析默认生视频模型对应的平台（用于「转动态镜头」）
   useEffect(() => {
@@ -203,7 +210,9 @@ export default function AssetsPage() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        const model = (data.models ?? []).find((m: { id: string }) => m.id === defaultVideoModel);
+        // 并入用户自定义视频模型
+        const merged = mergeCustomModels(data.models ?? [], customModels, "video", new Set(enabled.map((e) => e.name)));
+        const model = merged.find((m) => m.id === defaultVideoModel);
         if (cancelled || !model) return;
         const prov = enabled.find((e) => e.name === model.provider);
         if (prov) {
@@ -216,7 +225,7 @@ export default function AssetsPage() {
     return () => {
       cancelled = true;
     };
-  }, [providers, defaultVideoModel]);
+  }, [providers, defaultVideoModel, customModels]);
 
   // 转动态镜头：用该分镜已生成的图作首帧，调图生视频模型，结果存为该分镜素材（视频）
   const generateMotion = useCallback(
@@ -225,7 +234,7 @@ export default function AssetsPage() {
       if (!asset?.thumbnailUrl) return;
       if (!videoModelTarget) {
         setAssets((prev) =>
-          prev.map((a) => (a.shotId === shotId ? { ...a, error: "未配置默认生视频模型，请先在设置中选择" } : a))
+          prev.map((a) => (a.shotId === shotId ? { ...a, error: t("errorNoVideoModel") } : a))
         );
         return;
       }
@@ -242,12 +251,14 @@ export default function AssetsPage() {
             mode: "image-to-video",
             prompt: asset.prompt || asset.description,
             imageUrl: asset.thumbnailUrl,
+            // 用户自定义视频参数（比例/分辨率/时长/帧率/运动/种子/反向词）
+            options: buildVideoOptions(videoParams),
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "图生视频失败");
+        if (!res.ok) throw new Error(data.error || t("errorImageToVideoFailed"));
         const url = data.videoUrls?.[0];
-        if (!url) throw new Error("生成结果为空");
+        if (!url) throw new Error(t("errorEmptyResult"));
         // 存为该分镜素材（视频会被下载到本地），compose 会按视频片段处理（含原生音轨检测）
         const saveRes = await fetch(`/api/project/${id}/assets`, {
           method: "POST",
@@ -267,7 +278,7 @@ export default function AssetsPage() {
         );
       } catch (e) {
         setAssets((prev) =>
-          prev.map((a) => (a.shotId === shotId ? { ...a, error: e instanceof Error ? e.message : "图生视频失败" } : a))
+          prev.map((a) => (a.shotId === shotId ? { ...a, error: e instanceof Error ? e.message : t("errorImageToVideoFailed") } : a))
         );
       } finally {
         setMotionShots((prev) => {
@@ -277,7 +288,7 @@ export default function AssetsPage() {
         });
       }
     },
-    [assets, videoModelTarget, id]
+    [assets, videoModelTarget, id, videoParams]
   );
 
   // 真实生成单个素材
@@ -308,7 +319,7 @@ export default function AssetsPage() {
         setAssets((prev) =>
           prev.map((a) =>
             a.shotId === shotId
-              ? { ...a, status: "failed", error: "未配置默认生图模型，请先在设置中启用平台并选择模型" }
+              ? { ...a, status: "failed", error: t("errorNoImageModel") }
               : a
           )
         );
@@ -339,12 +350,14 @@ export default function AssetsPage() {
             mode: genMode,
             prompt: genPrompt,
             ...(useProductSafe && { imageUrl: productImages[0] }),
+            // 用户自定义图片参数（比例→尺寸/数量/步数/引导/种子/反向词）
+            options: buildImageOptions(imageParams),
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "生成失败");
+        if (!res.ok) throw new Error(data.error || t("errorGenerateFailed"));
         const url = data.imageUrls?.[0];
-        if (!url) throw new Error("生成结果为空");
+        if (!url) throw new Error(t("errorEmptyResult"));
         // 落库（远程图会被下载到本地），供合成读取真实 AI 素材
         let savedUrl = url;
         try {
@@ -369,12 +382,12 @@ export default function AssetsPage() {
       } catch (e) {
         setAssets((prev) =>
           prev.map((a) =>
-            a.shotId === shotId ? { ...a, status: "failed", error: e instanceof Error ? e.message : "生成失败" } : a
+            a.shotId === shotId ? { ...a, status: "failed", error: e instanceof Error ? e.message : t("errorGenerateFailed") } : a
           )
         );
       }
     },
-    [assets, modelTarget, productImages, productSafe]
+    [assets, modelTarget, productImages, productSafe, imageParams]
   );
 
   // 一键全部生成（串行，避免并发打满平台限流）
@@ -404,12 +417,13 @@ export default function AssetsPage() {
               <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+            <span className="text-sm text-muted-foreground">{projectName || t("untitledProject")}</span>
           </div>
 
           {/* 步骤进度 */}
           <div className="flex items-center gap-1">
-            {["脚本", "素材", "视频", "导出"].map((step, i) => (
+            <LanguageToggle className="mr-1" />
+            {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
                 <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 1 ? "bg-primary text-primary-foreground" : i < 1 ? "text-primary" : "text-muted-foreground"}`}>
                   <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 1 ? "bg-white/20" : i < 1 ? "bg-primary/20" : "bg-muted"}`}>
@@ -428,9 +442,9 @@ export default function AssetsPage() {
         {/* 操作栏 */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold">素材生成</h2>
+            <h2 className="text-lg font-semibold">{t("title")}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {loading ? "加载中..." : `${doneCount}/${assets.length} 个素材已就绪`}
+              {loading ? tc("loading") : t("assetsReady", { done: doneCount, total: assets.length })}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -438,7 +452,7 @@ export default function AssetsPage() {
               <button
                 type="button"
                 onClick={() => setProductSafe((v) => !v)}
-                title="展示商品的 AI 分镜将用你的商品图重绘，锁定商品外观，避免 AI 篡改"
+                title={t("productSafeTip")}
                 className={`flex items-center gap-1.5 rounded-full border px-3 h-8 text-xs font-medium transition-all ${
                   productSafe
                     ? "border-primary bg-primary/10 text-primary"
@@ -446,13 +460,13 @@ export default function AssetsPage() {
                 }`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${productSafe ? "bg-primary" : "bg-muted-foreground/40"}`} />
-                商品保真{productSafe ? "·开" : "·关"}
+                {t("productSafe")}{productSafe ? t("on") : t("off")}
               </button>
             )}
             <Link href={`/project/${id}/script`}>
               <Button variant="outline" size="sm" className="text-xs">
                 <LuArrowLeft className="w-3.5 h-3.5 mr-1" />
-                返回脚本
+                {t("backToScript")}
               </Button>
             </Link>
             <Button
@@ -463,14 +477,14 @@ export default function AssetsPage() {
               {isBatchGenerating ? (
                 <>
                   <LuLoaderCircle className="animate-spin mr-1.5 h-3.5 w-3.5" />
-                  生成中...
+                  {t("generatingAll")}
                 </>
               ) : allDone ? (
-                "全部完成"
+                t("allDone")
               ) : (
                 <>
                   <LuZap className="w-3.5 h-3.5 mr-1" />
-                  一键全部生成
+                  {t("generateAll")}
                 </>
               )}
             </Button>
@@ -482,10 +496,10 @@ export default function AssetsPage() {
           <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
             <LuTriangleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-amber-900">未配置默认生图模型</p>
+              <p className="text-sm font-medium text-amber-900">{t("noModelTitle")}</p>
               <p className="text-xs text-amber-700 mt-0.5">
-                AI 生成类分镜需要在设置中启用 AI 平台并选择「默认生图模型」（如 GPT Image 2）。
-                <Link href="/settings" className="underline ml-1">前往设置 →</Link>
+                {t("noModelDesc")}
+                <Link href="/settings" className="underline ml-1">{t("goToSettings")}</Link>
               </p>
             </div>
           </div>
@@ -495,14 +509,14 @@ export default function AssetsPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <LuLoaderCircle className="w-6 h-6 animate-spin mb-3" />
-            <p className="text-sm">正在加载脚本分镜...</p>
+            <p className="text-sm">{t("loadingShots")}</p>
           </div>
         ) : loadError ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <LuImage className="w-10 h-10 text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
             <Link href={`/project/${id}/script`}>
-              <Button variant="outline" size="sm">返回脚本步骤</Button>
+              <Button variant="outline" size="sm">{t("backToScriptStep")}</Button>
             </Link>
           </div>
         ) : (
@@ -531,7 +545,7 @@ export default function AssetsPage() {
                             {String(asset.shotId).padStart(2, "0")}
                           </span>
                           <Badge className={`${typeInfo.color} border-0 text-[10px] mt-1`}>
-                            {typeInfo.label}
+                            {t(typeInfo.key)}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground mt-1">{asset.duration}s</span>
                         </div>
@@ -541,12 +555,12 @@ export default function AssetsPage() {
                           <p className="text-sm leading-relaxed mb-2">{asset.description}</p>
                           {asset.prompt && (
                             <p className="text-xs text-muted-foreground bg-muted/20 rounded px-2 py-1.5 mb-2 line-clamp-2">
-                              Prompt: {asset.prompt}
+                              {t("promptLabel", { prompt: asset.prompt })}
                             </p>
                           )}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>
-                              {asset.visualSource === "product_image" ? "📷 商品原图" : asset.visualSource === "ai_generate" ? "✨ AI 生成" : "📁 用户上传"}
+                              {asset.visualSource === "product_image" ? t("sourceProductImage") : asset.visualSource === "ai_generate" ? t("sourceAiGenerate") : t("sourceUserUpload")}
                             </span>
                           </div>
                           {asset.status === "failed" && asset.error && (
@@ -560,7 +574,7 @@ export default function AssetsPage() {
                           <div className="w-24 h-16 bg-muted/30 rounded-md flex items-center justify-center border border-border/30 overflow-hidden">
                             {asset.status === "done" && asset.thumbnailUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={asset.thumbnailUrl} alt="素材预览" className="w-full h-full object-cover" />
+                              <img src={asset.thumbnailUrl} alt={t("assetPreviewAlt")} className="w-full h-full object-cover" />
                             ) : asset.status === "done" ? (
                               <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                                 <LuCheck className="w-5 h-5 text-primary" />
@@ -584,12 +598,12 @@ export default function AssetsPage() {
                               onClick={() => generateOne(asset.shotId)}
                             >
                               {asset.status === "generating"
-                                ? "生成中..."
+                                ? t("btnGenerating")
                                 : asset.status === "done"
-                                ? "重新生成"
+                                ? t("btnRegenerate")
                                 : asset.status === "failed"
-                                ? "重试"
-                                : "生成素材"}
+                                ? tc("retry")
+                                : t("btnGenerate")}
                             </Button>
                           )}
                           {/* 转动态镜头：已有图素材 → 图生视频（真实运镜）。商品特写镜头建议保持静态避免篡改 */}
@@ -600,13 +614,13 @@ export default function AssetsPage() {
                               className="text-xs w-24 text-muted-foreground hover:text-primary"
                               disabled={motionShots.has(asset.shotId)}
                               onClick={() => generateMotion(asset.shotId)}
-                              title="用这张图作首帧生成动态视频镜头（图生视频）"
+                              title={t("motionTip")}
                             >
-                              {motionShots.has(asset.shotId) ? "转动态中..." : "🎬 转动态"}
+                              {motionShots.has(asset.shotId) ? t("btnConvertingMotion") : t("btnConvertMotion")}
                             </Button>
                           )}
                           {asset.isVideo && (
-                            <span className="text-[10px] text-primary">✓ 动态镜头</span>
+                            <span className="text-[10px] text-primary">{t("motionDone")}</span>
                           )}
                           {asset.error && (
                             <span className="text-[10px] text-destructive max-w-24 text-center">{asset.error}</span>
@@ -623,7 +637,7 @@ export default function AssetsPage() {
             <div className="mt-8 flex justify-end">
               <Link href={allDone ? `/project/${id}/video` : "#"}>
                 <Button className="brand-gradient text-white text-sm" disabled={!allDone}>
-                  下一步：合成视频
+                  {t("nextCompose")}
                   <LuArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>

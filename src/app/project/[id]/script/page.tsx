@@ -13,22 +13,25 @@ import { Input } from "@/components/ui/input";
 import type { Shot } from "@/lib/db/schema";
 import { useTemplateStore } from "@/lib/stores/template-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
-// 镜头类型标签
-const shotTypeLabels: Record<Shot["type"], { label: string; color: string }> = {
-  hook: { label: "钩子", color: "bg-red-500/20 text-red-400" },
-  pain_point: { label: "痛点", color: "bg-orange-500/20 text-orange-400" },
-  product_reveal: { label: "产品", color: "bg-blue-500/20 text-blue-400" },
-  demo: { label: "演示", color: "bg-green-500/20 text-green-400" },
-  social_proof: { label: "背书", color: "bg-purple-500/20 text-purple-400" },
-  cta: { label: "转化", color: "bg-amber-500/20 text-amber-400" },
+// 镜头类型标签（label 改为词条 key，渲染时按语言取）
+const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> = {
+  hook: { labelKey: "shotTypeHook", color: "bg-red-500/20 text-red-400" },
+  pain_point: { labelKey: "shotTypePainPoint", color: "bg-orange-500/20 text-orange-400" },
+  product_reveal: { labelKey: "shotTypeProductReveal", color: "bg-blue-500/20 text-blue-400" },
+  demo: { labelKey: "shotTypeDemo", color: "bg-green-500/20 text-green-400" },
+  social_proof: { labelKey: "shotTypeSocialProof", color: "bg-purple-500/20 text-purple-400" },
+  cta: { labelKey: "shotTypeCta", color: "bg-amber-500/20 text-amber-400" },
 };
 
-const styleLabels: Record<string, string> = {
-  pain_point: "痛点种草",
-  scene: "场景安利",
-  comparison: "对比测评",
-  story: "剧情故事",
+// 脚本风格 → 词条 key（渲染时按语言取）
+const styleLabelKeys: Record<string, string> = {
+  pain_point: "stylePainPoint",
+  scene: "styleScene",
+  comparison: "styleComparison",
+  story: "styleStory",
 };
 
 // 后端 scripts 表返回的脚本结构
@@ -42,6 +45,8 @@ interface DbScript {
 }
 
 export default function ScriptPage() {
+  const t = useT("script");
+  const tc = useT("common");
   const { id } = useParams<{ id: string }>();
   const [selectedScript, setSelectedScript] = useState(0);
   const [scripts, setScripts] = useState<
@@ -89,7 +94,7 @@ export default function ScriptPage() {
         setScripts(
           dbScripts.map((s) => ({
             id: s.id,
-            title: s.title ?? "未命名脚本",
+            title: s.title ?? t("untitledScript"),
             styleType: s.styleType,
             totalDuration: s.totalDuration ?? 0,
             shots: s.shots ?? [],
@@ -114,7 +119,7 @@ export default function ScriptPage() {
   const handleGenerate = async () => {
     if (!projectMeta) return;
     if (!llm.apiKey) {
-      setGenError("尚未配置 LLM，请先到「设置」填写 API Key");
+      setGenError(t("errorNoLlm"));
       return;
     }
     setIsGenerating(true);
@@ -153,11 +158,11 @@ export default function ScriptPage() {
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || "脚本生成失败，请检查 LLM 设置");
+        throw new Error(e.error || t("errorGenFailedCheckLlm"));
       }
       await loadScripts();
     } catch (err) {
-      setGenError(err instanceof Error ? err.message : "脚本生成失败");
+      setGenError(err instanceof Error ? err.message : t("errorGenFailed"));
     } finally {
       setIsGenerating(false);
     }
@@ -193,7 +198,7 @@ export default function ScriptPage() {
           setScripts(
             dbScripts.map((s) => ({
               id: s.id,
-              title: s.title ?? "未命名脚本",
+              title: s.title ?? t("untitledScript"),
               styleType: s.styleType,
               totalDuration: s.totalDuration ?? 0,
               shots: s.shots ?? [],
@@ -265,8 +270,9 @@ export default function ScriptPage() {
             <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+          <span className="text-sm text-muted-foreground">{projectName || t("defaultProjectName")}</span>
         </div>
+        <LanguageToggle />
       </div>
     </header>
   );
@@ -278,7 +284,7 @@ export default function ScriptPage() {
         {headerBar}
         <div className="flex flex-col items-center justify-center py-32 text-muted-foreground">
           <LuLoaderCircle className="w-8 h-8 animate-spin mb-3" />
-          <p className="text-sm">正在加载脚本...</p>
+          <p className="text-sm">{t("loadingScripts")}</p>
         </div>
       </div>
     );
@@ -293,9 +299,9 @@ export default function ScriptPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40 mb-5">
             <LuWand className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold mb-2">还没有生成脚本</h2>
+          <h2 className="text-lg font-semibold mb-2">{t("emptyTitle")}</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            「{projectName || "该项目"}」尚未生成脚本，或上次生成失败。点击下方按钮，AI 将根据你的商品信息重新生成。
+            {t("emptyDesc", { name: projectName || t("emptyDescThisProject") })}
           </p>
           {genError && (
             <p className="text-sm text-destructive mb-4">{genError}</p>
@@ -305,17 +311,17 @@ export default function ScriptPage() {
               {isGenerating ? (
                 <>
                   <LuLoaderCircle className="w-4 h-4 mr-2 animate-spin" />
-                  生成中...
+                  {tc("generating")}
                 </>
               ) : (
                 <>
                   <LuWand className="w-4 h-4 mr-2" />
-                  生成脚本
+                  {t("generateScript")}
                 </>
               )}
             </Button>
             <Link href="/">
-              <Button variant="outline">返回项目列表</Button>
+              <Button variant="outline">{t("backToProjects")}</Button>
             </Link>
           </div>
         </div>
@@ -339,12 +345,12 @@ export default function ScriptPage() {
               <span className="text-lg font-bold tracking-tight">ClipForge</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+            <span className="text-sm text-muted-foreground">{projectName || t("defaultProjectName")}</span>
           </div>
 
           {/* 步骤进度 */}
           <div className="flex items-center gap-1">
-            {["脚本", "素材", "视频", "导出"].map((step, i) => (
+            {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
               <div key={step} className="flex items-center">
                 <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 0 ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
                   <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 0 ? "bg-white/20" : "bg-muted"}`}>
@@ -355,6 +361,7 @@ export default function ScriptPage() {
                 {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
               </div>
             ))}
+            <LanguageToggle />
           </div>
         </div>
       </header>
@@ -364,18 +371,18 @@ export default function ScriptPage() {
           {/* 左侧：脚本方案选择 */}
           <div className="lg:col-span-1">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold">脚本方案</h2>
+              <h2 className="text-base font-semibold">{t("scriptOptions")}</h2>
               <div className="flex items-center gap-2">
                 {savedTip && (
-                  <span className="text-xs text-green-400 animate-in fade-in">已保存为模板</span>
+                  <span className="text-xs text-green-400 animate-in fade-in">{t("savedAsTemplate")}</span>
                 )}
                 <Button variant="outline" size="sm" className="text-xs" onClick={handleSaveAsTemplate}>
                   <LuBookmarkPlus className="w-3.5 h-3.5 mr-1" />
-                  存为模板
+                  {t("saveAsTemplate")}
                 </Button>
                 <Button variant="outline" size="sm" disabled={isGenerating} className="text-xs">
                   <LuWand className="w-3.5 h-3.5 mr-1" />
-                  重新生成
+                  {t("regenerate")}
                 </Button>
               </div>
             </div>
@@ -391,11 +398,11 @@ export default function ScriptPage() {
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-medium text-sm">{script.title}</h3>
                       <Badge variant="secondary" className="text-xs shrink-0 ml-2">
-                        {styleLabels[script.styleType]}
+                        {styleLabelKeys[script.styleType] ? t(styleLabelKeys[script.styleType]) : script.styleType}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{script.shots.length} 个镜头</span>
+                      <span>{t("shotCount", { n: script.shots.length })}</span>
                       <span>{script.totalDuration}s</span>
                     </div>
                     {/* 镜头类型预览条 */}
@@ -426,12 +433,12 @@ export default function ScriptPage() {
             <Tabs defaultValue="timeline" className="w-full">
               <div className="flex items-center justify-between mb-4">
                 <TabsList>
-                  <TabsTrigger value="timeline">分镜时间线</TabsTrigger>
-                  <TabsTrigger value="text">文案编辑</TabsTrigger>
+                  <TabsTrigger value="timeline">{t("tabTimeline")}</TabsTrigger>
+                  <TabsTrigger value="text">{t("tabText")}</TabsTrigger>
                 </TabsList>
                 <Link href={`/project/${id}/assets`}>
                   <Button className="brand-gradient text-white text-sm">
-                    下一步：生成素材
+                    {t("nextStepAssets")}
                     <LuArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 </Link>
@@ -448,7 +455,7 @@ export default function ScriptPage() {
                             {/* 左侧序号和类型 */}
                             <div className="flex flex-col items-center justify-center w-16 py-4 border-r border-border/50 shrink-0">
                               <span className="text-lg font-bold text-muted-foreground/50">{String(index + 1).padStart(2, "0")}</span>
-                              <Badge className={`${typeInfo.color} border-0 text-[10px] mt-1`}>{typeInfo.label}</Badge>
+                              <Badge className={`${typeInfo.color} border-0 text-[10px] mt-1`}>{t(typeInfo.labelKey)}</Badge>
                               <span className="text-[10px] text-muted-foreground mt-1">{shot.duration}s</span>
                             </div>
                             {/* 右侧内容 */}
@@ -462,14 +469,14 @@ export default function ScriptPage() {
                                       {shot.camera}
                                     </span>
                                     <span className="flex items-center gap-1">
-                                      {shot.visualSource === "product_image" ? "📷 商品原图" : shot.visualSource === "ai_generate" ? "✨ AI 生成" : "📁 用户上传"}
+                                      {shot.visualSource === "product_image" ? t("visualProductImage") : shot.visualSource === "ai_generate" ? t("visualAiGenerate") : t("visualUserUpload")}
                                     </span>
                                   </div>
                                 </div>
                                 {/* 画面预览区 */}
                                 <div className="w-20 h-14 bg-muted/30 rounded-md shrink-0 flex items-center justify-center border border-border/30">
                                   {shot.visualSource === "product_image" ? (
-                                    <span className="text-[10px] text-muted-foreground">商品图</span>
+                                    <span className="text-[10px] text-muted-foreground">{t("productImageShort")}</span>
                                   ) : (
                                     <LuImage className="w-4 h-4 text-muted-foreground/40" />
                                   )}
@@ -495,15 +502,15 @@ export default function ScriptPage() {
               <TabsContent value="text" className="mt-0">
                 <Card className="glass-card">
                   <CardContent className="p-6 space-y-4">
-                    <h3 className="font-medium text-sm mb-2">完整配音文案</h3>
+                    <h3 className="font-medium text-sm mb-2">{t("fullVoiceover")}</h3>
                     <Textarea
                       className="min-h-[300px] bg-background/50 text-sm leading-relaxed"
                       defaultValue={currentScript?.shots.map((s) => s.voiceover).filter(Boolean).join("\n\n")}
                     />
                     <p className="text-xs text-muted-foreground">
-                      总字数：{currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0)} 字 ·
-                      预计时长：{currentScript?.totalDuration}s ·
-                      语速：约 {Math.round((currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0) || 0) / (currentScript?.totalDuration || 1) * 10) / 10} 字/秒
+                      {t("statsChars", { n: currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0) ?? 0 })} ·
+                      {t("statsDuration", { n: currentScript?.totalDuration ?? 0 })} ·
+                      {t("statsSpeed", { n: Math.round((currentScript?.shots.reduce((sum, s) => sum + (s.voiceover?.length || 0), 0) || 0) / (currentScript?.totalDuration || 1) * 10) / 10 })}
                     </p>
                   </CardContent>
                 </Card>
@@ -518,16 +525,16 @@ export default function ScriptPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <Card className="glass-card w-full max-w-md mx-4">
             <CardContent className="p-6 space-y-4">
-              <h3 className="text-base font-semibold">保存为模板</h3>
-              <p className="text-xs text-muted-foreground">保存当前脚本结构为模板，下次可直接套用到其他商品</p>
+              <h3 className="text-base font-semibold">{t("saveTemplateTitle")}</h3>
+              <p className="text-xs text-muted-foreground">{t("saveTemplateDesc")}</p>
               <Input
-                placeholder="模板名称，如：痛点种草-美妆通用"
+                placeholder={t("templateNamePlaceholder")}
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(false)}>取消</Button>
-                <Button size="sm" className="brand-gradient text-white" onClick={doSaveTemplate} disabled={!templateName.trim()}>保存</Button>
+                <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(false)}>{tc("cancel")}</Button>
+                <Button size="sm" className="brand-gradient text-white" onClick={doSaveTemplate} disabled={!templateName.trim()}>{tc("save")}</Button>
               </div>
             </CardContent>
           </Card>

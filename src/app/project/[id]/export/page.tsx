@@ -8,20 +8,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
-// 平台导出配置（规划中功能，展示用）
+// 平台导出配置（规划中功能，展示用）。name 用 i18n key（nameKey）在渲染时取译文
 const platformConfigs = [
-  { id: "douyin", name: "抖音", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-pink-500 to-red-500" },
-  { id: "kuaishou", name: "快手", ratio: "9:16", resolution: "1080p", subtitle: "贴边框", color: "from-orange-500 to-amber-500" },
-  { id: "xiaohongshu", name: "小红书", ratio: "3:4", resolution: "1440p", subtitle: "手写字体", color: "from-red-500 to-rose-500" },
+  { id: "douyin", nameKey: "platformDouyin", ratio: "9:16", resolution: "1080p", subtitle: "居中+描边", color: "from-pink-500 to-red-500" },
+  { id: "kuaishou", nameKey: "platformKuaishou", ratio: "9:16", resolution: "1080p", subtitle: "贴边框", color: "from-orange-500 to-amber-500" },
+  { id: "xiaohongshu", nameKey: "platformXiaohongshu", ratio: "3:4", resolution: "1440p", subtitle: "手写字体", color: "from-red-500 to-rose-500" },
 ];
 
-const styleLabels: Record<string, string> = {
-  pain_point: "痛点种草",
-  scene: "场景安利",
-  comparison: "对比测评",
-  story: "剧情故事",
-  auto: "智能推荐",
+// 脚本风格 → i18n key（在渲染时取译文）
+const styleLabelKeys: Record<string, string> = {
+  pain_point: "stylePainPoint",
+  scene: "styleScene",
+  comparison: "styleComparison",
+  story: "styleStory",
+  auto: "styleAuto",
 };
 
 interface Composition {
@@ -40,6 +43,7 @@ interface ScriptInfo {
 }
 
 export default function ExportPage() {
+  const t = useT("exportPage");
   const { id } = useParams<{ id: string }>();
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +62,11 @@ export default function ExportPage() {
   };
 
   const copyText = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); showToast("已复制"); } catch { showToast("复制失败"); }
+    try { await navigator.clipboard.writeText(text); showToast(t("copied")); } catch { showToast(t("copyFailed")); }
   };
 
   const generatePublish = async () => {
-    if (!llm.apiKey) { setPublish((p) => ({ ...p, error: "请先在设置配置 LLM" })); return; }
+    if (!llm.apiKey) { setPublish((p) => ({ ...p, error: t("publishNoLlm") })); return; }
     setPublish((p) => ({ ...p, loading: true, error: undefined }));
     try {
       const res = await fetch("/api/llm/publish", {
@@ -76,10 +80,10 @@ export default function ExportPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "生成失败");
+      if (!res.ok) throw new Error(data.error || t("publishFailed"));
       setPublish({ loading: false, titles: data.titles ?? [], hashtags: data.hashtags ?? [], caption: data.caption ?? "" });
     } catch (e) {
-      setPublish((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : "生成失败" }));
+      setPublish((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : t("publishFailed") }));
     }
   };
 
@@ -162,11 +166,11 @@ export default function ExportPage() {
         body: JSON.stringify({ platform: platformId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "导出失败");
+      if (!res.ok) throw new Error(data.error || t("exportFailed"));
       setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "done", url: data.url } }));
     } catch (e) {
       setPlatformExports((prev) => ({ ...prev, [platformId]: { status: "error" } }));
-      showToast(e instanceof Error ? e.message : "导出失败");
+      showToast(e instanceof Error ? e.message : t("exportFailed"));
     }
   };
 
@@ -175,9 +179,9 @@ export default function ExportPage() {
     const full = `${window.location.origin}${composition.url}`;
     try {
       await navigator.clipboard.writeText(full);
-      showToast("链接已复制到剪贴板");
+      showToast(t("linkCopied"));
     } catch {
-      showToast("复制失败，请手动复制");
+      showToast(t("copyLinkFailed"));
     }
   };
 
@@ -199,20 +203,23 @@ export default function ExportPage() {
             <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm text-muted-foreground">{projectName || "带货项目"}</span>
+          <span className="text-sm text-muted-foreground">{projectName || t("projectFallback")}</span>
         </div>
-        <div className="flex items-center gap-1">
-          {["脚本", "素材", "视频", "导出"].map((step, i) => (
-            <div key={step} className="flex items-center">
-              <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 3 ? "bg-primary text-primary-foreground" : "text-primary"}`}>
-                <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 3 ? "bg-white/20" : "bg-primary/20"}`}>
-                  {i < 3 ? "✓" : i + 1}
-                </span>
-                {step}
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
+          <div className="flex items-center gap-1">
+            {["stepScript", "stepAssets", "stepVideo", "stepExport"].map((stepKey, i) => (
+              <div key={stepKey} className="flex items-center">
+                <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 3 ? "bg-primary text-primary-foreground" : "text-primary"}`}>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 3 ? "bg-white/20" : "bg-primary/20"}`}>
+                    {i < 3 ? "✓" : i + 1}
+                  </span>
+                  {t(stepKey)}
+                </div>
+                {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
               </div>
-              {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </header>
@@ -224,7 +231,7 @@ export default function ExportPage() {
         {headerBar}
         <div className="flex flex-col items-center justify-center py-32 text-muted-foreground">
           <LuLoaderCircle className="w-8 h-8 animate-spin mb-3" />
-          <p className="text-sm">正在加载成片...</p>
+          <p className="text-sm">{t("loadingComposition")}</p>
         </div>
       </div>
     );
@@ -239,16 +246,16 @@ export default function ExportPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/40 mb-5">
             <LuFilm className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold mb-2">还没有合成视频</h2>
+          <h2 className="text-lg font-semibold mb-2">{t("emptyTitle")}</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            「{projectName || "该项目"}」尚未生成成片。请先到「视频」步骤完成合成，再回到这里导出。
+            {t("emptyDesc", { name: projectName || t("emptyProjectFallback") })}
           </p>
           <div className="flex items-center gap-3">
             <Link href={`/project/${id}/video`}>
-              <Button className="brand-gradient text-white">去合成视频</Button>
+              <Button className="brand-gradient text-white">{t("goCompose")}</Button>
             </Link>
             <Link href="/">
-              <Button variant="outline">返回项目列表</Button>
+              <Button variant="outline">{t("backToProjects")}</Button>
             </Link>
           </div>
         </div>
@@ -277,10 +284,10 @@ export default function ExportPage() {
             <LuCircleCheck className="w-8 h-8 text-emerald-500" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight mb-1">
-            视频<span className="brand-gradient-text">生成完成</span>
+            {t("doneTitleRest")}<span className="brand-gradient-text">{t("doneTitleAccent")}</span>
           </h1>
           <p className="text-sm text-muted-foreground">
-            你的带货视频已准备就绪，可以下载或分享
+            {t("doneSubtitle")}
           </p>
         </div>
 
@@ -323,7 +330,7 @@ export default function ExportPage() {
           <a href={`${composition.url}?download=1`} download={composition.fileName}>
             <Button className="brand-gradient text-white h-11 px-8 text-sm font-semibold w-full">
               <LuDownload className="w-[18px] h-[18px] mr-2" />
-              下载视频
+              {t("downloadVideo")}
             </Button>
           </a>
           <Button
@@ -332,7 +339,7 @@ export default function ExportPage() {
             className="h-11 px-6 text-sm"
           >
             <LuLink2 className="w-4 h-4 mr-2" />
-            复制分享链接
+            {t("copyShareLink")}
           </Button>
         </div>
 
@@ -342,20 +349,20 @@ export default function ExportPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <LuFileText className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold">发布文案</h3>
+                <h3 className="text-sm font-semibold">{t("publishTitle")}</h3>
               </div>
               <Button size="sm" variant="outline" className="text-xs" disabled={publish.loading} onClick={generatePublish}>
-                {publish.loading ? "生成中..." : publish.titles.length ? "重新生成" : "AI 生成标题/话题"}
+                {publish.loading ? t("publishGenerating") : publish.titles.length ? t("publishRegenerate") : t("publishGenerate")}
               </Button>
             </div>
             {publish.error && <p className="text-xs text-destructive mb-2">{publish.error}</p>}
             {publish.titles.length === 0 && !publish.loading && !publish.error && (
-              <p className="text-xs text-muted-foreground">一键生成吸睛标题、#话题标签和种草文案，复制即可发布。</p>
+              <p className="text-xs text-muted-foreground">{t("publishHint")}</p>
             )}
             {publish.titles.length > 0 && (
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">标题（点击复制）</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">{t("publishTitlesLabel")}</p>
                   <div className="space-y-1.5">
                     {publish.titles.map((t, i) => (
                       <button key={i} onClick={() => copyText(t)} className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
@@ -367,8 +374,8 @@ export default function ExportPage() {
                 {publish.hashtags.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-xs text-muted-foreground">话题标签</p>
-                      <button onClick={() => copyText(publish.hashtags.join(" "))} className="text-xs text-primary">复制全部</button>
+                      <p className="text-xs text-muted-foreground">{t("publishHashtagsLabel")}</p>
+                      <button onClick={() => copyText(publish.hashtags.join(" "))} className="text-xs text-primary">{t("publishCopyAll")}</button>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {publish.hashtags.map((h, i) => (
@@ -379,7 +386,7 @@ export default function ExportPage() {
                 )}
                 {publish.caption && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1.5">种草文案</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">{t("publishCaptionLabel")}</p>
                     <button onClick={() => copyText(publish.caption)} className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
                       {publish.caption}
                     </button>
@@ -395,29 +402,30 @@ export default function ExportPage() {
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-4">
               <LuSmartphone className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-semibold">多平台导出</h3>
+              <h3 className="text-sm font-semibold">{t("multiExportTitle")}</h3>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">一键重编码为各平台比例（模糊填充，不裁掉字幕/贴片）</p>
+            <p className="text-xs text-muted-foreground mb-4">{t("multiExportDesc")}</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {platformConfigs.map(platform => {
                 const ex = platformExports[platform.id] ?? { status: "idle" as const };
+                const platformName = t(platform.nameKey);
                 return (
                   <div key={platform.id} className="p-3 rounded-lg border border-border/50 bg-muted/10">
                     <div className="flex items-center gap-2 mb-2">
                       <div className={`w-6 h-6 rounded bg-gradient-to-br ${platform.color} flex items-center justify-center`}>
-                        <span className="text-[10px] text-white font-bold">{platform.name[0]}</span>
+                        <span className="text-[10px] text-white font-bold">{platformName[0]}</span>
                       </div>
-                      <span className="text-sm font-medium">{platform.name}</span>
+                      <span className="text-sm font-medium">{platformName}</span>
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p>比例: {platform.ratio}</p>
-                      <p>分辨率: {platform.resolution}</p>
+                      <p>{t("ratioLabel", { ratio: platform.ratio })}</p>
+                      <p>{t("resolutionLabel", { resolution: platform.resolution })}</p>
                     </div>
                     {ex.status === "done" && ex.url ? (
                       <a href={`${ex.url}?download=1`} download>
                         <Button variant="outline" size="sm" className="w-full mt-2 text-xs text-emerald-600">
                           <LuDownload className="w-3 h-3 mr-1" />
-                          下载{platform.name}版
+                          {t("downloadPlatform", { platform: platformName })}
                         </Button>
                       </a>
                     ) : (
@@ -428,7 +436,7 @@ export default function ExportPage() {
                         disabled={ex.status === "exporting"}
                         onClick={() => exportPlatform(platform.id)}
                       >
-                        {ex.status === "exporting" ? "导出中..." : ex.status === "error" ? "重试导出" : `导出${platform.name}版`}
+                        {ex.status === "exporting" ? t("exporting") : ex.status === "error" ? t("retryExport") : t("exportPlatform", { platform: platformName })}
                       </Button>
                     )}
                   </div>
@@ -444,36 +452,36 @@ export default function ExportPage() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <LuShuffle className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold">A/B 测试版本</h3>
+                <h3 className="text-sm font-semibold">{t("abTitle")}</h3>
               </div>
-              <Badge variant="secondary" className="text-xs">开发中</Badge>
+              <Badge variant="secondary" className="text-xs">{t("abBadge")}</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">未来将自动生成不同开头/文案的变体，测试哪个转化率更高（当前为规划展示）</p>
+            <p className="text-xs text-muted-foreground">{t("abDesc")}</p>
           </CardContent>
         </Card>
 
         {/* 视频详情（真实脚本数据） */}
         <Card className="glass-card">
           <CardContent className="p-5">
-            <h3 className="text-sm font-semibold mb-4">视频详情</h3>
+            <h3 className="text-sm font-semibold mb-4">{t("detailTitle")}</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">脚本风格</p>
-                  <p className="text-sm">{scriptInfo ? (styleLabels[scriptInfo.styleType] ?? scriptInfo.styleType) : "—"}</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">{t("detailStyle")}</p>
+                  <p className="text-sm">{scriptInfo ? (styleLabelKeys[scriptInfo.styleType] ? t(styleLabelKeys[scriptInfo.styleType]) : scriptInfo.styleType) : t("emptyValue")}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">分镜数量</p>
-                  <p className="text-sm">{scriptInfo ? `${scriptInfo.shotCount} 个镜头` : "—"}</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">{t("detailShots")}</p>
+                  <p className="text-sm">{scriptInfo ? t("shotCount", { n: scriptInfo.shotCount }) : t("emptyValue")}</p>
                 </div>
               </div>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">总时长</p>
-                  <p className="text-sm">{scriptInfo?.totalDuration ? `${scriptInfo.totalDuration} 秒` : "—"}</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">{t("detailDuration")}</p>
+                  <p className="text-sm">{scriptInfo?.totalDuration ? t("durationSeconds", { n: scriptInfo.totalDuration }) : t("emptyValue")}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">分辨率 / 比例</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">{t("detailResolution")}</p>
                   <p className="text-sm">{composition.resolution ?? "1080p"} · {composition.aspectRatio ?? "9:16"}</p>
                 </div>
               </div>
@@ -486,13 +494,13 @@ export default function ExportPage() {
           <Link href="/project/new">
             <Button className="brand-gradient text-white">
               <LuPlus className="w-4 h-4 mr-1.5" />
-              再做一个
+              {t("makeAnother")}
             </Button>
           </Link>
           <Link href="/">
             <Button variant="outline">
               <LuHouse className="w-4 h-4 mr-1.5" />
-              返回项目列表
+              {t("backToProjects")}
             </Button>
           </Link>
         </div>

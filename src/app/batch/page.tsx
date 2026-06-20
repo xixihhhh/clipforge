@@ -20,22 +20,24 @@ import { Label } from "@/components/ui/label";
 import { useProductLibraryStore } from "@/lib/stores/product-library-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { exampleProducts } from "@/lib/examples";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 
-// 视频模式选项
+// 视频模式选项（labelKey 指向 batch 命名空间词条，渲染时取译文）
 const videoModeOptions = [
-  { value: "product_closeup", label: "产品特写", icon: LuBox },
-  { value: "graphic_montage", label: "图文混剪", icon: LuLayoutGrid },
-  { value: "scene_demo", label: "场景演示", icon: LuEye },
-  { value: "live_presenter", label: "真人出镜", icon: LuVideo },
+  { value: "product_closeup", labelKey: "modeProductCloseup", icon: LuBox },
+  { value: "graphic_montage", labelKey: "modeGraphicMontage", icon: LuLayoutGrid },
+  { value: "scene_demo", labelKey: "modeSceneDemo", icon: LuEye },
+  { value: "live_presenter", labelKey: "modeLivePresenter", icon: LuVideo },
 ];
 
-// 脚本风格选项
+// 脚本风格选项（labelKey 指向 batch 命名空间词条，渲染时取译文）
 const scriptStyleOptions = [
-  { value: "pain-point", label: "痛点种草" },
-  { value: "scenario", label: "场景安利" },
-  { value: "comparison", label: "对比测评" },
-  { value: "story", label: "剧情故事" },
-  { value: "auto", label: "智能推荐" },
+  { value: "pain-point", labelKey: "stylePainPoint" },
+  { value: "scenario", labelKey: "styleScenario" },
+  { value: "comparison", labelKey: "styleComparison" },
+  { value: "story", labelKey: "styleStory" },
+  { value: "auto", labelKey: "styleAuto" },
 ];
 
 // 目标时长选项
@@ -45,14 +47,14 @@ const durationOptions = [
   { value: "60", label: "60s" },
 ];
 
-// 品类中文映射
-const categoryLabels: Record<string, string> = {
-  home: "家居日用",
-  tech: "数码3C",
-  beauty: "美妆护肤",
-  food: "食品零食",
-  fashion: "服饰鞋包",
-  other: "其他",
+// 品类 → batch 命名空间词条 key（渲染时取译文）
+const categoryLabelKeys: Record<string, string> = {
+  home: "categoryHome",
+  tech: "categoryTech",
+  beauty: "categoryBeauty",
+  food: "categoryFood",
+  fashion: "categoryFashion",
+  other: "categoryOther",
 };
 
 // 脚本风格值 → 后端 styleType 规范化
@@ -75,12 +77,12 @@ interface BatchTask {
   error?: string;
 }
 
-// 任务状态标签
-const statusLabels: Record<TaskStatus, string> = {
-  pending: "等待中",
-  generating: "生成中",
-  done: "已完成",
-  failed: "失败",
+// 任务状态 → batch 命名空间词条 key（渲染时取译文）
+const statusLabelKeys: Record<TaskStatus, string> = {
+  pending: "taskPending",
+  generating: "taskGenerating",
+  done: "taskDone",
+  failed: "taskFailed",
 };
 
 // 任务状态颜色
@@ -92,6 +94,8 @@ const statusColors: Record<TaskStatus, string> = {
 };
 
 export default function BatchPage() {
+  const t = useT("batch");
+  const tc = useT("common");
   // 真实商品库 + LLM 配置
   const { products, incrementVideoCount, addProduct } = useProductLibraryStore();
   const { llm } = useSettingsStore();
@@ -150,7 +154,7 @@ export default function BatchPage() {
   const handleStartBatch = useCallback(async () => {
     if (selectedProducts.size === 0 || isGenerating) return;
     if (!llm.apiKey) {
-      setConfigError("尚未配置 LLM，请先到「设置」填写 API Key");
+      setConfigError(t("errorNoLlm"));
       return;
     }
     setConfigError("");
@@ -176,7 +180,7 @@ export default function BatchPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: `${product.name} 推广`,
+            name: t("projectNameSuffix", { name: product.name }),
             productName: product.name,
             productCategory: product.category,
             productDescription: product.description ?? "",
@@ -184,7 +188,7 @@ export default function BatchPage() {
             videoMode,
           }),
         });
-        if (!projRes.ok) throw new Error("项目创建失败");
+        if (!projRes.ok) throw new Error(t("errorProjectCreate"));
         const project = await projRes.json();
 
         // 2) 生成脚本
@@ -210,14 +214,14 @@ export default function BatchPage() {
         });
         if (!scriptRes.ok) {
           const e = await scriptRes.json().catch(() => ({}));
-          throw new Error(e.error || "脚本生成失败");
+          throw new Error(e.error || t("errorScriptFailed"));
         }
 
         incrementVideoCount(product.id);
         setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "done", projectId: project.id } : t)));
       } catch (err) {
         setBatchTasks((prev) =>
-          prev.map((t) => (t.id === product.id ? { ...t, status: "failed", error: err instanceof Error ? err.message : "生成失败" } : t))
+          prev.map((task) => (task.id === product.id ? { ...task, status: "failed", error: err instanceof Error ? err.message : t("errorGenerateFailed") } : task))
         );
       }
     };
@@ -253,7 +257,7 @@ export default function BatchPage() {
             <Link href="/">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground -ml-2">
                 <LuArrowLeft className="w-4 h-4" />
-                <span className="ml-1">返回</span>
+                <span className="ml-1">{tc("back")}</span>
               </Button>
             </Link>
             <div className="h-5 w-px bg-border/50" />
@@ -268,8 +272,9 @@ export default function BatchPage() {
               <span className="text-sm font-semibold tracking-tight">ClipForge</span>
             </div>
             <div className="h-5 w-px bg-border/50" />
-            <span className="text-sm font-medium">批量出片</span>
+            <span className="text-sm font-medium">{t("navTitle")}</span>
           </div>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -277,10 +282,10 @@ export default function BatchPage() {
         {/* 页面标题 */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
-            <span className="brand-gradient-text">批量出片</span>
+            <span className="brand-gradient-text">{t("heroTitle")}</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5">
-            选择多个商品并统一配置，一键批量生成带货视频
+            {t("heroSubtitle")}
           </p>
         </div>
 
@@ -290,11 +295,11 @@ export default function BatchPage() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <Label className="text-sm font-medium">
-                  步骤 1：选择商品
+                  {t("step1Label")}
                   <span className="text-destructive ml-0.5">*</span>
                 </Label>
                 <span className="text-xs text-muted-foreground">
-                  已选 {selectedProducts.size}/{products.length} 个商品
+                  {t("step1Selected", { selected: selectedProducts.size, total: products.length })}
                 </span>
               </div>
 
@@ -305,15 +310,15 @@ export default function BatchPage() {
                     <LuPackage className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">
-                    商品库还是空的，导入示例商品即可马上体验批量出片
+                    {t("emptyHint")}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button size="sm" className="brand-gradient text-white" onClick={importExamples}>
-                      导入示例商品
+                      {t("importExamples")}
                     </Button>
                     <Link href="/products">
                       <Button variant="outline" size="sm">
-                        前往商品库
+                        {t("goToProducts")}
                       </Button>
                     </Link>
                   </div>
@@ -354,7 +359,7 @@ export default function BatchPage() {
                             {product.name}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {categoryLabels[product.category] || product.category}
+                            {categoryLabelKeys[product.category] ? t(categoryLabelKeys[product.category]) : product.category}
                           </span>
                         </div>
                       </button>
@@ -368,11 +373,11 @@ export default function BatchPage() {
           {/* 步骤 2：统一配置 */}
           <Card className="glass-card">
             <CardContent className="p-5 space-y-5">
-              <Label className="text-sm font-medium block">步骤 2：统一配置</Label>
+              <Label className="text-sm font-medium block">{t("step2Label")}</Label>
 
               {/* 视频模式 */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-2.5 block">视频模式</Label>
+                <Label className="text-xs text-muted-foreground mb-2.5 block">{t("videoModeLabel")}</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {videoModeOptions.map((opt) => {
                     const Icon = opt.icon;
@@ -397,7 +402,7 @@ export default function BatchPage() {
                             videoMode === opt.value ? "text-primary" : "text-foreground"
                           }`}
                         >
-                          {opt.label}
+                          {t(opt.labelKey)}
                         </span>
                         {videoMode === opt.value && (
                           <div className="absolute top-1.5 right-1.5">
@@ -412,7 +417,7 @@ export default function BatchPage() {
 
               {/* 脚本风格 */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-2.5 block">脚本风格</Label>
+                <Label className="text-xs text-muted-foreground mb-2.5 block">{t("scriptStyleLabel")}</Label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {scriptStyleOptions.map((opt) => (
                     <button
@@ -425,7 +430,7 @@ export default function BatchPage() {
                           : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-foreground"
                       } ${isGenerating ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                       {scriptStyle === opt.value && (
                         <div className="absolute -top-px -right-px h-3 w-3 flex items-center justify-center">
                           <div className="h-1.5 w-1.5 rounded-full brand-gradient" />
@@ -438,7 +443,7 @@ export default function BatchPage() {
 
               {/* 目标时长 */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-2.5 block">目标时长</Label>
+                <Label className="text-xs text-muted-foreground mb-2.5 block">{t("durationLabel")}</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {durationOptions.map((opt) => (
                     <button
@@ -469,9 +474,9 @@ export default function BatchPage() {
             <Card className="glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <Label className="text-sm font-medium">生成进度</Label>
+                  <Label className="text-sm font-medium">{t("progressLabel")}</Label>
                   <span className="text-xs text-muted-foreground">
-                    {doneCount}/{batchTasks.length} 已完成
+                    {t("progressDone", { done: doneCount, total: batchTasks.length })}
                   </span>
                 </div>
 
@@ -506,7 +511,7 @@ export default function BatchPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {task.status === "done" && task.projectId && (
                           <Link href={`/project/${task.projectId}/script`}>
-                            <Button variant="outline" size="sm" className="text-xs h-7">查看</Button>
+                            <Button variant="outline" size="sm" className="text-xs h-7">{t("taskView")}</Button>
                           </Link>
                         )}
                         <Badge className={statusColors[task.status]}>
@@ -516,7 +521,7 @@ export default function BatchPage() {
                           {task.status === "done" && (
                             <LuCheck className="w-3 h-3 mr-1" />
                           )}
-                          {statusLabels[task.status]}
+                          {t(statusLabelKeys[task.status])}
                         </Badge>
                       </div>
                     </div>
@@ -527,7 +532,7 @@ export default function BatchPage() {
                 {isComplete && (
                   <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
                     <p className="text-sm text-emerald-400 font-medium">
-                      批量生成完成！共 {doneCount} 条视频
+                      {t("completeMsg", { count: doneCount })}
                     </p>
                   </div>
                 )}
@@ -548,25 +553,25 @@ export default function BatchPage() {
               {isGenerating ? (
                 <>
                   <LuLoader className="w-5 h-5 mr-2 animate-spin" />
-                  批量生成中...
+                  {t("ctaGenerating")}
                 </>
               ) : isComplete ? (
                 <>
                   <LuCheck className="w-5 h-5 mr-2" />
-                  生成完成，再来一批
+                  {t("ctaAgain")}
                 </>
               ) : (
                 <>
                   <LuZap className="w-5 h-5 mr-2" />
-                  开始批量生成
+                  {t("ctaStart")}
                 </>
               )}
             </Button>
             {!isGenerating && !isComplete && (
               <p className="text-xs text-muted-foreground text-center mt-3">
                 {selectedProducts.size > 0
-                  ? `将为 ${selectedProducts.size} 个商品批量生成带货视频`
-                  : "请先选择至少 1 个商品"}
+                  ? t("hintWillGenerate", { count: selectedProducts.size })
+                  : t("hintSelectAtLeastOne")}
               </p>
             )}
           </div>

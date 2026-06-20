@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette } from "react-icons/lu";
+import { useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useCharacterStore, type Character } from "@/lib/stores/project-store";
 import { useBrandStore } from "@/lib/stores/brand-store";
@@ -28,6 +30,8 @@ import {
   isPaidTTSReady,
   type TTSProvider,
 } from "@/lib/tts-presets";
+import { mergeCustomModels } from "@/lib/gen-params";
+import { GenerationSettings } from "@/components/generation-settings";
 
 // 默认分辨率选项
 const resolutionOptions = [
@@ -35,11 +39,11 @@ const resolutionOptions = [
   { value: "1080p", label: "1080p (1920x1080)" },
 ];
 
-// 默认画面比例选项
+// 默认画面比例选项（labelKey 在组件内按语言渲染）
 const aspectRatioOptions = [
-  { value: "9:16", label: "9:16 竖屏" },
-  { value: "16:9", label: "16:9 横屏" },
-  { value: "1:1", label: "1:1 方形" },
+  { value: "9:16", labelKey: "aspect916" },
+  { value: "16:9", labelKey: "aspect169" },
+  { value: "1:1", labelKey: "aspect11" },
 ];
 
 // AI 平台配置信息
@@ -47,8 +51,8 @@ const AI_PROVIDERS = [
   {
     key: "atlas-cloud",
     name: "Atlas Cloud",
-    description: "高质量图像和视频生成平台，支持多种 AI 模型",
-    tip: "推荐首选，模型最全最便宜",
+    descKey: "providerAtlasDesc",
+    tipKey: "providerAtlasTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -61,8 +65,8 @@ const AI_PROVIDERS = [
   {
     key: "fal-ai",
     name: "fal.ai",
-    description: "快速推理平台，支持 Flux、SDXL 等主流图像生成模型",
-    tip: "支持 Kling 3.0、Veo 3 等最新模型",
+    descKey: "providerFalDesc",
+    tipKey: "providerFalTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -73,8 +77,8 @@ const AI_PROVIDERS = [
   {
     key: "replicate",
     name: "Replicate",
-    description: "海量模型聚合平台，FLUX、Imagen、Kling、Seedance、Veo 等一站接入",
-    tip: "模型库最全，predictions API 统一调用",
+    descKey: "providerReplicateDesc",
+    tipKey: "providerReplicateTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="4 17 10 11 4 5" />
@@ -86,8 +90,8 @@ const AI_PROVIDERS = [
   {
     key: "volcengine",
     name: "火山引擎",
-    description: "字节跳动旗下云服务，提供豆包大模型和视频生成能力",
-    tip: "字节系模型 Seedance/Seedream，中文优化好",
+    descKey: "providerVolcengineDesc",
+    tipKey: "providerVolcengineTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
@@ -98,8 +102,8 @@ const AI_PROVIDERS = [
   {
     key: "alibaba",
     name: "阿里百炼",
-    description: "阿里云大模型服务平台，支持通义系列模型和图像生成",
-    tip: "万相系列，商品图生视频效果佳",
+    descKey: "providerAlibabaDesc",
+    tipKey: "providerAlibabaTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -112,8 +116,8 @@ const AI_PROVIDERS = [
   {
     key: "siliconflow",
     name: "硅基流动",
-    description: "国产 AI 推理平台，提供高性价比的模型推理服务",
-    tip: "国产高性价比推理平台",
+    descKey: "providerSiliconflowDesc",
+    tipKey: "providerSiliconflowTip",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -208,6 +212,7 @@ function Toggle({
 }
 
 export default function SettingsPage() {
+  const t = useT("settings");
   // 从 store 读取设置
   const {
     providers,
@@ -217,6 +222,7 @@ export default function SettingsPage() {
     defaultAspectRatio,
     defaultImageModel,
     defaultVideoModel,
+    customModels,
     setProvider,
     setLLM,
     setTTS,
@@ -235,7 +241,7 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // 发解析后的完整配置（含按平台复用的 Key / 默认 baseUrl / 模型）
-        body: JSON.stringify({ text: "这款产品真的太好用了，赶紧下单试试吧！", ttsConfig: resolveTTSConfig(tts, providers) }),
+        body: JSON.stringify({ text: t("ttsSample"), ttsConfig: resolveTTSConfig(tts, providers) }),
       });
       if (!res.ok) throw new Error();
       const blob = await res.blob();
@@ -304,6 +310,11 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabledKey]);
 
+  // 把用户自定义模型并入下拉（仅已启用平台），让自定义模型可被选作默认
+  const enabledNames = new Set(enabledProviders.map((p) => p.name));
+  const imageModelOptions = mergeCustomModels(imageModels, customModels, "image", enabledNames);
+  const videoModelOptions = mergeCustomModels(videoModels, customModels, "video", enabledNames);
+
   // LLM 连接测试状态
   const [llmTestStatus, setLlmTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
 
@@ -321,10 +332,10 @@ export default function SettingsPage() {
       });
       const data = await res.json().catch(() => ({ ok: false }));
       setLlmTestStatus(data.ok ? "success" : "error");
-      if (!data.ok) setLlmTestError(data.error || "连接失败");
+      if (!data.ok) setLlmTestError(data.error || t("connectFailed"));
     } catch (e) {
       setLlmTestStatus("error");
-      setLlmTestError(e instanceof Error ? e.message : "连接失败");
+      setLlmTestError(e instanceof Error ? e.message : t("connectFailed"));
     }
     setTimeout(() => setLlmTestStatus("idle"), 5000);
   };
@@ -353,24 +364,27 @@ export default function SettingsPage() {
             </div>
             <span className="text-lg font-bold tracking-tight">ClipForge</span>
           </div>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 12H5" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
-              <span className="ml-1.5">返回首页</span>
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1">
+            <LanguageToggle />
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 12H5" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+                <span className="ml-1.5">{t("backHome")}</span>
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-10">
         {/* 页面标题 */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">设置</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("pageTitle")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            配置 AI 服务后即可开始生成带货视频。需要配置 LLM（生成脚本）+ 至少一个 AI 平台（生成图片/视频）。
+            {t("pageSubtitle")}
           </p>
         </div>
 
@@ -390,21 +404,21 @@ export default function SettingsPage() {
                 <path d="M9 2v2" />
                 <path d="M9 20v2" />
               </svg>
-              AI 平台
+              {t("tabProviders")}
             </TabsTrigger>
             <TabsTrigger value={1}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              LLM 配置
+              {t("tabLlm")}
             </TabsTrigger>
             <TabsTrigger value={2}>
               <LuUser className="w-3.5 h-3.5" />
-              出镜人物
+              {t("tabCharacters")}
             </TabsTrigger>
             <TabsTrigger value={3}>
               <LuPalette className="w-3.5 h-3.5" />
-              品牌设置
+              {t("tabBrand")}
             </TabsTrigger>
           </TabsList>
 
@@ -435,14 +449,14 @@ export default function SettingsPage() {
                               </h3>
                               {provider.enabled && (
                                 <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">
-                                  已启用
+                                  {t("providerEnabled")}
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              {platform.description}
+                              {t(platform.descKey)}
                             </p>
-                            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{platform.tip}</p>
+                            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{t(platform.tipKey)}</p>
                           </div>
                         </div>
 
@@ -471,7 +485,25 @@ export default function SettingsPage() {
                               apiKey,
                             })
                           }
-                          placeholder={`输入 ${platform.name} 的 API Key`}
+                          placeholder={t("apiKeyPlaceholder", { name: platform.name })}
+                        />
+                      </div>
+
+                      {/* 自定义接入点（代理/自建端点，选填；留空走平台默认） */}
+                      <div className="mt-3">
+                        <Label className="text-xs text-muted-foreground mb-1.5">
+                          {t("providerBaseUrlLabel")}
+                        </Label>
+                        <Input
+                          value={provider.baseUrl ?? ""}
+                          onChange={(e) =>
+                            setProvider(platform.key, {
+                              ...provider,
+                              baseUrl: e.target.value || undefined,
+                            })
+                          }
+                          placeholder={t("providerBaseUrlPlaceholder")}
+                          className="font-mono text-xs"
                         />
                       </div>
                     </CardContent>
@@ -493,21 +525,21 @@ export default function SettingsPage() {
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-sm">LLM Provider</h3>
+                    <h3 className="font-semibold text-sm">{t("llmProvider")}</h3>
                   </div>
 
                   {/* 快捷预设 */}
                   <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
-                    <p className="text-xs text-muted-foreground mb-2">快捷预设（点击自动填入 baseUrl 和模型，还需填写 API Key）：</p>
+                    <p className="text-xs text-muted-foreground mb-2">{t("llmPresetHint")}</p>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        { label: "Atlas Cloud", baseUrl: "https://api.atlascloud.ai/v1", model: "claude-sonnet-4-20250514", tip: "推荐！LLM+生图生视频共用一个 Key" },
-                        { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-4o", tip: "一个 Key 聚合 400+ 模型，OpenAI 协议直连" },
-                        { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-v3.2", tip: "V3.2 推理+对话统一模型" },
-                        { label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "kimi-k2.5", tip: "K2.5 支持 Agent Swarm" },
-                        { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-5-turbo", tip: "GLM-5 旗舰级" },
-                        { label: "MiniMax", baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-M2.7", tip: "M2.7 兼容 OpenAI 协议" },
-                        { label: "豆包", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-seed-2.0-pro", tip: "Seed 2.0 对标 GPT-5.2" },
+                        { label: "Atlas Cloud", baseUrl: "https://api.atlascloud.ai/v1", model: "claude-sonnet-4-20250514", tip: t("presetAtlasTip") },
+                        { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-4o", tip: t("presetOpenrouterTip") },
+                        { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-v3.2", tip: t("presetDeepseekTip") },
+                        { label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "kimi-k2.5", tip: t("presetKimiTip") },
+                        { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-5-turbo", tip: t("presetGlmTip") },
+                        { label: "MiniMax", baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-M2.7", tip: t("presetMinimaxTip") },
+                        { label: "豆包", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-seed-2.0-pro", tip: t("presetDoubaoTip") },
                         { label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-5.4", tip: "" },
                       ].map((preset) => (
                         <button
@@ -526,7 +558,7 @@ export default function SettingsPage() {
                     {/* API 地址 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        API 地址（baseUrl）
+                        {t("llmBaseUrlLabel")}
                       </Label>
                       <Input
                         value={llm.baseUrl}
@@ -541,12 +573,12 @@ export default function SettingsPage() {
                     {/* API Key */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        API Key
+                        {t("apiKeyLabel")}
                       </Label>
                       <PasswordInput
                         value={llm.apiKey}
                         onChange={(apiKey) => setLLM({ ...llm, apiKey })}
-                        placeholder="输入 LLM API Key"
+                        placeholder={t("llmApiKeyPlaceholder")}
                       />
                     </div>
 
@@ -554,7 +586,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">
-                          文本模型
+                          {t("llmTextModel")}
                         </Label>
                         <Input
                           value={llm.model}
@@ -567,7 +599,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">
-                          视觉模型
+                          {t("llmVisionModel")}
                         </Label>
                         <Input
                           value={llm.visionModel ?? ""}
@@ -598,18 +630,18 @@ export default function SettingsPage() {
                             : ""
                         }`}
                       >
-                        {llmTestStatus === "testing" ? "测试中..."
-                         : llmTestStatus === "success" ? "连接成功 ✓"
-                         : llmTestStatus === "error" ? "连接失败 ✗"
-                         : "测试连接"}
+                        {llmTestStatus === "testing" ? t("llmTestTesting")
+                         : llmTestStatus === "success" ? t("llmTestSuccess")
+                         : llmTestStatus === "error" ? t("llmTestError")
+                         : t("llmTestButton")}
                       </Button>
                       {!llm.apiKey && (
-                        <span className="text-xs text-muted-foreground ml-2">请先填写 API Key</span>
+                        <span className="text-xs text-muted-foreground ml-2">{t("llmFillKeyFirst")}</span>
                       )}
                       {llmTestStatus === "error" && llmTestError && (
                         <p className="mt-2 text-xs text-destructive break-all">{llmTestError}</p>
                       )}
-                      <p className="mt-2 text-[11px] text-muted-foreground">提示：连接测试走服务端，不受浏览器跨域限制；若失败，多为 baseUrl/Key/模型名填写有误。</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">{t("llmTestTip")}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -630,8 +662,8 @@ export default function SettingsPage() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-sm">配音 TTS</h3>
-                        <p className="text-xs text-muted-foreground">开启后合成会为每个分镜生成口播配音（支持 OpenAI 兼容 / Atlas Cloud / MiniMax / fal.ai）</p>
+                        <h3 className="font-semibold text-sm">{t("ttsTitle")}</h3>
+                        <p className="text-xs text-muted-foreground">{t("ttsSubtitle")}</p>
                       </div>
                     </div>
                     <Toggle checked={tts.enabled} onChange={(v) => setTTS({ ...tts, enabled: v })} />
@@ -641,11 +673,11 @@ export default function SettingsPage() {
                     <div className="space-y-4">
                       {/* 配音平台选择 */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">配音平台</Label>
+                        <Label className="text-xs text-muted-foreground">{t("ttsProviderLabel")}</Label>
                         <Select value={tts.provider ?? "openai"} onValueChange={(v) => onChangeTTSProvider((v ?? "openai") as TTSProvider)}>
                           <SelectTrigger className="w-full">
                             <SelectValue>
-                              {(value: string) => TTS_PROVIDERS.find((p) => p.value === value)?.label ?? "OpenAI 兼容"}
+                              {(value: string) => TTS_PROVIDERS.find((p) => p.value === value)?.label ?? t("ttsProviderFallback")}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -661,7 +693,7 @@ export default function SettingsPage() {
                         <>
                           {/* OpenAI 兼容：快捷预设 + baseUrl + Key + 自由模型/音色 */}
                           <div>
-                            <p className="text-xs text-muted-foreground mb-2">快捷预设（点击填入 baseUrl 和模型，还需填 API Key）：</p>
+                            <p className="text-xs text-muted-foreground mb-2">{t("ttsPresetHint")}</p>
                             <div className="flex flex-wrap gap-2">
                               {OPENAI_TTS_PRESETS.map((p) => (
                                 <button
@@ -675,20 +707,20 @@ export default function SettingsPage() {
                             </div>
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
+                            <Label className="text-xs text-muted-foreground">{t("ttsBaseUrlLabel")}</Label>
                             <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder="https://api.siliconflow.cn/v1" className="font-mono text-xs" />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">API Key</Label>
-                            <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 TTS API Key" />
+                            <Label className="text-xs text-muted-foreground">{t("apiKeyLabel")}</Label>
+                            <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder={t("ttsApiKeyPlaceholder")} />
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">模型</Label>
+                              <Label className="text-xs text-muted-foreground">{t("ttsModelLabel")}</Label>
                               <Input value={tts.model} onChange={(e) => setTTS({ ...tts, model: e.target.value })} placeholder="tts-1" className="font-mono text-xs" />
                             </div>
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">音色 voice</Label>
+                              <Label className="text-xs text-muted-foreground">{t("ttsVoiceLabel")}</Label>
                               <Input value={tts.voice} onChange={(e) => setTTS({ ...tts, voice: e.target.value })} placeholder="alloy" className="font-mono text-xs" />
                             </div>
                           </div>
@@ -698,34 +730,34 @@ export default function SettingsPage() {
                           {/* Atlas / MiniMax / fal：Key（复用或自填）+ 可选 GroupId/baseUrl + 模型/音色下拉 */}
                           {ttsMeta.keySource === "tts" ? (
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">API Key</Label>
-                              <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder="输入 API Key" />
+                              <Label className="text-xs text-muted-foreground">{t("apiKeyLabel")}</Label>
+                              <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder={t("ttsApiKeyPlaceholderShort")} />
                             </div>
                           ) : (
                             <div className="text-xs rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                               {providers[ttsMeta.keySource]?.apiKey ? (
-                                <span className="text-emerald-500">✓ 已复用「AI 平台」里该平台的 API Key</span>
+                                <span className="text-emerald-500">{t("ttsKeyReused")}</span>
                               ) : (
-                                <span className="text-amber-500">⚠ 请先到上方「AI 平台」标签页填好该平台的 API Key</span>
+                                <span className="text-amber-500">{t("ttsKeyMissing")}</span>
                               )}
                             </div>
                           )}
                           {ttsMeta.editableBaseUrl && (
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">API 地址（baseUrl）</Label>
+                              <Label className="text-xs text-muted-foreground">{t("ttsBaseUrlLabel")}</Label>
                               <Input value={tts.baseUrl} onChange={(e) => setTTS({ ...tts, baseUrl: e.target.value })} placeholder={ttsMeta.baseUrl} className="font-mono text-xs" />
                             </div>
                           )}
                           {ttsMeta.needsGroupId && (
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">GroupId（海螺国内端点必填，国际版可空）</Label>
-                              <Input value={tts.groupId ?? ""} onChange={(e) => setTTS({ ...tts, groupId: e.target.value })} placeholder="海螺控制台的 GroupId" className="font-mono text-xs" />
+                              <Label className="text-xs text-muted-foreground">{t("ttsGroupIdLabel")}</Label>
+                              <Input value={tts.groupId ?? ""} onChange={(e) => setTTS({ ...tts, groupId: e.target.value })} placeholder={t("ttsGroupIdPlaceholder")} className="font-mono text-xs" />
                             </div>
                           )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {ttsMeta.models.length > 0 && (
                               <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">模型</Label>
+                                <Label className="text-xs text-muted-foreground">{t("ttsModelLabel")}</Label>
                                 <Select value={tts.model || ttsMeta.defaultModel} onValueChange={(v) => setTTS({ ...tts, model: v ?? ttsMeta.defaultModel })}>
                                   <SelectTrigger className="w-full">
                                     <SelectValue>{(value: string) => ttsMeta.models.find((o) => o.value === value)?.label ?? value}</SelectValue>
@@ -737,7 +769,7 @@ export default function SettingsPage() {
                               </div>
                             )}
                             <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">音色 voice</Label>
+                              <Label className="text-xs text-muted-foreground">{t("ttsVoiceLabel")}</Label>
                               <Select value={tts.voice || ttsMeta.defaultVoice} onValueChange={(v) => setTTS({ ...tts, voice: v ?? ttsMeta.defaultVoice })}>
                                 <SelectTrigger className="w-full">
                                   <SelectValue>{(value: string) => ttsMeta.voices.find((o) => o.value === value)?.label ?? value}</SelectValue>
@@ -754,9 +786,9 @@ export default function SettingsPage() {
                       {/* 试听 */}
                       <div className="pt-3 mt-1 border-t border-border/50">
                         <Button variant="outline" size="sm" onClick={testTTS} disabled={!ttsReady || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
-                          {ttsTestStatus === "testing" ? "合成中..." : ttsTestStatus === "error" ? "试听失败 ✗" : "🔊 试听音色"}
+                          {ttsTestStatus === "testing" ? t("ttsTesting") : ttsTestStatus === "error" ? t("ttsTestError") : t("ttsTestButton")}
                         </Button>
-                        {!ttsReady && <span className="ml-2 text-[11px] text-muted-foreground">填好 Key 后可试听</span>}
+                        {!ttsReady && <span className="ml-2 text-[11px] text-muted-foreground">{t("ttsFillKeyFirst")}</span>}
                       </div>
                     </div>
                   )}
@@ -775,14 +807,14 @@ export default function SettingsPage() {
                         <circle cx="12" cy="12" r="3" />
                       </svg>
                     </div>
-                    <h3 className="font-semibold text-sm">默认设置</h3>
+                    <h3 className="font-semibold text-sm">{t("defaultsTitle")}</h3>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* 默认分辨率 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        默认分辨率
+                        {t("defaultResolution")}
                       </Label>
                       <Select
                         value={defaultResolution}
@@ -809,7 +841,7 @@ export default function SettingsPage() {
                     {/* 默认画面比例 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        默认画面比例
+                        {t("defaultAspectRatio")}
                       </Label>
                       <Select
                         value={defaultAspectRatio}
@@ -820,15 +852,18 @@ export default function SettingsPage() {
                         }
                       >
                         <SelectTrigger className="w-full">
-                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为中文标签 */}
+                          {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为按语言渲染的标签 */}
                           <SelectValue>
-                            {(value: string) => aspectRatioOptions.find((o) => o.value === value)?.label ?? value}
+                            {(value: string) => {
+                              const o = aspectRatioOptions.find((o) => o.value === value);
+                              return o ? t(o.labelKey) : value;
+                            }}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {aspectRatioOptions.map((o) => (
                             <SelectItem key={o.value} value={o.value}>
-                              {o.label}
+                              {t(o.labelKey)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -838,26 +873,26 @@ export default function SettingsPage() {
                     {/* 默认生图模型 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        默认生图模型
+                        {t("defaultImageModel")}
                       </Label>
                       <Select
                         value={defaultImageModel}
                         onValueChange={(val) => setDefaultImageModel(val ?? "")}
-                        disabled={imageModels.length === 0}
+                        disabled={imageModelOptions.length === 0}
                       >
                         <SelectTrigger className="w-full">
                           {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
                           <SelectValue>
                             {(value: string) =>
-                              imageModels.find((m) => m.id === value)?.name ??
-                              (modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生图模型")
+                              imageModelOptions.find((m) => m.id === value)?.name ??
+                              (modelsLoading ? t("modelsLoading") : enabledProviders.length === 0 ? t("enableProviderFirst") : t("selectImageModel"))
                             }
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {imageModels.map((m) => (
+                          {imageModelOptions.map((m) => (
                             <SelectItem key={m.id} value={m.id}>
-                              {m.name}
+                              {m.name}{m.custom ? " ·自定义" : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -867,26 +902,26 @@ export default function SettingsPage() {
                     {/* 默认生视频模型 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        默认生视频模型
+                        {t("defaultVideoModel")}
                       </Label>
                       <Select
                         value={defaultVideoModel}
                         onValueChange={(val) => setDefaultVideoModel(val ?? "")}
-                        disabled={videoModels.length === 0}
+                        disabled={videoModelOptions.length === 0}
                       >
                         <SelectTrigger className="w-full">
                           {/* Base UI 的 Select.Value 默认显示原始 value，用函数子节点映射为模型名 */}
                           <SelectValue>
                             {(value: string) =>
-                              videoModels.find((m) => m.id === value)?.name ??
-                              (modelsLoading ? "加载中..." : enabledProviders.length === 0 ? "请先启用 AI 平台" : "选择生视频模型")
+                              videoModelOptions.find((m) => m.id === value)?.name ??
+                              (modelsLoading ? t("modelsLoading") : enabledProviders.length === 0 ? t("enableProviderFirst") : t("selectVideoModel"))
                             }
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {videoModels.map((m) => (
+                          {videoModelOptions.map((m) => (
                             <SelectItem key={m.id} value={m.id}>
-                              {m.name}
+                              {m.name}{m.custom ? " ·自定义" : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -895,6 +930,9 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* 自定义模型接入点 + 生成参数 */}
+              <GenerationSettings />
             </div>
           </TabsContent>
           {/* Tab 3: 出镜人物管理 */}
@@ -912,17 +950,17 @@ export default function SettingsPage() {
           {/* 配置状态摘要 */}
           <div className="text-xs text-muted-foreground space-y-1">
             <p className={llm.apiKey ? "text-emerald-600" : "text-amber-600"}>
-              {llm.apiKey ? "✓ LLM 已配置" : "⚠ LLM 未配置（脚本生成需要）"}
+              {llm.apiKey ? t("llmConfigured") : t("llmNotConfigured")}
             </p>
             <p className={hasAnyProvider ? "text-emerald-600" : "text-amber-600"}>
-              {hasAnyProvider ? `✓ ${enabledCount} 个 AI 平台已启用` : "⚠ 无 AI 平台启用（素材生成需要）"}
+              {hasAnyProvider ? t("providerCount", { n: enabledCount }) : t("noProvider")}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {saved && (
               <span className="text-sm text-emerald-400 animate-in fade-in slide-in-from-right-2">
-                设置已保存
+                {t("settingsSaved")}
               </span>
             )}
             <Button
@@ -935,7 +973,7 @@ export default function SettingsPage() {
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-              保存设置
+              {t("saveSettings")}
             </Button>
           </div>
         </div>
@@ -947,6 +985,7 @@ export default function SettingsPage() {
 // ==================== 出镜人物管理组件 ====================
 
 function CharacterManager() {
+  const t = useT("settings");
   const { characters, addCharacter, updateCharacter, removeCharacter } = useCharacterStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1001,7 +1040,7 @@ function CharacterManager() {
       <Card className="glass-card">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            添加出镜人物后，AI 生成脚本和素材时会自动注入人物外貌描述，确保不同分镜中人物形象保持一致。
+            {t("characterIntro")}
           </p>
         </CardContent>
       </Card>
@@ -1022,13 +1061,13 @@ function CharacterManager() {
                         {char.isDefault && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">
                             <LuStar className="w-3 h-3" />
-                            默认
+                            {t("characterDefault")}
                           </span>
                         )}
                       </div>
                       {char.description && <p className="text-xs text-muted-foreground mb-1">{char.description}</p>}
-                      {char.appearance && <p className="text-xs text-muted-foreground/70 line-clamp-1">外貌: {char.appearance}</p>}
-                      {char.voiceProfile?.style && <p className="text-xs text-muted-foreground/70 mt-0.5">声音: {char.voiceProfile.style}</p>}
+                      {char.appearance && <p className="text-xs text-muted-foreground/70 line-clamp-1">{t("characterAppearancePrefix", { appearance: char.appearance })}</p>}
+                      {char.voiceProfile?.style && <p className="text-xs text-muted-foreground/70 mt-0.5">{t("characterVoicePrefix", { voice: char.voiceProfile.style })}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -1037,7 +1076,7 @@ function CharacterManager() {
                         <LuStar className="w-3 h-3" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => startEdit(char)}>编辑</Button>
+                    <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => startEdit(char)}>{t("characterEdit")}</Button>
                     <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-destructive hover:text-destructive" onClick={() => removeCharacter(char.id)}>
                       <LuTrash2 className="w-3 h-3" />
                     </Button>
@@ -1052,28 +1091,28 @@ function CharacterManager() {
       {isCreating ? (
         <Card className="glass-card ring-1 ring-primary/30">
           <CardContent className="p-5 space-y-4">
-            <h3 className="text-sm font-semibold">{editingId ? "编辑人物" : "添加人物"}</h3>
+            <h3 className="text-sm font-semibold">{editingId ? t("characterFormEditTitle") : t("characterFormAddTitle")}</h3>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">人物名称 *</Label>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="如：小美、张老师" className="text-sm" />
+              <Label className="text-xs text-muted-foreground">{t("characterNameLabel")}</Label>
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t("characterNamePlaceholder")} className="text-sm" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">简短描述</Label>
-              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="如：25岁护肤博主，活泼开朗" className="text-sm" />
+              <Label className="text-xs text-muted-foreground">{t("characterDescLabel")}</Label>
+              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder={t("characterDescPlaceholder")} className="text-sm" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">外貌特征（英文，用于 AI 生图 prompt）</Label>
-              <Textarea value={form.appearance} onChange={(e) => setForm((f) => ({ ...f, appearance: e.target.value }))} placeholder="如：Young Asian woman, 25 years old, long black hair, oval face, fair skin, bright smile" rows={3} className="text-sm resize-none" />
-              <p className="text-[11px] text-muted-foreground/60">描述越具体，不同分镜中人物的一致性越好</p>
+              <Label className="text-xs text-muted-foreground">{t("characterAppearanceLabel")}</Label>
+              <Textarea value={form.appearance} onChange={(e) => setForm((f) => ({ ...f, appearance: e.target.value }))} placeholder={t("characterAppearancePlaceholder")} rows={3} className="text-sm resize-none" />
+              <p className="text-[11px] text-muted-foreground/60">{t("characterAppearanceTip")}</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">声音风格</Label>
-              <Input value={form.voiceStyle} onChange={(e) => setForm((f) => ({ ...f, voiceStyle: e.target.value }))} placeholder="如：温柔女声、活力女声、专业男声" className="text-sm" />
+              <Label className="text-xs text-muted-foreground">{t("characterVoiceLabel")}</Label>
+              <Input value={form.voiceStyle} onChange={(e) => setForm((f) => ({ ...f, voiceStyle: e.target.value }))} placeholder={t("characterVoicePlaceholder")} className="text-sm" />
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={resetForm}>取消</Button>
+              <Button variant="outline" size="sm" onClick={resetForm}>{t("characterCancel")}</Button>
               <Button size="sm" className="brand-gradient text-white" onClick={handleSave} disabled={!form.name.trim()}>
-                {editingId ? "保存修改" : "添加人物"}
+                {editingId ? t("characterSaveEdit") : t("characterAddSubmit")}
               </Button>
             </div>
           </CardContent>
@@ -1081,7 +1120,7 @@ function CharacterManager() {
       ) : (
         <Button variant="outline" className="w-full h-12 border-dashed" onClick={() => setIsCreating(true)}>
           <LuPlus className="w-4 h-4 mr-2" />
-          添加出镜人物
+          {t("characterAddButton")}
         </Button>
       )}
     </div>
@@ -1090,15 +1129,16 @@ function CharacterManager() {
 
 // ==================== 品牌设置组件 ====================
 
-// 水印位置选项
+// 水印位置选项（labelKey 在组件内按语言渲染）
 const WATERMARK_POSITIONS = [
-  { value: "top-left" as const, label: "左上" },
-  { value: "top-right" as const, label: "右上" },
-  { value: "bottom-left" as const, label: "左下" },
-  { value: "bottom-right" as const, label: "右下" },
+  { value: "top-left" as const, labelKey: "brandPositionTopLeft" },
+  { value: "top-right" as const, labelKey: "brandPositionTopRight" },
+  { value: "bottom-left" as const, labelKey: "brandPositionBottomLeft" },
+  { value: "bottom-right" as const, labelKey: "brandPositionBottomRight" },
 ] as const;
 
 function BrandSettings() {
+  const t = useT("settings");
   const { brand, updateBrand, updateWatermark } = useBrandStore();
 
   return (
@@ -1113,17 +1153,17 @@ function BrandSettings() {
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
             </div>
-            <h3 className="font-semibold text-sm">店铺信息</h3>
+            <h3 className="font-semibold text-sm">{t("brandShopTitle")}</h3>
           </div>
 
           <div className="grid gap-4">
             {/* 店铺名称 */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">店铺名称</Label>
+              <Label className="text-xs text-muted-foreground">{t("brandNameLabel")}</Label>
               <Input
                 value={brand.name}
                 onChange={(e) => updateBrand({ name: e.target.value })}
-                placeholder="输入品牌或店铺名称"
+                placeholder={t("brandNamePlaceholder")}
                 className="text-sm"
               />
             </div>
@@ -1136,7 +1176,7 @@ function BrandSettings() {
                   {brand.logoUrl ? (
                     <img
                       src={brand.logoUrl}
-                      alt="品牌 Logo"
+                      alt={t("brandLogoAlt")}
                       className="h-full w-full object-contain"
                     />
                   ) : (
@@ -1167,7 +1207,7 @@ function BrandSettings() {
                     />
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
                       <LuUpload className="w-3 h-3" />
-                      上传 Logo
+                      {t("brandUploadLogo")}
                     </span>
                   </label>
                   {brand.logoUrl && (
@@ -1175,7 +1215,7 @@ function BrandSettings() {
                       onClick={() => updateBrand({ logoUrl: undefined })}
                       className="text-xs text-destructive hover:underline text-left"
                     >
-                      移除
+                      {t("brandRemove")}
                     </button>
                   )}
                 </div>
@@ -1192,13 +1232,13 @@ function BrandSettings() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 text-white">
               <LuPalette className="w-4 h-4" />
             </div>
-            <h3 className="font-semibold text-sm">品牌色</h3>
+            <h3 className="font-semibold text-sm">{t("brandColorTitle")}</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* 主色 */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">主色</Label>
+              <Label className="text-xs text-muted-foreground">{t("brandPrimaryColor")}</Label>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <input
@@ -1223,7 +1263,7 @@ function BrandSettings() {
 
             {/* 辅色 */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">辅色</Label>
+              <Label className="text-xs text-muted-foreground">{t("brandSecondaryColor")}</Label>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <input
@@ -1259,7 +1299,7 @@ function BrandSettings() {
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-sm">水印设置</h3>
+              <h3 className="font-semibold text-sm">{t("brandWatermarkTitle")}</h3>
             </div>
             <Toggle
               checked={brand.watermark.enabled}
@@ -1271,7 +1311,7 @@ function BrandSettings() {
             <div className="space-y-4 pt-2">
               {/* 水印位置 */}
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">水印位置</Label>
+                <Label className="text-xs text-muted-foreground">{t("brandWatermarkPosition")}</Label>
                 <div className="grid grid-cols-4 gap-2">
                   {WATERMARK_POSITIONS.map((pos) => (
                     <button
@@ -1283,7 +1323,7 @@ function BrandSettings() {
                           : "border-border bg-background hover:bg-accent text-muted-foreground"
                       }`}
                     >
-                      {pos.label}
+                      {t(pos.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -1292,7 +1332,7 @@ function BrandSettings() {
               {/* 透明度 */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-muted-foreground">透明度</Label>
+                  <Label className="text-xs text-muted-foreground">{t("brandWatermarkOpacity")}</Label>
                   <span className="text-xs text-muted-foreground font-mono">
                     {Math.round(brand.watermark.opacity * 100)}%
                   </span>
@@ -1329,7 +1369,7 @@ function BrandSettings() {
                   <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-sm">片尾设置</h3>
+              <h3 className="font-semibold text-sm">{t("brandOutroTitle")}</h3>
             </div>
             <Toggle
               checked={brand.outroEnabled}
@@ -1339,16 +1379,16 @@ function BrandSettings() {
 
           {brand.outroEnabled && (
             <div className="space-y-1.5 pt-2">
-              <Label className="text-xs text-muted-foreground">片尾文字</Label>
+              <Label className="text-xs text-muted-foreground">{t("brandOutroTextLabel")}</Label>
               <Textarea
                 value={brand.outroText ?? ""}
                 onChange={(e) => updateBrand({ outroText: e.target.value })}
-                placeholder="如：关注我们获取更多好物推荐"
+                placeholder={t("brandOutroTextPlaceholder")}
                 rows={2}
                 className="text-sm resize-none"
               />
               <p className="text-[11px] text-muted-foreground/60">
-                片尾文字会叠加在品牌色背景上展示
+                {t("brandOutroTip")}
               </p>
             </div>
           )}
