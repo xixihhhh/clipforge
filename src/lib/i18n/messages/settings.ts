@@ -8,6 +8,14 @@ export const settings: NamespaceMessages = {
     pageSubtitle:
       "配置 AI 服务后即可开始生成带货视频。需要配置 LLM（生成脚本）+ 至少一个 AI 平台（生成图片/视频）。",
 
+    // 新手一键接入 Atlas
+    oneKeyTitle: "新手推荐 · 一个 Key 全搞定",
+    oneKeyDesc: "填 Atlas Cloud 的 API Key，自动配好脚本 + 图 + 视频 + 配音，无需在下面逐项设置。",
+    oneKeyPlaceholder: "粘贴 Atlas Cloud API Key",
+    oneKeyCta: "一键接入",
+    oneKeyDone: "已接入 Atlas Cloud — 下方 LLM / 生图 / 生视频 / 配音 已自动配好，可直接开始出片",
+    oneKeyGetKey: "没有 Key？前往 Atlas Cloud 获取 →",
+
     // 标签页
     tabProviders: "AI 平台",
     tabLlm: "LLM 配置",
@@ -27,6 +35,8 @@ export const settings: NamespaceMessages = {
     providerAlibabaTip: "万相系列，商品图生视频效果佳",
     providerSiliconflowDesc: "国产 AI 推理平台，提供高性价比的模型推理服务",
     providerSiliconflowTip: "国产高性价比推理平台",
+    providerOpenaiDesc: "OpenAI 官方平台，支持 gpt-image-2、gpt-image-1.5 图片生成与图生图编辑",
+    providerOpenaiTip: "2026 旗舰 gpt-image-2，9:16 竖屏直出 + 商品保真图生图（暂不支持视频）",
 
     // AI 平台卡片
     providerEnabled: "已启用",
@@ -154,6 +164,14 @@ export const settings: NamespaceMessages = {
     pageSubtitle:
       "Configure your AI services to start generating commerce videos. You'll need an LLM (for scripts) plus at least one AI platform (for images/video).",
 
+    // One-key Atlas setup for newcomers
+    oneKeyTitle: "Recommended · One key does it all",
+    oneKeyDesc: "Paste your Atlas Cloud API key and we'll wire up scripts + images + video + voiceover automatically — no need to configure each section below.",
+    oneKeyPlaceholder: "Paste your Atlas Cloud API key",
+    oneKeyCta: "Connect",
+    oneKeyDone: "Atlas Cloud connected — LLM / image / video / voiceover below are all set up. You're ready to create.",
+    oneKeyGetKey: "No key? Get one from Atlas Cloud →",
+
     // Tabs
     tabProviders: "AI platforms",
     tabLlm: "LLM config",
@@ -173,6 +191,8 @@ export const settings: NamespaceMessages = {
     providerAlibabaTip: "Wanxiang series, great for product image-to-video",
     providerSiliconflowDesc: "Homegrown AI inference platform with cost-effective model inference",
     providerSiliconflowTip: "Cost-effective domestic inference platform",
+    providerOpenaiDesc: "OpenAI's official platform — gpt-image-2 and gpt-image-1.5 image generation and editing",
+    providerOpenaiTip: "2026 flagship gpt-image-2: native 9:16 + product-faithful editing (no video yet)",
 
     // AI platform card
     providerEnabled: "Enabled",

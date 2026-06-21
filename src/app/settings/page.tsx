@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette } from "react-icons/lu";
+import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette, LuZap, LuCheck } from "react-icons/lu";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useSettingsStore } from "@/lib/stores/settings-store";
@@ -134,6 +134,19 @@ const AI_PROVIDERS = [
     ),
     iconBg: "from-emerald-500 to-teal-500",
   },
+  {
+    key: "openai",
+    name: "OpenAI",
+    descKey: "providerOpenaiDesc",
+    tipKey: "providerOpenaiTip",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a4.5 4.5 0 0 1 4.27 3.08A4.5 4.5 0 0 1 19.5 12a4.5 4.5 0 0 1-3.23 6.92A4.5 4.5 0 0 1 12 22a4.5 4.5 0 0 1-4.27-3.08A4.5 4.5 0 0 1 4.5 12a4.5 4.5 0 0 1 3.23-6.92A4.5 4.5 0 0 1 12 2z" />
+        <path d="M12 8.5v7M8.5 10.25l7 3.5M15.5 10.25l-7 3.5" />
+      </svg>
+    ),
+    iconBg: "from-teal-600 to-green-700",
+  },
 ];
 
 // 密码输入框（可切换显示/隐藏）
@@ -230,7 +243,17 @@ export default function SettingsPage() {
     setDefaultAspectRatio,
     setDefaultImageModel,
     setDefaultVideoModel,
+    applyAtlasOneKey,
   } = useSettingsStore();
+
+  // 新手一键接入 Atlas：一个 Key 自动配好 LLM/生图/生视频/配音
+  const [atlasOneKey, setAtlasOneKey] = useState("");
+  const [atlasApplied, setAtlasApplied] = useState(false);
+  const applyOneKey = () => {
+    if (!atlasOneKey.trim()) return;
+    applyAtlasOneKey(atlasOneKey.trim());
+    setAtlasApplied(true);
+  };
 
   // TTS 试听状态
   const [ttsTestStatus, setTtsTestStatus] = useState<"idle" | "testing" | "error">("idle");
@@ -422,6 +445,38 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {t("pageSubtitle")}
           </p>
+        </div>
+
+        {/* 新手一键接入：一个 Atlas Key 自动配好 LLM/生图/生视频/配音，免去逐项设置 */}
+        <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <LuZap className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-sm">{t("oneKeyTitle")}</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">{t("oneKeyDesc")}</p>
+          {atlasApplied ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-400">
+              <LuCheck className="w-4 h-4 shrink-0" />
+              <span>{t("oneKeyDone")}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="password"
+                value={atlasOneKey}
+                onChange={(e) => setAtlasOneKey(e.target.value)}
+                placeholder={t("oneKeyPlaceholder")}
+                className="flex-1"
+              />
+              <Button onClick={applyOneKey} disabled={!atlasOneKey.trim()} className="brand-gradient text-white border-0 shrink-0">
+                <LuZap className="w-4 h-4 mr-1.5" />
+                {t("oneKeyCta")}
+              </Button>
+            </div>
+          )}
+          <a href="https://www.atlascloud.ai" target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-primary hover:underline">
+            {t("oneKeyGetKey")}
+          </a>
         </div>
 
         {/* 标签页 */}
