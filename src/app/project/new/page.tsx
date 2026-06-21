@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark } from "react-icons/lu";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
+import { useProductLibraryStore, type ProductItem } from "@/lib/stores/product-library-store";
 import { getExampleProducts, type ExampleProduct } from "@/lib/examples";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import Link from "next/link";
@@ -91,6 +92,9 @@ export default function NewProjectPage() {
   // 人物库
   const { characters } = useCharacterStore();
 
+  // 商品库（用于「做视频」从商品库带入预填）
+  const { products: libraryProducts } = useProductLibraryStore();
+
   // 图片上传状态（本地模拟）
   const [images, setImages] = useState<{ id: string; url: string; file: File }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -173,6 +177,45 @@ export default function NewProjectPage() {
       // 取示例图失败也无妨，文字已填好，用户可自行上传
     }
   }, []);
+
+  // 商品库「做视频」带入：按 productId 预填商品名/品类/卖点，并尽力把商品图拉成 File
+  const prefillFromProduct = useCallback(async (product: ProductItem) => {
+    setProductName(product.name);
+    // 商品库的 tech 品类对应本页的 digital，其余取值一致
+    setCategory(product.category === "tech" ? "digital" : product.category);
+    if (product.description) setSellingPoints(product.description);
+    // 拉商品图为 File：示例/服务器图可成功；本地 blob 图跨页失效则跳过（文案已填好，用户可自行补传）
+    const files: { id: string; url: string; file: File }[] = [];
+    for (const [i, src] of product.images.slice(0, 5).entries()) {
+      try {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const file = new File([blob], `product-${i}.png`, { type: blob.type || "image/png" });
+        files.push({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file });
+      } catch {
+        // 图取不到无妨
+      }
+    }
+    if (files.length) {
+      setImages((prev) => {
+        prev.forEach((p) => URL.revokeObjectURL(p.url));
+        return files;
+      });
+    }
+  }, []);
+
+  // 落地时若带了 ?productId，从商品库取该商品预填一次（store 水合后 products 才有值，故依赖它）
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current) return;
+    const productId = new URLSearchParams(window.location.search).get("productId");
+    if (!productId) return;
+    const product = libraryProducts.find((p) => p.id === productId);
+    if (product) {
+      prefilledRef.current = true;
+      void prefillFromProduct(product);
+    }
+  }, [libraryProducts, prefillFromProduct]);
 
   // 表单校验
   const isValid = productName.trim().length > 0 && images.length >= 1;

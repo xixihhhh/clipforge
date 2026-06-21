@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX } from "react-icons/lu";
+import { LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX, LuVideo } from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -530,7 +530,7 @@ export default function ProductsPage() {
                 {products.map((product) => (
                   <Card
                     key={product.id}
-                    className="card-hover glass-card cursor-pointer group"
+                    className="card-hover glass-card group"
                   >
                     <CardContent className="p-0">
                       {/* 商品缩略图 */}
@@ -594,6 +594,13 @@ export default function ProductsPage() {
                             {t("videoCount", { n: product.videoCount })}
                           </span>
                         </div>
+                        {/* 做视频：带上 productId 跳到新建页，自动预填商品信息（商品库的核心用途） */}
+                        <Link href={`/project/new?productId=${product.id}`} className="block mt-3">
+                          <Button size="sm" className="w-full brand-gradient text-white border-0">
+                            <LuVideo className="w-3.5 h-3.5 mr-1.5" />
+                            {t("makeVideo")}
+                          </Button>
+                        </Link>
                       </div>
                     </CardContent>
                   </Card>

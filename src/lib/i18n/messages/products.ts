@@ -48,6 +48,7 @@ export const products: NamespaceMessages = {
     allProducts: "全部商品",
     productCount: "{n} 个商品",
     videoCount: "{n} 个视频",
+    makeVideo: "做视频",
   },
   en: {
     categoryBeauty: "Beauty & skincare",
@@ -89,5 +90,6 @@ export const products: NamespaceMessages = {
     allProducts: "All products",
     productCount: "{n} products",
     videoCount: "{n} videos",
+    makeVideo: "Make video",
   },
 };
