@@ -100,3 +100,13 @@ export function shouldOfferStockFill(
   if (contentType === "topic") return true;
   return !hasImageModel && pendingNonProductShotCount(rows) > 0;
 }
+
+/**
+ * 是否需要提示「未配置默认生图模型」：
+ * 未配模型、且仍有 AI 生成分镜尚未出图时才提示；若 AI 分镜都已生成（done），
+ * 则不提示——避免与「N/N 个素材已就绪」自相矛盾，给小白造成"出错了"的错觉。
+ */
+export function needsImageModelWarning(rows: AssetItem[], hasImageModel: boolean): boolean {
+  if (hasImageModel) return false;
+  return rows.some((r) => r.visualSource === "ai_generate" && r.status !== "done");
+}

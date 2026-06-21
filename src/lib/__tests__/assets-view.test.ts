@@ -4,6 +4,7 @@ import {
   pendingShotCount,
   pendingNonProductShotCount,
   shouldOfferStockFill,
+  needsImageModelWarning,
   type SavedAssetRow,
 } from "@/lib/assets-view";
 import type { Shot } from "@/lib/db/schema";
@@ -119,5 +120,30 @@ describe("shouldOfferStockFill", () => {
 
   it("空分镜 → 不提供", () => {
     expect(shouldOfferStockFill([], "topic", false)).toBe(false);
+  });
+});
+
+describe("needsImageModelWarning", () => {
+  it("已配生图模型 → 不提示", () => {
+    const rows = buildAssetRows([shot({ shotId: 1, visualSource: "ai_generate" })], [], []);
+    expect(needsImageModelWarning(rows, true)).toBe(false);
+  });
+
+  it("未配模型·有 AI 分镜待出图 → 提示", () => {
+    const rows = buildAssetRows([shot({ shotId: 1, visualSource: "ai_generate" })], [], []);
+    expect(needsImageModelWarning(rows, false)).toBe(true);
+  });
+
+  it("未配模型·AI 分镜都已生成 → 不提示（避免与「已就绪」矛盾）", () => {
+    const saved: SavedAssetRow[] = [
+      { shotId: 1, filePath: "/api/files/p/reel1.png", status: "done", type: "ai_generated" },
+    ];
+    const rows = buildAssetRows([shot({ shotId: 1, visualSource: "ai_generate" })], saved, []);
+    expect(needsImageModelWarning(rows, false)).toBe(false);
+  });
+
+  it("未配模型·只有商品原图分镜（无 AI 生成）→ 不提示", () => {
+    const rows = buildAssetRows([shot({ shotId: 1, visualSource: "product_image" })], [], ["/p.jpg"]);
+    expect(needsImageModelWarning(rows, false)).toBe(false);
   });
 });

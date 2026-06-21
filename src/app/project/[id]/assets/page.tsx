@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { mergeCustomModels, buildImageOptions, buildVideoOptions } from "@/lib/gen-params";
 import type { Shot } from "@/lib/db/schema";
-import { buildAssetRows, shouldOfferStockFill, type AssetItem } from "@/lib/assets-view";
+import { buildAssetRows, shouldOfferStockFill, needsImageModelWarning, type AssetItem } from "@/lib/assets-view";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
@@ -75,6 +75,8 @@ export default function AssetsPage() {
   const allDone = assets.length > 0 && doneCount === assets.length;
   // 未配置生图模型时（modelTarget 为空）给无 Key 用户提供免费素材配画面入口
   const offerStockFill = !loading && shouldOfferStockFill(assets, contentType, modelTarget !== null);
+  // 仅当还有 AI 分镜未出图时才提示配模型（已全部就绪则不提示，避免与「已就绪」矛盾）
+  const showModelWarning = !loading && needsImageModelWarning(assets, modelTarget !== null);
 
   // 载入真实数据：项目信息 + 已选脚本分镜 + 解析默认生图模型所属平台
   useEffect(() => {
@@ -534,8 +536,8 @@ export default function AssetsPage() {
           </div>
         )}
 
-        {/* 未配置生图模型提示 */}
-        {!loading && !modelTarget && assets.some((a) => a.visualSource === "ai_generate") && (
+        {/* 未配置生图模型提示（仅当仍有 AI 分镜待出图） */}
+        {showModelWarning && (
           <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
             <LuTriangleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
