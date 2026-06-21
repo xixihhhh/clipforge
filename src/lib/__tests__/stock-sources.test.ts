@@ -20,6 +20,12 @@ import {
   isSourceAvailable,
   getAvailableSources,
 } from "@/lib/providers/stock-registry";
+import {
+  stripHtml,
+  wikimediaRequiresAttribution,
+  toWikimediaCandidate,
+  type CommonsPage,
+} from "@/lib/providers/wikimedia";
 import { STOCK_SOURCES } from "@/lib/providers/stock-types";
 
 // ==================== Openverse ====================
@@ -153,13 +159,74 @@ describe("Pixabay 归一化", () => {
 
 // ==================== 注册表 ====================
 
+// ==================== Wikimedia Commons ====================
+
+describe("Wikimedia 归一化", () => {
+  it("stripHtml 去标签并压空白", () => {
+    expect(stripHtml('<a href="x">Jane  Doe</a>')).toBe("Jane Doe");
+    expect(stripHtml(undefined)).toBe("");
+  });
+
+  it("wikimediaRequiresAttribution：PD/CC0 免署名，BY 系需署名", () => {
+    expect(wikimediaRequiresAttribution("Public domain")).toBe(false);
+    expect(wikimediaRequiresAttribution("CC0")).toBe(false);
+    expect(wikimediaRequiresAttribution("CC BY-SA 4.0")).toBe(true);
+    expect(wikimediaRequiresAttribution("CC BY 3.0")).toBe(true);
+  });
+
+  it("视频文件归一化为 video 候选，带时长/许可/署名链接", () => {
+    const page: CommonsPage = {
+      pageid: 123,
+      title: "File:Ocean waves.webm",
+      imageinfo: [
+        {
+          url: "https://upload.wikimedia.org/x/Ocean_waves.webm",
+          thumburl: "https://upload.wikimedia.org/x/thumb.jpg",
+          width: 1280,
+          height: 720,
+          mime: "video/webm",
+          duration: 12.6,
+          user: "Uploader",
+          extmetadata: {
+            LicenseShortName: { value: "CC BY-SA 4.0" },
+            LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" },
+            Artist: { value: '<a href="x">Jane Doe</a>' },
+          },
+        },
+      ],
+    };
+    const c = toWikimediaCandidate(page, "video")!;
+    expect(c.source).toBe("wikimedia");
+    expect(c.mediaType).toBe("video");
+    expect(c.downloadUrl).toBe("https://upload.wikimedia.org/x/Ocean_waves.webm");
+    expect(c.durationSec).toBe(13); // 12.6 → 四舍五入
+    expect(c.author).toBe("Jane Doe");
+    expect(c.requiresAttribution).toBe(true);
+    expect(c.previewImage).toBe("https://upload.wikimedia.org/x/thumb.jpg");
+    expect(c.pageUrl).toContain("commons.wikimedia.org/wiki/");
+  });
+
+  it("无 imageinfo/直链 → 返回 null（被过滤）", () => {
+    expect(toWikimediaCandidate({ pageid: 1, title: "File:x" }, "image")).toBeNull();
+  });
+});
+
 describe("多源注册表", () => {
-  it("STOCK_SOURCES 含 openverse(keyless)/pexels/pixabay", () => {
+  it("STOCK_SOURCES 含 openverse(keyless)/wikimedia(keyless,视频)/pexels/pixabay", () => {
     const ids = STOCK_SOURCES.map((s) => s.id);
     expect(ids).toContain("openverse");
     expect(ids).toContain("pexels");
     expect(ids).toContain("pixabay");
+    expect(ids).toContain("wikimedia");
     expect(STOCK_SOURCES.find((s) => s.id === "openverse")?.keyless).toBe(true);
+    const wm = STOCK_SOURCES.find((s) => s.id === "wikimedia")!;
+    expect(wm.keyless).toBe(true); // 免 Key
+    expect(wm.mediaTypes).toContain("video"); // 唯一免 Key 视频源
+  });
+
+  it("wikimedia 无 key 也可用(keyless)", () => {
+    const wm = STOCK_SOURCES.find((s) => s.id === "wikimedia")!;
+    expect(isSourceAvailable(wm, {})).toBe(true);
   });
 
   it("resolveSourceKey 优先 apiKeys，其次为空", () => {

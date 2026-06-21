@@ -18,6 +18,7 @@ import {
 import { searchPexelsVideos, searchPexelsPhotos } from "./pexels";
 import { searchPixabayVideos, searchPixabayImages } from "./pixabay";
 import { searchOpenverseImages, searchOpenverseAudio } from "./openverse";
+import { searchWikimediaImages, searchWikimediaVideos } from "./wikimedia";
 
 export interface StockSearchOptions {
   /** 各源 Key：{ pexels: "...", pixabay: "..." }；openverse 可选 token */
@@ -72,6 +73,12 @@ export async function searchStock(
       // Openverse 无视频；请求视频时回退到图片，让"无商品成片"仍有画面
       if (mediaType === "audio") return searchOpenverseAudio(query, { token: key || undefined, perPage });
       return searchOpenverseImages(query, { token: key || undefined, perPage });
+
+    case "wikimedia":
+      // Commons 免 Key 的图片+视频源（唯一免 Key 视频）；无音频
+      if (mediaType === "audio") return [];
+      if (mediaType === "image") return searchWikimediaImages(query, { perPage });
+      return searchWikimediaVideos(query, { perPage });
 
     default:
       return [];

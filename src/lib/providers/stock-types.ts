@@ -7,7 +7,7 @@
  */
 
 /** 已接入的素材源 id */
-export type StockSourceId = "pexels" | "pixabay" | "openverse";
+export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia";
 
 export type StockMediaType = "video" | "image" | "audio";
 export type StockOrientation = "portrait" | "landscape" | "square";
@@ -68,6 +68,14 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
     signupUrl: "https://api.openverse.org/",
     envKey: "OPENVERSE_TOKEN",
     note: "免 Key 即可用，CC 授权图片+音乐/音效，新手零配置首选（无视频）",
+  },
+  {
+    id: "wikimedia",
+    label: "Wikimedia Commons",
+    keyless: true,
+    mediaTypes: ["image", "video"],
+    signupUrl: "https://commons.wikimedia.org/",
+    note: "免 Key，CC/公共领域图片+视频；目前唯一免 Key 的视频源（无需 Pexels/Pixabay Key 也能配实拍 B-roll）",
   },
   {
     id: "pexels",
