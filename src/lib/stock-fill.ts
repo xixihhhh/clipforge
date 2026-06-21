@@ -44,7 +44,7 @@ export async function fillShotStock(input: FillShotInput): Promise<Record<string
   const stockDir = join(getUploadsDir(), projectId, "stock");
   await mkdir(stockDir, { recursive: true });
   const base = `${c.source}_${c.id}_${Date.now()}_${shotId}`;
-  const { filePath } = await downloadStockFile(c.downloadUrl, stockDir, base);
+  const { filePath } = await downloadStockFile(c.downloadUrl, stockDir, base, c.mediaType);
   const publicUrl = `/api/files/${projectId}/stock/${basename(filePath)}`;
 
   const [row] = await getDb()

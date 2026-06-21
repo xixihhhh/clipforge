@@ -125,8 +125,8 @@ export function filterByDuration(
   });
 }
 
-/** 从直链/响应推断文件扩展名 */
-export function inferExtension(url: string, contentType?: string | null): string {
+/** 从直链/响应推断文件扩展名；都识别不出时按媒体类型给默认（避免图片/音频被错存成 .mp4） */
+export function inferExtension(url: string, contentType?: string | null, mediaType?: StockMediaType): string {
   const ctMap: Record<string, string> = {
     "video/mp4": "mp4",
     "video/webm": "webm",
@@ -142,7 +142,10 @@ export function inferExtension(url: string, contentType?: string | null): string
     return ctMap[contentType.split(";")[0].trim()];
   }
   const m = url.split("?")[0].match(/\.([a-zA-Z0-9]{2,4})$/);
-  return (m?.[1] || "mp4").toLowerCase();
+  if (m?.[1]) return m[1].toLowerCase();
+  if (mediaType === "image") return "jpg";
+  if (mediaType === "audio") return "mp3";
+  return "mp4";
 }
 
 // ==================== 共享网络函数 ====================
@@ -171,7 +174,8 @@ export interface DownloadResult {
 export async function downloadStockFile(
   url: string,
   destDir: string,
-  fileBaseName: string
+  fileBaseName: string,
+  mediaType?: StockMediaType
 ): Promise<DownloadResult> {
   const { writeFile } = await import("fs/promises");
   const { join } = await import("path");
@@ -190,7 +194,7 @@ export async function downloadStockFile(
     throw new Error(`素材体积 ${buffer.byteLength} 超过上限 ${MAX_DOWNLOAD_BYTES}`);
   }
 
-  const ext = inferExtension(url, contentType);
+  const ext = inferExtension(url, contentType, mediaType);
   const filePath = join(destDir, `${fileBaseName}.${ext}`);
   await writeFile(filePath, buffer);
   return { filePath, bytes: buffer.byteLength };

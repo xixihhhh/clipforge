@@ -19,7 +19,9 @@ import {
   resolveSourceKey,
   isSourceAvailable,
   getAvailableSources,
+  rankStockCandidates,
 } from "@/lib/providers/stock-registry";
+import { inferExtension, type StockCandidate } from "@/lib/providers/stock-types";
 import {
   stripHtml,
   wikimediaRequiresAttribution,
@@ -50,7 +52,7 @@ describe("Openverse 归一化", () => {
   };
 
   it("图片字段映射 + 组合 license + 现成署名文本", () => {
-    const c = toOpenverseImageCandidate(IMG);
+    const c = toOpenverseImageCandidate(IMG)!;
     expect(c.source).toBe("openverse");
     expect(c.mediaType).toBe("image");
     expect(c.downloadUrl).toContain("coffee.jpg");
@@ -85,7 +87,7 @@ describe("Openverse 归一化", () => {
         { url: "https://x/hq.mp3", bit_rate: 320000 },
       ],
     };
-    const c = toOpenverseAudioCandidate(AUD);
+    const c = toOpenverseAudioCandidate(AUD)!;
     expect(c.mediaType).toBe("audio");
     expect(c.durationSec).toBe(125);
     expect(c.downloadUrl).toContain("hq.mp3");
@@ -304,5 +306,81 @@ describe("多源注册表", () => {
   it("getAvailableSources 在无任何 key 时至少含 openverse", () => {
     const avail = getAvailableSources({}).map((s) => s.id);
     expect(avail).toContain("openverse");
+  });
+});
+
+// ==================== 审查修复回归 ====================
+
+const cand = (over: Partial<StockCandidate>): StockCandidate => ({
+  source: "openverse",
+  mediaType: "image",
+  id: "1",
+  downloadUrl: "u",
+  pageUrl: "p",
+  author: "a",
+  authorUrl: "au",
+  license: "cc0",
+  ...over,
+});
+
+describe("rankStockCandidates（聚合排序）", () => {
+  it("请求视频时：真视频排在高分辨率 Openverse 图片之前（修『要视频却拿到静态图』）", () => {
+    const ranked = rankStockCandidates(
+      [
+        cand({ source: "openverse", mediaType: "image", id: "img", width: 4000, height: 6000 }),
+        cand({ source: "pexels", mediaType: "video", id: "vid", width: 720, height: 1280 }),
+      ],
+      "video",
+      "portrait",
+    );
+    expect(ranked[0].id).toBe("vid");
+  });
+
+  it("请求图片时：竖向素材优先于横向（朝向匹配，减少竖屏裁切/黑边）", () => {
+    const ranked = rankStockCandidates(
+      [
+        cand({ id: "land", width: 1920, height: 1080 }),
+        cand({ id: "port", width: 1080, height: 1920 }),
+      ],
+      "image",
+      "portrait",
+    );
+    expect(ranked[0].id).toBe("port");
+  });
+});
+
+describe("Wikimedia 跳过无 webm 转码的视频", () => {
+  it("视频回退到 .ogv（无 webm 转码）→ 返回 null（不可播素材不入选）", () => {
+    const page: CommonsPage = {
+      pageid: 5,
+      title: "File:Old.ogv",
+      videoinfo: [
+        {
+          url: "https://up/Old.ogv",
+          mime: "application/ogg",
+          derivatives: [{ transcodekey: "144p.mjpeg.mov", src: "https://up/Old.144p.mov" }],
+        },
+      ],
+    };
+    expect(toWikimediaCandidate(page, "video")).toBeNull();
+  });
+});
+
+describe("inferExtension 无扩展名按媒体类型给默认", () => {
+  it("content-type 优先，其次 URL 扩展名", () => {
+    expect(inferExtension("https://x/file", "image/png")).toBe("png");
+    expect(inferExtension("https://x/a.webm?v=1")).toBe("webm");
+  });
+  it("都识别不出 → 图片 jpg / 音频 mp3 / 视频 mp4（不再一律 mp4）", () => {
+    expect(inferExtension("https://x/noext", null, "image")).toBe("jpg");
+    expect(inferExtension("https://x/noext", null, "audio")).toBe("mp3");
+    expect(inferExtension("https://x/noext", null, "video")).toBe("mp4");
+  });
+});
+
+describe("Openverse 无直链返回 null", () => {
+  it("图片/音频缺 url → null（被搜索结果过滤，不会 undefined 下载崩分镜）", () => {
+    expect(toOpenverseImageCandidate({ id: "x", url: "", license: "cc0" } as OpenverseImage)).toBeNull();
+    expect(toOpenverseAudioCandidate({ id: "x", url: "", license: "cc0" } as OpenverseAudio)).toBeNull();
   });
 });

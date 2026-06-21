@@ -58,8 +58,9 @@ export function composeLicense(license: string, version?: string): string {
   return version ? `${license}-${version}` : license;
 }
 
-/** 把 Openverse 图片归一化为候选 */
-export function toOpenverseImageCandidate(img: OpenverseImage): StockCandidate {
+/** 把 Openverse 图片归一化为候选；无直链则返回 null（过滤掉，避免下载崩该分镜） */
+export function toOpenverseImageCandidate(img: OpenverseImage): StockCandidate | null {
+  if (!img.url) return null;
   return {
     source: "openverse",
     mediaType: "image",
@@ -79,11 +80,12 @@ export function toOpenverseImageCandidate(img: OpenverseImage): StockCandidate {
 }
 
 /** 把 Openverse 音频归一化为候选（取最高码率 alt_files，否则 url；时长毫秒→秒） */
-export function toOpenverseAudioCandidate(a: OpenverseAudio): StockCandidate {
+export function toOpenverseAudioCandidate(a: OpenverseAudio): StockCandidate | null {
   const best =
     (a.alt_files || [])
       .slice()
       .sort((x, y) => (y.bit_rate ?? 0) - (x.bit_rate ?? 0))[0]?.url || a.url;
+  if (!best) return null; // 无可用直链 → 跳过，避免后续 undefined 下载崩该分镜
   return {
     source: "openverse",
     mediaType: "audio",
@@ -131,7 +133,9 @@ export async function searchOpenverseImages(
     throw new Error(`Openverse 图片检索失败 ${res.status}: ${body.slice(0, 200)}`);
   }
   const data = (await res.json()) as { results?: OpenverseImage[] };
-  return (data.results ?? []).map(toOpenverseImageCandidate);
+  return (data.results ?? [])
+    .map(toOpenverseImageCandidate)
+    .filter((c): c is StockCandidate => c !== null);
 }
 
 /** 搜索 Openverse 音频（音乐/音效，默认可商用） */
@@ -152,5 +156,7 @@ export async function searchOpenverseAudio(
     throw new Error(`Openverse 音频检索失败 ${res.status}: ${body.slice(0, 200)}`);
   }
   const data = (await res.json()) as { results?: OpenverseAudio[] };
-  return (data.results ?? []).map(toOpenverseAudioCandidate);
+  return (data.results ?? [])
+    .map(toOpenverseAudioCandidate)
+    .filter((c): c is StockCandidate => c !== null);
 }

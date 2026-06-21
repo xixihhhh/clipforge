@@ -9,6 +9,7 @@
 
 import {
   STOCK_SOURCES,
+  orientationOf,
   type StockCandidate,
   type StockSourceId,
   type StockMediaType,
@@ -121,16 +122,36 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
     else erroredSources.push(usable[i].id);
   });
 
-  // keyless 源优先 + 分辨率（短边）高者优先
+  return { candidates: rankStockCandidates(merged, mediaType, opts.orientation), skippedSources, erroredSources };
+}
+
+/**
+ * 聚合候选排序（纯函数，可单测）。优先级：
+ * ① 命中请求媒体类型（真视频 > Openverse 回退图片，避免「要视频却拿到静态图」）
+ * ② keyless 源优先 ③ 朝向匹配（竖屏短视频偏好竖向素材，少裁切/黑边）④ 短边分辨率高者
+ */
+export function rankStockCandidates(
+  candidates: StockCandidate[],
+  mediaType: StockMediaType,
+  orientation?: StockOrientation
+): StockCandidate[] {
   const keylessIds = new Set(STOCK_SOURCES.filter((s) => s.keyless).map((s) => s.id));
-  merged.sort((a, b) => {
+  const matchesOrientation = (c: StockCandidate) =>
+    orientation && c.width && c.height ? orientationOf(c.width, c.height) === orientation : false;
+  return candidates.slice().sort((a, b) => {
+    const am = a.mediaType === mediaType ? 0 : 1;
+    const bm = b.mediaType === mediaType ? 0 : 1;
+    if (am !== bm) return am - bm;
     const ak = keylessIds.has(a.source) ? 0 : 1;
     const bk = keylessIds.has(b.source) ? 0 : 1;
     if (ak !== bk) return ak - bk;
+    if (orientation) {
+      const ao = matchesOrientation(a) ? 0 : 1;
+      const bo = matchesOrientation(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+    }
     const aShort = Math.min(a.width ?? 0, a.height ?? 0);
     const bShort = Math.min(b.width ?? 0, b.height ?? 0);
     return bShort - aShort;
   });
-
-  return { candidates: merged, skippedSources, erroredSources };
 }

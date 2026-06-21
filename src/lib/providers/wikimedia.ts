@@ -84,12 +84,16 @@ export function toWikimediaCandidate(page: CommonsPage, requested: StockMediaTyp
   const ext = ii.extmetadata ?? {};
   const license = stripHtml(ext.LicenseShortName?.value) || "Unknown";
   const isVideo = requested === "video" || /^video\//.test(ii.mime ?? "");
+  const downloadUrl = isVideo ? pickWikimediaVideoSrc(ii.derivatives, ii.url) : ii.url;
+  // 视频但没有 ≤720p webm 转码（回退到原始 .ogv 等）→ 跳过：体积大、FFmpeg/浏览器播放不友好，
+  // 且静态文件路由不识别其 MIME（octet-stream 不可播）。让该分镜改由其它源/图片兜底。
+  if (isVideo && !/\.webm(\?|$)/i.test(downloadUrl)) return null;
   const commonsPageUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title)}`;
   return {
     source: "wikimedia",
     mediaType: isVideo ? "video" : "image",
     id: page.pageid,
-    downloadUrl: isVideo ? pickWikimediaVideoSrc(ii.derivatives, ii.url) : ii.url,
+    downloadUrl,
     pageUrl: commonsPageUrl,
     author: stripHtml(ext.Artist?.value) || ii.user || "Unknown",
     authorUrl: commonsPageUrl,
