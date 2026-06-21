@@ -156,6 +156,9 @@ const RESOLUTIONS: Record<string, Record<string, { width: number; height: number
 // 避免 FFmpeg「Error reinitializing filters」合成崩溃的关键。
 const SEGMENT_NORM = "format=yuv420p,setsar=1,fps=30,settb=AVTB";
 
+/** ffmpeg_fade 转场的交叉淡化时长（秒）。视频 xfade / 音频 acrossfade / 字幕时间轴必须用同一个值，否则音画字失步 */
+export const FADE_DURATION = 0.5;
+
 // 生成 FFmpeg 合成命令
 export function buildComposeCommand(config: ComposeConfig): string {
   const { width, height } = RESOLUTIONS[config.output.aspectRatio][config.output.resolution];
@@ -183,9 +186,11 @@ export function buildComposeCommand(config: ComposeConfig): string {
       // （yuvj420p/yuv420p/yuvj444p…），不归一会让 concat/xfade 报「Error reinitializing filters」而合成失败。
       filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,trim=end_frame=1,setpts=PTS-STARTPTS,${motion.getFilter(width, height, clip.duration)},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     } else {
-      // 视频片段：缩放铺满 + 按分镜时长裁剪，保证与音轨/字幕时间轴对齐
+      // 视频片段：缩放铺满 + 按分镜时长对齐。免费素材库（Wikimedia 等）真实视频长度不一，
+      // 短于分镜时长的片段若只 trim 会留黑尾、并使音画/字幕错位——先 tpad 克隆末帧补到目标时长，
+      // 再 trim 截断，保证视频段恒等于 clip.duration。
       inputs.push(`-i "${escapeShellPath(clip.filePath)}"`);
-      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30,trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
+      filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30,tpad=stop_mode=clone:stop_duration=${clip.duration},trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     }
   });
 
@@ -222,7 +227,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const clipDuration = config.clips[i].duration;
 
     if (transitionMode === "ffmpeg_fade") {
-      const fadeDuration = 0.5;
+      const fadeDuration = FADE_DURATION;
       // 从「当前累计流末尾往前 fadeDuration」开始交叉淡化
       const offset = Math.max(accumulated - fadeDuration, 0);
       filterParts.push(
@@ -242,11 +247,19 @@ export function buildComposeCommand(config: ComposeConfig): string {
   let currentAudioStream = "";
   if (hasAnyAudio && audioParts.length > 0) {
     filterParts.push(...audioParts);
-    // 按顺序拼接所有音轨
-    const audioInputs = config.clips.map((_, i) => `[a${i}]`).join("");
-    const concatAudioStream = "aconcat_out";
-    filterParts.push(`${audioInputs}concat=n=${config.clips.length}:v=0:a=1[${concatAudioStream}]`);
-    currentAudioStream = concatAudioStream;
+    // 音轨拼接必须镜像视频转场：ffmpeg_fade 用 acrossfade 重叠 FADE_DURATION（与视频 xfade 同步缩短），
+    // 其余转场直接 concat。否则音轨按全时长 concat 会比 xfade 后的视频长 0.5s/转场，造成音画渐进失步。
+    let curA = "a0";
+    for (let i = 1; i < config.clips.length; i++) {
+      const next = `acs${i}`;
+      if ((config.clips[i].transition as TransitionMode) === "ffmpeg_fade") {
+        filterParts.push(`[${curA}][a${i}]acrossfade=d=${FADE_DURATION}[${next}]`);
+      } else {
+        filterParts.push(`[${curA}][a${i}]concat=n=2:v=0:a=1[${next}]`);
+      }
+      curA = next;
+    }
+    currentAudioStream = curA;
   }
 
   // BGM 混音：叠加在片段音频之上
@@ -335,7 +348,8 @@ export function buildComposeCommand(config: ComposeConfig): string {
   // 渲染质量预设：分辨率在上方已按 preset 决定，这里用 preset 的编码速度/质量（白名单兜底防注入）
   const enc = safeEncodeParams(config.output.videoPreset, config.output.crf);
   cmd += ` -c:v libx264 -preset ${enc.videoPreset} -crf ${enc.crf} -profile:v high -level:v 4.2 -pix_fmt yuv420p`;
-  cmd += ` -c:a aac -b:a 256k -movflags +faststart "${escapeShellPath(outputPath)}"`;
+  // 显式限定输出时长为视频真实时间轴(accumulated)：xfade 重叠后视频比朴素累计短，避免尾部音频盖在冻结帧上
+  cmd += ` -c:a aac -b:a 256k -movflags +faststart -t ${accumulated.toFixed(3)} "${escapeShellPath(outputPath)}"`;
 
   return cmd;
 }

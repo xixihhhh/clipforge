@@ -10,7 +10,7 @@ import { resolveRenderProfile } from "@/lib/compose-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { composeVideo, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { composeVideo, FADE_DURATION, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
 import type { Shot } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
@@ -212,7 +212,8 @@ export async function POST(
         continue;
       }
       // 视频素材 vs 静态图：视频自带音轨时用模型原生语音，不再叠 TTS（避免双重声音）
-      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(local);
+      // 注意：免费素材库（Wikimedia）也会返回 .ogv 等容器，必须纳入视频判定，否则被当静态图 → 冻结帧 + 丢音轨
+      const isVideo = /\.(mp4|webm|mov|m4v|ogv|ogg|mkv|avi)$/i.test(local);
       const nativeAudio = isVideo ? await videoHasAudio(local) : false;
       const audioPath =
         shot.voiceover && !nativeAudio ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
@@ -243,7 +244,10 @@ export async function POST(
     let acc = 0;
     const subtitleTexts: { text: string; startTime: number; endTime: number }[] = [];
     const overlays: { text: string; style: "title" | "highlight" | "price"; startTime: number; endTime: number }[] = [];
-    for (const r of rendered) {
+    rendered.forEach((r, idx) => {
+      // 与 composer 的 xfade 时间轴严格一致：ffmpeg_fade 转入的片段与前段重叠 FADE_DURATION，整条时间轴前移，
+      // 否则字幕/贴片会比对应画面晚 0.5s/转场亮起（渐进漂移）。
+      if (idx > 0 && r.clip.transition === "ffmpeg_fade") acc -= FADE_DURATION;
       const start = acc;
       acc += r.duration;
       const end = acc;
@@ -252,7 +256,7 @@ export async function POST(
       if (ov && ov.style !== "subtitle" && ov.text) {
         overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });
       }
-    }
+    });
 
     // 背景音乐（可选）：本地路径转绝对路径，合成时混入并自动压低
     const bgmLocal = body.bgmPath ? toLocalPath(body.bgmPath) : undefined;

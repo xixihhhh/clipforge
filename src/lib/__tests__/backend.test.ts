@@ -248,6 +248,24 @@ describe("buildComposeCommand", () => {
     expect(cmd).not.toContain("offset=2.5:");
   });
 
+  it("ffmpeg_fade：视频补帧 tpad + 音轨 acrossfade 镜像 xfade + 输出限定真实时长（修音画失步）", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      clips: [
+        { type: "video", filePath: "/d/1.webm", duration: 4, transition: "direct_concat", audioPath: "/d/a1.mp3" },
+        { type: "video", filePath: "/d/2.webm", duration: 4, transition: "ffmpeg_fade", audioPath: "/d/a2.mp3" },
+        { type: "video", filePath: "/d/3.webm", duration: 3, transition: "ffmpeg_fade", audioPath: "/d/a3.mp3" },
+      ],
+    };
+    const cmd = buildComposeCommand(config);
+    // 短视频补帧：先 tpad 克隆末帧再 trim，保证视频段恒等于分镜时长（免费素材长度不一不留黑尾）
+    expect(cmd).toContain("tpad=stop_mode=clone:stop_duration=4");
+    // 音轨镜像视频 xfade：ffmpeg_fade 边界用 acrossfade（而非朴素 concat），与视频同步缩短 0.5s/转场
+    expect(cmd).toContain("acrossfade=d=0.5");
+    // 输出限定为视频真实时间轴 accumulated = 4 + (4-0.5) + (3-0.5) = 10.0，避免尾部音频盖冻结帧
+    expect(cmd).toContain("-t 10.000");
+  });
+
   it("输出文件路径正确", () => {
     const cmd = buildComposeCommand(baseConfig);
     expect(cmd).toContain("test-project-001");
