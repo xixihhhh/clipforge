@@ -59,7 +59,7 @@
 
 ---
 
-## 为什么选择ClipForge？
+## 🆚 横向对比：传统流程 vs 商业 SaaS vs ClipForge
 
 | 痛点 | 传统方式 | ClipForge |
 |------|---------|---------|
