@@ -16,6 +16,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "mcp": "node mcp/clipforge-mcp.mjs",
     "bundle:standalone": "node scripts/bundle-standalone.mjs",
     "electron": "electron .",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
@@ -25,6 +26,7 @@
   "dependencies": {
     "@base-ui/react": "^1.3.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/fluent-ffmpeg": "^2.1.28",
     "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
