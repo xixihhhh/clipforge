@@ -30,6 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const source = (body.source as StockSourceId | "all") ?? "all";
+  // mediaType="auto"：逐镜「视频优先、配不到再退图片」——拿到动态 B-roll 又保证每镜有画面（全程免 Key）
+  const autoMode = body.mediaType === "auto";
   const mediaType: StockMediaType =
     body.mediaType === "image" || body.mediaType === "audio" ? (body.mediaType as StockMediaType) : "video";
   const orientation: StockOrientation =
@@ -58,7 +60,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const already = new Set(existing.map((e) => e.shotId));
 
   const searchOpts = { apiKeys, mediaType, orientation, perPage: 10 };
-  const results: Array<{ shotId: number; ok: boolean; query: string; provider?: string; reason?: string }> = [];
+  const results: Array<{
+    shotId: number;
+    ok: boolean;
+    query: string;
+    provider?: string;
+    mediaType?: StockMediaType;
+    reason?: string;
+  }> = [];
 
   for (const shot of shots) {
     const sid = shot.shotId;
@@ -77,10 +86,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       continue;
     }
     try {
-      const asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts });
+      let asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts });
+      let usedType: StockMediaType = mediaType;
+      // auto 模式下视频没配到 → 退回图片，保证该分镜不空画面
+      if (!asset && autoMode && mediaType !== "image") {
+        asset = await fillShotStock({
+          projectId: id,
+          shotId: sid,
+          query,
+          source,
+          searchOpts: { ...searchOpts, mediaType: "image" },
+        });
+        usedType = "image";
+      }
       results.push(
         asset
-          ? { shotId: sid, ok: true, query, provider: String(asset.provider) }
+          ? { shotId: sid, ok: true, query, provider: String(asset.provider), mediaType: usedType }
           : { shotId: sid, ok: false, query, reason: "未找到素材" }
       );
     } catch (e) {

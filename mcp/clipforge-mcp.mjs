@@ -26,22 +26,19 @@ const LLM = {
   model: process.env.CLIPFORGE_LLM_MODEL || "",
 };
 
-// 免费素材源 Key（可选）：配了就能拿 Pexels/Pixabay 的视频 B-roll；不配则走 keyless Openverse 图片
+// 免费素材源 Key（可选）：配了就再补充 Pexels/Pixabay 高质量视频；不配也有 keyless Wikimedia 视频 + Openverse 图片
 const STOCK_KEYS = {};
 if (process.env.CLIPFORGE_PIXABAY_KEY) STOCK_KEYS.pixabay = process.env.CLIPFORGE_PIXABAY_KEY;
 if (process.env.CLIPFORGE_PEXELS_KEY) STOCK_KEYS.pexels = process.env.CLIPFORGE_PEXELS_KEY;
-const HAS_STOCK_VIDEO_KEY = Boolean(STOCK_KEYS.pixabay || STOCK_KEYS.pexels);
 
 const NARRATION_STYLES = ["knowledge", "story", "lifestyle", "inspiration", "travel"];
 const FOOTAGE_KINDS = ["auto", "image", "video"];
 const ASPECT_RATIOS = ["9:16", "16:9", "1:1"]; // 9:16 竖屏(抖音/快手/Reels/Shorts) · 16:9 横屏 · 1:1 方形
 const QUALITY_PRESETS = ["fast", "standard", "hd"]; // 映射真实 FFmpeg 编码：分辨率 + x264 preset + crf
 
-/** footage=auto 时：配了 Pexels/Pixabay Key 取视频 B-roll，否则用 keyless Openverse 图片 */
+/** footage 解析：默认 "auto"——交给 stock-fill 逐镜「视频优先、缺则图片」（全程免 Key）；image/video 为显式指定 */
 function resolveMediaType(footage) {
-  const f = FOOTAGE_KINDS.includes(footage) ? footage : "auto";
-  if (f === "auto") return HAS_STOCK_VIDEO_KEY ? "video" : "image";
-  return f;
+  return FOOTAGE_KINDS.includes(footage) ? footage : "auto";
 }
 
 /** 由工具入参拼出 compose 请求体：免费 TTS（可选音色）+ 画幅 + 画质预设 */
@@ -143,7 +140,7 @@ const TOOLS = [
         footage: {
           type: "string",
           enum: FOOTAGE_KINDS,
-          description: "画面类型：auto（默认，配了 Pexels/Pixabay Key 用视频 B-roll，否则免 Key 图片）/ image / video",
+          description: "画面类型：auto（默认，逐镜视频优先、配不到再退图片，全程免 Key）/ image（只图片，最快）/ video（只视频）",
         },
         ...OUTPUT_OPTION_PROPS,
       },

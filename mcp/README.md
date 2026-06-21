@@ -25,8 +25,8 @@ Drive ClipForge's text-to-video pipeline from any MCP client (Claude Desktop / C
 > **成片选项**：`create_video` / `compose` 支持 `voice`（音色，见 `clipforge_list_voices`）、`aspectRatio`（`9:16` 竖屏默认 / `16:9` / `1:1`）、`quality`（`fast` / `standard` / `hd`）。一个画面都没配到时 `create_video` 会直接返回可操作的提示而非空白片。
 > **Output options**: `create_video` / `compose` accept `voice`, `aspectRatio` (`9:16` default / `16:9` / `1:1`) and `quality` (`fast`/`standard`/`hd`).
 
-> **视频 B-roll**：默认 `footage:"auto"` 取 keyless Openverse **图片**（最稳）。传 `footage:"video"` 即可要**实拍视频**——现在 **无需任何 Key**（Wikimedia Commons 提供免 Key 的 CC/公共领域视频）；配了 `CLIPFORGE_PEXELS_KEY` / `CLIPFORGE_PIXABAY_KEY` 则再补充 Pexels/Pixabay 高质量视频，`auto` 也会自动转视频。
-> **Video B-roll**: `footage:"video"` now works with **no key at all** (Wikimedia Commons supplies key-less CC/public-domain video); adding `CLIPFORGE_PEXELS_KEY` / `CLIPFORGE_PIXABAY_KEY` adds higher-quality Pexels/Pixabay footage and makes `auto` switch to video.
+> **视频 B-roll**：默认 `footage:"auto"` 现在**逐镜视频优先、配不到再退图片**——**全程免 Key** 就能拿到实拍动态 B-roll（Wikimedia Commons 提供 CC/公共领域视频，取 ≤720p webm 转码）。想更快可传 `footage:"image"`（只图片）；`footage:"video"` 只视频。配了 `CLIPFORGE_PEXELS_KEY` / `CLIPFORGE_PIXABAY_KEY` 则再补充 Pexels/Pixabay 高质量视频。
+> **Video B-roll**: `footage:"auto"` (default) now picks **video first, falling back to image per shot** — real motion B-roll with **no key at all** (Wikimedia Commons). Pass `footage:"image"` for the fastest path; add `CLIPFORGE_PEXELS_KEY` / `CLIPFORGE_PIXABAY_KEY` for extra Pexels/Pixabay footage.
 
 ## 环境变量 / Environment
 
