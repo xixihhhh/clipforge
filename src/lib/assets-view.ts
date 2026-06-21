@@ -20,12 +20,17 @@ export interface AssetItem {
   assetType?: string;
 }
 
+/** 视频素材文件后缀（用于区分视频 vs 静态图，决定缩略图与「转动态」入口） */
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v)$/i;
+
 /** GET /api/project/[id]/assets 返回行里本函数关心的子集 */
 export interface SavedAssetRow {
   shotId: number;
   filePath?: string | null;
   status?: string | null;
   type?: string | null;
+  /** 视频素材的静态预览图（免费素材视频会落此列）；用作 <img> 缩略图，避免拿 mp4 当图渲染 */
+  thumbnailPath?: string | null;
 }
 
 /**
@@ -50,6 +55,8 @@ export function buildAssetRows(
   return shots.map((s) => {
     const saved = savedByShot.get(s.shotId);
     if (saved && saved.filePath) {
+      // 视频素材：用静态预览图当缩略图（拿 mp4 当 <img> 会裂图），并标记 isVideo 以正确收起「转动态」入口
+      const isVideo = VIDEO_EXT.test(saved.filePath);
       return {
         shotId: s.shotId,
         type: s.type,
@@ -58,7 +65,8 @@ export function buildAssetRows(
         prompt: s.prompt ?? "",
         visualSource: s.visualSource,
         status: "done" as const,
-        thumbnailUrl: saved.filePath,
+        thumbnailUrl: isVideo && saved.thumbnailPath ? saved.thumbnailPath : saved.filePath,
+        isVideo: isVideo || undefined,
         assetType: saved.type ?? undefined,
       };
     }

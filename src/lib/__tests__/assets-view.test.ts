@@ -35,6 +35,33 @@ describe("buildAssetRows", () => {
     expect(rows[0].status).toBe("done");
     expect(rows[0].thumbnailUrl).toBe("/api/files/p1/stock/a.jpg");
     expect(rows[0].assetType).toBe("stock_footage");
+    expect(rows[0].isVideo).toBeUndefined(); // 图片素材不是视频
+  });
+
+  it("视频素材（mp4）→ 标记 isVideo，缩略图取静态预览图而非 mp4", () => {
+    const shots = [shot({ shotId: 1, visualSource: "ai_generate" })];
+    const saved: SavedAssetRow[] = [
+      {
+        shotId: 1,
+        filePath: "/api/files/p1/stock/clip.mp4",
+        thumbnailPath: "https://cdn/preview.jpg",
+        status: "done",
+        type: "stock_footage",
+      },
+    ];
+    const rows = buildAssetRows(shots, saved, []);
+    expect(rows[0].isVideo).toBe(true);
+    expect(rows[0].thumbnailUrl).toBe("https://cdn/preview.jpg"); // 用预览图，不拿 mp4 当 <img>
+  });
+
+  it("视频素材但无预览图 → isVideo 仍为 true，缩略图回退到文件本身", () => {
+    const shots = [shot({ shotId: 1 })];
+    const saved: SavedAssetRow[] = [
+      { shotId: 1, filePath: "/api/files/p1/x.webm", status: "done", type: "stock_footage" },
+    ];
+    const rows = buildAssetRows(shots, saved, []);
+    expect(rows[0].isVideo).toBe(true);
+    expect(rows[0].thumbnailUrl).toBe("/api/files/p1/x.webm");
   });
 
   it("未就绪的落库素材（status 非 done）不算就绪", () => {

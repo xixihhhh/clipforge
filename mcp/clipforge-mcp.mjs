@@ -47,6 +47,7 @@ async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res;
+  let text;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
@@ -54,13 +55,14 @@ async function api(path, { method = "GET", body, timeoutMs = 600000 } = {}) {
       body: body ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
     });
+    // 读 body 也要在超时保护内：fetch 只在收到响应头时 resolve，body 卡住时不清掉 timer 才能中止
+    text = await res.text();
   } catch (e) {
-    clearTimeout(timer);
     if (e?.name === "AbortError") throw new Error(`请求超时：${path}`);
     throw new Error(`连不上 ClipForge（${BASE_URL}）。请先启动实例：pnpm dev 或 pnpm start。原始错误：${e?.message || e}`);
+  } finally {
+    clearTimeout(timer);
   }
-  clearTimeout(timer);
-  const text = await res.text();
   let data;
   try {
     data = text ? JSON.parse(text) : {};
