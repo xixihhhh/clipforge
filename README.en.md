@@ -1,8 +1,8 @@
-<p align="center"><img src="docs/banner.png" alt="ClipForge — AI short-video generator for TikTok, Reels and Shorts" width="820"/></p>
+<p align="center"><img src="docs/banner.png" alt="ClipForge — open-source AI e-commerce short-video generator: a product photo into a TikTok Shop / Reels / Shorts ad that sells" width="820"/></p>
 
-# ClipForge — Open-Source AI Short-Video Generator
+# ClipForge — Open-Source AI Video Generator for E-Commerce & UGC Ads
 
-> **Turn one sentence — or a single product photo — into a ready-to-post vertical video for TikTok, Reels & YouTube Shorts.** AI writes the script, auto-fills the footage, adds a voiceover and subtitles, and renders it in one click. Free, self-hosted, no watermark.
+> **Turn a product photo into a sales-driving short video.** Upload your product → AI extracts the selling points, writes the script, **keeps the product pixel-accurate (no distortion)**, and adds voiceover + subtitles + music → a ready-to-post ad for **TikTok Shop · Shopify · Amazon · Reels · Shorts**. One seller, dozens of videos a day — free, self-hosted, no watermark.
 
 <p align="right"><strong>English</strong> · <a href="README.md">中文</a></p>
 
@@ -14,12 +14,16 @@
   <img src="https://img.shields.io/badge/UI-中文%20%2F%20English-06B6D4?style=flat-square" alt="Bilingual UI" />
 </p>
 
-**ClipForge** is a free, open-source **AI video generator** you run on your own machine. It automates the whole short-form pipeline — **script → footage → voiceover → subtitles → final cut** — so anyone can make **faceless videos** and **product ads** without filming, editing, or design skills.
+**ClipForge** (formerly *带货剪手 / daihuo-jianshou*) is a free, open-source **AI short-video generator built for selling**. Most AI video tools can't actually do e-commerce — they don't extract selling points, don't understand platform algorithms, and distort your product. ClipForge was designed for **conversion** from day one:
 
-Two zero-friction ways to create:
+- 🎯 **Product fidelity (the e-commerce must-have).** Image-to-image locks your original product photo — swap backgrounds & lighting **without changing the product itself**.
+- 🧲 **Scripts that sell.** Category templates × selling-angle styles (pain-point, lifestyle, comparison, story) + a *golden-3-seconds* hook library — not dry spec-reading.
+- 📈 **Platform-tuned.** Auto hashtags, cover copy & CTAs matched to TikTok / Reels / Shorts and Douyin / Kuaishou / Xiaohongshu algorithms.
+- 📦 **Batch & remix.** Bulk-render 10 products at once, save winning scripts as templates, *clone a trending video* (swap the product), A/B variants.
 
-- 🎬 **Text to video (faceless)** — type one topic, get a narrated vertical short. No product, **no API key required**: footage comes from free stock libraries and the voiceover from a free TTS engine. Perfect for faceless TikTok / YouTube Shorts / Instagram Reels channels.
-- 🛍️ **Product & UGC video** — upload a product photo, and AI analyzes the selling points, writes the scripts, generates the shots, and composes a polished ad — ready to export for TikTok Shop, Shopify, Amazon, Etsy, Douyin, Kuaishou, or Xiaohongshu.
+**And it's free to run at scale:** free stock footage (Openverse images + **Wikimedia real video**) + free Microsoft Edge TTS voiceover + free background music + local FFmpeg — **no API key needed for a full video**. No watermark, local-first & private. Add a key only for higher-end AI models (GPT-Image-2, Seedance 2.0, Kling 3.0…).
+
+> Two ways to create: **🛍️ Product → sales video** (main use case), or **🗣️ one-sentence → faceless topic video** for any non-commerce subject.
 
 <p align="center"><img src="docs/hero.png" alt="ClipForge pipeline: one sentence or a product photo → AI script → auto stock footage → free voiceover → subtitles → vertical video" width="820"/></p>
 
@@ -35,7 +39,7 @@ Two zero-friction ways to create:
 - **Faceless by design.** Every shot is matched to real stock footage — no face, no camera, no on-screen talent needed.
 - **Free stock footage engine.** Aggregated search across **Openverse (keyless), Pixabay, and Pexels**, with automatic attribution and an "always returns footage" fallback so no shot is ever left blank.
 - **Free AI voiceover.** Built-in keyless Microsoft Edge text-to-speech — **$0, no API key**, with 5 natural voices and instant preview. Or plug in OpenAI / Atlas / MiniMax / fal.ai for premium voices.
-- **AI image & video generation.** One UI over many models (Seedance 2.0, GPT-Image-2, Kling, Veo, FLUX, …) across 6 providers, with product-fidelity image-to-image so your product is never distorted.
+- **AI image & video generation.** One UI over many models (Seedance 2.0, GPT-Image-2, Kling, Veo, FLUX, …) across 7 providers, with product-fidelity image-to-image so your product is never distorted.
 - **Auto subtitles & motion.** Burned-in captions timed to the voiceover, Ken Burns motion, cross-fades, and price/feature overlays — all via FFmpeg.
 - **Multi-platform export.** One click re-renders for TikTok / Reels / Shorts (9:16), Xiaohongshu (3:4), and more — no manual re-cropping.
 - **Batch & reuse.** A product library, batch rendering, "clone a trending video" structure reuse, and auto-generated publish captions.
@@ -107,7 +111,7 @@ No watermark, ever. It's self-hosted and open-source.
 Next.js 16 (App Router) + React 19 + Tailwind 4   ·   zero-dependency i18n (zh / en)
    ├─ Script engine        prompt + templates + platform SEO + topic mode
    ├─ Stock engine         Openverse / Pixabay / Pexels aggregate search
-   ├─ AI providers         6 platforms, image + video models
+   ├─ AI providers         7 platforms, image + video models
    ├─ TTS                  free keyless Edge TTS + paid OpenAI / Atlas / MiniMax / fal
    └─ Compositor (FFmpeg)  transitions · Ken Burns · subtitles · mixing · overlays
 Drizzle ORM + better-sqlite3 (local SQLite) · Electron desktop packaging
