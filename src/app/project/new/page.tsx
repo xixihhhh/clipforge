@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark } from "react-icons/lu";
+import { LuArrowLeft, LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark, LuLink2, LuLoader } from "react-icons/lu";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
 import { useProductLibraryStore, type ProductItem } from "@/lib/stores/product-library-store";
@@ -103,6 +103,10 @@ export default function NewProjectPage() {
   // 提交状态
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 粘贴商品链接一键导入（2026 带货标准入口）
+  const [ingestUrl, setIngestUrl] = useState("");
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestError, setIngestError] = useState("");
   const [progress, setProgress] = useState<{
     step: string;
     percent: number;
@@ -221,6 +225,30 @@ export default function NewProjectPage() {
   const isValid = productName.trim().length > 0 && images.length >= 1;
 
   // 提交处理
+  // 粘贴商品链接 → 后端抓取解析（标题/价/图）+ 建带货项目下图 → 直达脚本页
+  const handleIngest = async () => {
+    const url = ingestUrl.trim();
+    if (!/^https?:\/\/.+/i.test(url)) {
+      setIngestError(t("ingestErrorUrl"));
+      return;
+    }
+    setIngestError("");
+    setIngesting(true);
+    try {
+      const res = await fetch("/api/ingest/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, createProject: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.projectId) throw new Error(data.error || t("ingestErrorFail"));
+      router.push(`/project/${data.projectId}/script`);
+    } catch (e) {
+      setIngestError(e instanceof Error ? e.message : t("ingestErrorFail"));
+      setIngesting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isValid || isSubmitting) return;
 
@@ -413,6 +441,33 @@ export default function NewProjectPage() {
                   </button>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* 粘贴商品链接一键导入（2026 带货标准入口：贴链接 → 自动抓取标题/价/图 → 直接建项目） */}
+          <Card className="glass-card border-primary/20">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <LuLink2 className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">{t("ingestTitle")}</span>
+                <Badge variant="secondary" className="text-[10px]">{t("ingestBadge")}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">{t("ingestDesc")}</p>
+              <div className="flex gap-2">
+                <Input
+                  value={ingestUrl}
+                  onChange={(e) => setIngestUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleIngest();
+                  }}
+                  placeholder={t("ingestPlaceholder")}
+                  disabled={ingesting}
+                />
+                <Button type="button" onClick={handleIngest} disabled={ingesting || !ingestUrl.trim()} className="shrink-0">
+                  {ingesting ? <LuLoader className="w-4 h-4 animate-spin" /> : t("ingestBtn")}
+                </Button>
+              </div>
+              {ingestError && <p className="text-xs text-destructive mt-2">{ingestError}</p>}
             </CardContent>
           </Card>
 
