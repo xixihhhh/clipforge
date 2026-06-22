@@ -12,6 +12,7 @@ import { scripts as scriptsTable, assets as assetsTable, projects, compositions 
 import { eq } from "drizzle-orm";
 import { composeVideo, FADE_DURATION, chunkCaption, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
+import { buildComplianceOverlays } from "@/lib/compliance-overlays";
 import { fetchFreeBgm } from "@/lib/free-bgm";
 import type { Shot } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
@@ -266,6 +267,18 @@ export async function POST(
         overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });
       }
     });
+
+    // 可选叠加：AI 生成合规标识（TikTok/抖音 2025 末起要求）+ 片尾购买 CTA（带货转化），按 body 开关
+    overlays.push(
+      ...buildComplianceOverlays(
+        {
+          aiDisclosure: body.aiDisclosure === true,
+          disclosureText: typeof body.disclosureText === "string" ? body.disclosureText : undefined,
+          ctaText: typeof body.ctaText === "string" ? body.ctaText : undefined,
+        },
+        acc
+      )
+    );
 
     // 背景音乐（可选）：① 用户上传的 bgmPath；② freeBgm=true 时自动取一条免费 CC 音乐。合成时混入并自动压低。
     let bgmLocal = body.bgmPath ? toLocalPath(body.bgmPath) : undefined;
