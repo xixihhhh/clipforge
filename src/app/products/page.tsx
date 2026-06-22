@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX, LuVideo } from "react-icons/lu";
+import { LuPlus, LuTrash2, LuPencil, LuPackage, LuArrowLeft, LuImage, LuX, LuVideo, LuCircleAlert } from "react-icons/lu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +88,10 @@ export default function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 保存状态（上传商品图需走服务端落盘，故保存改为异步）
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // 重置表单
   const resetForm = () => {
     setName("");
@@ -95,7 +99,14 @@ export default function ProductsPage() {
     setDescription("");
     setPrice("");
     setTargetAudience("");
-    setImages([]);
+    // 释放仅用于预览的 blob URL，避免内存泄漏
+    setImages((prev) => {
+      prev.forEach((img) => {
+        if (img.file) URL.revokeObjectURL(img.url);
+      });
+      return [];
+    });
+    setSaveError(null);
     setIsFormOpen(false);
     setEditingId(null);
   };
@@ -168,39 +179,75 @@ export default function ProductsPage() {
     setIsFormOpen(true);
   };
 
-  // 保存商品
-  const handleSave = () => {
-    if (!name.trim()) return;
+  // 保存商品：新加的图片（带 file）先上传到服务端落盘，换回持久有效的 /api/files 地址，
+  // 避免直接存 blob: URL —— 后者刷新或跳「做视频」页后即失效（裂图/带不进新建页）
+  const handleSave = async () => {
+    if (!name.trim() || isSaving) return;
 
-    const imageUrls = images.map((img) => img.url);
+    setIsSaving(true);
+    setSaveError(null);
 
-    if (editingId) {
-      // 编辑模式
-      updateProduct(editingId, {
-        name: name.trim(),
-        category,
-        description: description.trim() || undefined,
-        images: imageUrls,
-        price: price.trim() || undefined,
-        targetAudience: targetAudience.trim() || undefined,
-      });
-    } else {
-      // 新增模式
-      const newProduct: ProductItem = {
-        id: crypto.randomUUID(),
-        name: name.trim(),
-        category,
-        description: description.trim() || undefined,
-        images: imageUrls,
-        price: price.trim() || undefined,
-        targetAudience: targetAudience.trim() || undefined,
-        videoCount: 0,
-        createdAt: new Date(),
-      };
-      addProduct(newProduct);
+    try {
+      // 编辑时复用原 id，新增时先生成 id 作为图片落盘目录名
+      const productId = editingId ?? crypto.randomUUID();
+
+      // 仅带 file 的是本次新选图片，需要上传；已是服务器/示例 URL 的旧图保持不动
+      const filesToUpload = images.filter((img) => img.file);
+      let uploadedPaths: string[] = [];
+      if (filesToUpload.length > 0) {
+        const formData = new FormData();
+        filesToUpload.forEach((img) => formData.append("files", img.file!));
+        formData.append("productId", productId);
+        const res = await fetch("/api/products/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || t("uploadFailed"));
+        }
+        const data = await res.json();
+        uploadedPaths = data.paths as string[];
+      }
+
+      // 按原顺序拼装最终地址：新图取上传回来的服务器路径，旧图沿用其 URL
+      let cursor = 0;
+      const imageUrls = images.map((img) =>
+        img.file ? uploadedPaths[cursor++] : img.url
+      );
+
+      if (editingId) {
+        // 编辑模式
+        updateProduct(editingId, {
+          name: name.trim(),
+          category,
+          description: description.trim() || undefined,
+          images: imageUrls,
+          price: price.trim() || undefined,
+          targetAudience: targetAudience.trim() || undefined,
+        });
+      } else {
+        // 新增模式
+        const newProduct: ProductItem = {
+          id: productId,
+          name: name.trim(),
+          category,
+          description: description.trim() || undefined,
+          images: imageUrls,
+          price: price.trim() || undefined,
+          targetAudience: targetAudience.trim() || undefined,
+          videoCount: 0,
+          createdAt: new Date(),
+        };
+        addProduct(newProduct);
+      }
+
+      resetForm();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : t("uploadFailed"));
+    } finally {
+      setIsSaving(false);
     }
-
-    resetForm();
   };
 
   // 删除商品
@@ -469,18 +516,26 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* 上传/保存失败提示 */}
+              {saveError && (
+                <p className="text-sm text-destructive flex items-center gap-1.5">
+                  <LuCircleAlert className="w-4 h-4 shrink-0" />
+                  {saveError}
+                </p>
+              )}
+
               {/* 保存/取消按钮 */}
               <div className="flex items-center justify-end gap-2 pt-2">
-                <Button variant="outline" size="sm" onClick={resetForm}>
+                <Button variant="outline" size="sm" onClick={resetForm} disabled={isSaving}>
                   {t("cancel")}
                 </Button>
                 <Button
                   size="sm"
                   className="brand-gradient text-white"
                   onClick={handleSave}
-                  disabled={!name.trim()}
+                  disabled={!name.trim() || isSaving}
                 >
-                  {editingId ? t("saveEdit") : t("addProduct")}
+                  {isSaving ? t("saving") : editingId ? t("saveEdit") : t("addProduct")}
                 </Button>
               </div>
             </CardContent>

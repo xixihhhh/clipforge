@@ -40,6 +40,8 @@ export const products: NamespaceMessages = {
     audiencePlaceholder: "例如：18-35岁女性",
     cancel: "取消",
     saveEdit: "保存修改",
+    saving: "保存中...",
+    uploadFailed: "图片上传失败，请重试",
     // 空状态
     emptyText: "还没有商品，添加你的第一个商品",
     importExamples: "导入示例商品",
@@ -84,6 +86,8 @@ export const products: NamespaceMessages = {
     audiencePlaceholder: "e.g. Women aged 18-35",
     cancel: "Cancel",
     saveEdit: "Save changes",
+    saving: "Saving...",
+    uploadFailed: "Image upload failed, please try again",
     emptyText: "No products yet — add your first one",
     importExamples: "Import sample products",
     emptyHint: "No products ready? Import 3 samples and try batch production first",
