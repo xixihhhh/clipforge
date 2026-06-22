@@ -29,6 +29,7 @@ export const batch: NamespaceMessages = {
     // 任务状态
     taskPending: "等待中",
     taskGenerating: "生成中",
+    taskComposing: "出片中",
     taskDone: "已完成",
     taskFailed: "失败",
     // 错误/接口提示
@@ -36,6 +37,7 @@ export const batch: NamespaceMessages = {
     errorNoLlmCta: "前往设置填 Key →",
     errorProjectCreate: "项目创建失败",
     errorScriptFailed: "脚本生成失败",
+    errorComposeFailed: "合成失败",
     errorGenerateFailed: "生成失败",
     projectNameSuffix: "{name} 推广",
     // 步骤 1
@@ -49,10 +51,12 @@ export const batch: NamespaceMessages = {
     videoModeLabel: "视频模式",
     scriptStyleLabel: "脚本风格",
     durationLabel: "目标时长",
+    autoComposeLabel: "生成脚本后自动配画面 + 合成成片（免费，全程 0 Key）",
     // 生成进度
     progressLabel: "生成进度",
     progressDone: "{done}/{total} 已完成",
     taskView: "查看",
+    taskViewVideo: "看成片",
     completeMsg: "批量生成完成！共 {count} 条视频",
     // 底部操作栏
     ctaGenerating: "批量生成中...",
@@ -88,6 +92,7 @@ export const batch: NamespaceMessages = {
     // 任务状态
     taskPending: "Pending",
     taskGenerating: "Generating",
+    taskComposing: "Rendering",
     taskDone: "Done",
     taskFailed: "Failed",
     // 错误/接口提示
@@ -95,6 +100,7 @@ export const batch: NamespaceMessages = {
     errorNoLlmCta: "Add your API key in Settings →",
     errorProjectCreate: "Failed to create project",
     errorScriptFailed: "Script generation failed",
+    errorComposeFailed: "Render failed",
     errorGenerateFailed: "Generation failed",
     projectNameSuffix: "{name} promo",
     // 步骤 1
@@ -108,10 +114,12 @@ export const batch: NamespaceMessages = {
     videoModeLabel: "Video mode",
     scriptStyleLabel: "Script style",
     durationLabel: "Target duration",
+    autoComposeLabel: "Auto-fill footage + render the video after scripting (free, 0 API key)",
     // 生成进度
     progressLabel: "Progress",
     progressDone: "{done}/{total} done",
     taskView: "View",
+    taskViewVideo: "View video",
     completeMsg: "Batch generation complete! {count} videos created",
     // 底部操作栏
     ctaGenerating: "Generating batch...",

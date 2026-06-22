@@ -66,8 +66,8 @@ const styleTypeMap: Record<string, string> = {
   auto: "auto",
 };
 
-// 批量任务状态
-type TaskStatus = "pending" | "generating" | "done" | "failed";
+// 批量任务状态（generating=写脚本；composing=配画面+合成成片；done=全部完成）
+type TaskStatus = "pending" | "generating" | "composing" | "done" | "failed";
 
 interface BatchTask {
   id: string;
@@ -81,6 +81,7 @@ interface BatchTask {
 const statusLabelKeys: Record<TaskStatus, string> = {
   pending: "taskPending",
   generating: "taskGenerating",
+  composing: "taskComposing",
   done: "taskDone",
   failed: "taskFailed",
 };
@@ -89,6 +90,7 @@ const statusLabelKeys: Record<TaskStatus, string> = {
 const statusColors: Record<TaskStatus, string> = {
   pending: "bg-zinc-500/20 text-zinc-400 border-0",
   generating: "bg-amber-500/20 text-amber-400 border-0",
+  composing: "bg-violet-500/20 text-violet-300 border-0",
   done: "bg-emerald-500/20 text-emerald-400 border-0",
   failed: "bg-red-500/20 text-red-400 border-0",
 };
@@ -128,6 +130,8 @@ export default function BatchPage() {
   const [videoMode, setVideoMode] = useState("product_closeup");
   const [scriptStyle, setScriptStyle] = useState("auto");
   const [duration, setDuration] = useState("30");
+  // 生成脚本后是否自动配画面 + 合成成片（免费路径，0 Key）——把批量从"只出脚本"升级为"一键全成片"
+  const [autoCompose, setAutoCompose] = useState(true);
   // 批量生成状态
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchTasks, setBatchTasks] = useState<BatchTask[]>([]);
@@ -218,8 +222,34 @@ export default function BatchPage() {
           throw new Error(e.error || t("errorScriptFailed"));
         }
 
+        // 3) 自动出片（免费路径）：配画面（逐镜视频优先、缺则图片）→ 免费 Edge TTS 合成 → 轮询到成片
+        if (autoCompose && !abortRef.current) {
+          setBatchTasks((prev) => prev.map((tk) => (tk.id === product.id ? { ...tk, status: "composing", projectId: project.id } : tk)));
+          await fetch(`/api/project/${project.id}/stock-fill`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source: "all", mediaType: "auto" }),
+          }).catch(() => {}); // 配画面失败不阻断（可能已有商品图/素材）
+          const composeRes = await fetch(`/api/project/${project.id}/compose`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ freeTts: { enabled: true } }),
+          });
+          if (!composeRes.ok) throw new Error(t("errorComposeFailed"));
+          // 合成是异步的：轮询 composition 状态直到 done/failed（最多 ~3.75 分钟）
+          let composed = false;
+          for (let i = 0; i < 90 && !abortRef.current; i++) {
+            await new Promise((r) => setTimeout(r, 2500));
+            const c = await fetch(`/api/project/${project.id}/compose`).then((x) => x.json()).catch(() => ({}));
+            const st = c?.composition?.status;
+            if (st === "done") { composed = true; break; }
+            if (st === "failed") throw new Error(t("errorComposeFailed"));
+          }
+          if (!composed && !abortRef.current) throw new Error(t("errorComposeFailed"));
+        }
+
         incrementVideoCount(product.id);
-        setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "done", projectId: project.id } : t)));
+        setBatchTasks((prev) => prev.map((tk) => (tk.id === product.id ? { ...tk, status: "done", projectId: project.id } : tk)));
       } catch (err) {
         setBatchTasks((prev) =>
           prev.map((task) => (task.id === product.id ? { ...task, status: "failed", error: err instanceof Error ? err.message : t("errorGenerateFailed") } : task))
@@ -243,7 +273,7 @@ export default function BatchPage() {
       setIsComplete(true);
     }
     setIsGenerating(false);
-  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, incrementVideoCount]);
+  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, incrementVideoCount]);
 
   // 已完成的任务数量
   const doneCount = batchTasks.filter((t) => t.status === "done").length;
@@ -511,8 +541,8 @@ export default function BatchPage() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {task.status === "done" && task.projectId && (
-                          <Link href={`/project/${task.projectId}/script`}>
-                            <Button variant="outline" size="sm" className="text-xs h-7">{t("taskView")}</Button>
+                          <Link href={`/project/${task.projectId}/${autoCompose ? "export" : "script"}`}>
+                            <Button variant="outline" size="sm" className="text-xs h-7">{autoCompose ? t("taskViewVideo") : t("taskView")}</Button>
                           </Link>
                         )}
                         <Badge className={statusColors[task.status]}>
@@ -551,6 +581,17 @@ export default function BatchPage() {
                 </Link>
               </p>
             )}
+            {/* 自动出片开关：把批量从「只出脚本」升级为「一键全成片」（免费路径） */}
+            <label className="flex items-center justify-center gap-2 mb-3 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoCompose}
+                onChange={(e) => setAutoCompose(e.target.checked)}
+                disabled={isGenerating}
+                className="w-4 h-4 accent-violet-500"
+              />
+              {t("autoComposeLabel")}
+            </label>
             <Button
               onClick={handleStartBatch}
               disabled={selectedProducts.size === 0 || isGenerating}
