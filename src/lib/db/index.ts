@@ -21,8 +21,13 @@ if (!fs.existsSync(DB_DIR)) {
 const sqlite = new Database(DB_PATH);
 
 // 开启 WAL 模式，提升并发读写性能
-sqlite.pragma("journal_mode = WAL");
-// 开启外键约束
+// 跳过 next build 阶段：journal_mode=WAL 会改写库文件头、需短暂排他锁，
+// 构建时多 worker 并发导入本模块会同时抢锁触发 "database is locked"。
+// WAL 是库文件的持久属性，运行时（next start / Electron）设置一次即可。
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  sqlite.pragma("journal_mode = WAL");
+}
+// 开启外键约束（每连接级 pragma，不写库文件、无锁竞争，构建期保留无碍）
 sqlite.pragma("foreign_keys = ON");
 
 // 创建 drizzle ORM 实例，绑定 schema 以支持关系查询
