@@ -38,7 +38,8 @@ function escapeDrawText(text: string): string {
     .replace(/\\/g, "\\\\\\\\")  // 反斜杠
     .replace(/'/g, "\u2019")      // 单引号替换为右单引号（避免 shell 嵌套转义问题）
     .replace(/:/g, "\\\\:")       // 冒号（FFmpeg drawtext 参数分隔符）
-    .replace(/%/g, "\\\\%")       // 百分号（FFmpeg 时间格式占位符）
+    // 不转义 %：drawtext 配 expansion=none 后 % 为字面量；带货文案高频含「立省50%」「50% off」，
+    // 若转成 \% 则 ffmpeg 8.0 报 `Stray %` 致整条字幕/贴片渲染为空白（静默失效）。
     .replace(/\[/g, "\\\\[")      // 方括号（FFmpeg filter 流标记）
     .replace(/\]/g, "\\\\]");
 }
@@ -332,7 +333,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
       .map((t) => {
         // 自动换行避免英文/长文案溢出画面（drawtext 原生支持真实换行符）
         const wrapped = wrapCaption(t.text, fontSize, width);
-        return `drawtext=${fontFileArg}text='${escapeDrawText(wrapped)}':fontsize=${fontSize}:fontcolor=${fontColor}:borderw=${borderW}:line_spacing=${lineSpacing}:${boxArg}x=(w-text_w)/2:y=${yPos}:enable='between(t,${t.startTime},${t.endTime})'`;
+        return `drawtext=${fontFileArg}expansion=none:text='${escapeDrawText(wrapped)}':fontsize=${fontSize}:fontcolor=${fontColor}:borderw=${borderW}:line_spacing=${lineSpacing}:${boxArg}x=(w-text_w)/2:y=${yPos}:enable='between(t,${t.startTime},${t.endTime})'`;
       })
       .join(",");
 
@@ -356,7 +357,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
       .map((o) => {
         const s = styleOf(o.style);
         const bb = Math.round(s.size * 0.4);
-        return `drawtext=${ovFontArg}text='${escapeDrawText(o.text)}':fontsize=${s.size}:fontcolor=${s.color}:borderw=2:box=1:boxcolor=${s.box}:boxborderw=${bb}:x=(w-text_w)/2:y=${s.y}:enable='between(t,${o.startTime},${o.endTime})'`;
+        return `drawtext=${ovFontArg}expansion=none:text='${escapeDrawText(o.text)}':fontsize=${s.size}:fontcolor=${s.color}:borderw=2:box=1:boxcolor=${s.box}:boxborderw=${bb}:x=(w-text_w)/2:y=${s.y}:enable='between(t,${o.startTime},${o.endTime})'`;
       })
       .join(",");
     const ovStream = "ov_out";

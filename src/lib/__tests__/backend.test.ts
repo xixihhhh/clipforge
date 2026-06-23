@@ -205,6 +205,25 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("box=1:boxcolor=black@0.45"); // 字幕底框
   });
 
+  it("字幕/贴片含百分号：用 expansion=none + 字面 %（不转义成 \\%，否则 ffmpeg 8.0 Stray % 致整条空白）", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      subtitle: { texts: [{ text: "立省50% 闭眼入", startTime: 0, endTime: 3 }], position: "bottom" },
+      overlays: [{ text: "全场5折 直降30%", style: "price", startTime: 0, endTime: 3 }],
+    };
+    const cmd = buildComposeCommand(config);
+    // 所有 drawtext 必须带 expansion=none（关闭 % 展开）
+    const drawCount = (cmd.match(/drawtext=/g) || []).length;
+    const expCount = (cmd.match(/expansion=none/g) || []).length;
+    expect(drawCount).toBeGreaterThan(0);
+    expect(expCount).toBe(drawCount);
+    // 文本里是字面 50% / 30%，不能被转义成 50\% / 30\%
+    expect(cmd).toContain("50%");
+    expect(cmd).toContain("30%");
+    expect(cmd).not.toContain("50\\%");
+    expect(cmd).not.toContain("30\\%");
+  });
+
   it("文件路径含特殊字符时正确转义", () => {
     const config: ComposeConfig = {
       ...baseConfig,
