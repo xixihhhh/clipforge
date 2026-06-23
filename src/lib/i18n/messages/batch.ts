@@ -52,6 +52,7 @@ export const batch: NamespaceMessages = {
     scriptStyleLabel: "脚本风格",
     durationLabel: "目标时长",
     autoComposeLabel: "生成脚本后自动配画面 + 合成成片（免费，全程 0 Key）",
+    productCardLabel: "左下角叠商品卡贴片（商品图+名+价+购买引导）",
     // 生成进度
     progressLabel: "生成进度",
     progressDone: "{done}/{total} 已完成",
@@ -115,6 +116,7 @@ export const batch: NamespaceMessages = {
     scriptStyleLabel: "Script style",
     durationLabel: "Target duration",
     autoComposeLabel: "Auto-fill footage + render the video after scripting (free, 0 API key)",
+    productCardLabel: "Overlay a product card (image + name + price + buy CTA)",
     // 生成进度
     progressLabel: "Progress",
     progressDone: "{done}/{total} done",

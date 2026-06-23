@@ -132,6 +132,7 @@ export default function BatchPage() {
   const [duration, setDuration] = useState("30");
   // 生成脚本后是否自动配画面 + 合成成片（免费路径，0 Key）——把批量从"只出脚本"升级为"一键全成片"
   const [autoCompose, setAutoCompose] = useState(true);
+  const [productCard, setProductCard] = useState(true); // 批量带货默认叠商品卡贴片（有商品图才显示）
   // 批量生成状态
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchTasks, setBatchTasks] = useState<BatchTask[]>([]);
@@ -233,7 +234,7 @@ export default function BatchPage() {
           const composeRes = await fetch(`/api/project/${project.id}/compose`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ freeTts: { enabled: true } }),
+            body: JSON.stringify({ freeTts: { enabled: true }, ...(productCard && { productCard: true }) }),
           });
           if (!composeRes.ok) throw new Error(t("errorComposeFailed"));
           // 合成是异步的：轮询 composition 状态直到 done/failed（最多 ~3.75 分钟）
@@ -273,7 +274,7 @@ export default function BatchPage() {
       setIsComplete(true);
     }
     setIsGenerating(false);
-  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, incrementVideoCount]);
+  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, productCard, incrementVideoCount]);
 
   // 已完成的任务数量
   const doneCount = batchTasks.filter((t) => t.status === "done").length;
@@ -592,6 +593,18 @@ export default function BatchPage() {
               />
               {t("autoComposeLabel")}
             </label>
+            {autoCompose && (
+              <label className="flex items-center justify-center gap-2 mb-3 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={productCard}
+                  onChange={(e) => setProductCard(e.target.checked)}
+                  disabled={isGenerating}
+                  className="w-4 h-4 accent-violet-500"
+                />
+                {t("productCardLabel")}
+              </label>
+            )}
             <Button
               onClick={handleStartBatch}
               disabled={selectedProducts.size === 0 || isGenerating}
