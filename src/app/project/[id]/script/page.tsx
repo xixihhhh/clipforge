@@ -380,7 +380,7 @@ export default function ScriptPage() {
                   <LuBookmarkPlus className="w-3.5 h-3.5 mr-1" />
                   {t("saveAsTemplate")}
                 </Button>
-                <Button variant="outline" size="sm" disabled={isGenerating} className="text-xs">
+                <Button variant="outline" size="sm" disabled={isGenerating} className="text-xs" onClick={handleGenerate}>
                   <LuWand className="w-3.5 h-3.5 mr-1" />
                   {t("regenerate")}
                 </Button>
