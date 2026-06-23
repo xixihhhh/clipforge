@@ -3,14 +3,29 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import { getUploadsDir } from "@/lib/paths";
-import { mkdir } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { join, basename } from "path";
 import { parseProductFromHtml } from "@/lib/product-ingest";
-import { downloadStockFile } from "@/lib/providers/stock-types";
+import { inferExtension, MAX_DOWNLOAD_BYTES } from "@/lib/providers/stock-types";
+import { safeFetch } from "@/lib/ssrf-guard";
 
 const UA = "Mozilla/5.0 (compatible; ClipForge/1.0; +https://github.com/xixihhhh/clipforge)";
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGES = 3;
+
+/** 经 SSRF 防护下载一张商品图到本地（safeFetch 逐跳校验，杜绝 og:image 指向内网）。 */
+async function safeDownloadImage(url: string, destDir: string, base: string): Promise<string> {
+  const res = await safeFetch(url, { headers: { "User-Agent": UA } });
+  if (!res.ok) throw new Error(`图片下载失败 ${res.status}`);
+  const ct = res.headers.get("content-type");
+  const declared = Number(res.headers.get("content-length") || 0);
+  if (declared && declared > MAX_DOWNLOAD_BYTES) throw new Error("图片体积超限");
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength > MAX_DOWNLOAD_BYTES) throw new Error("图片体积超限");
+  const filePath = join(destDir, `${base}.${inferExtension(url, ct, "image")}`);
+  await writeFile(filePath, buf);
+  return filePath;
+}
 
 /**
  * POST /api/ingest/product —— 商品链接一键导入。
@@ -36,10 +51,10 @@ export async function POST(req: NextRequest) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
-    const res = await fetch(url, {
+    // safeFetch：禁内网/元数据地址 + 逐跳校验重定向（防 SSRF）
+    const res = await safeFetch(url, {
       headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml,*/*" },
       signal: ctrl.signal,
-      redirect: "follow",
     }).finally(() => clearTimeout(timer));
     if (!res.ok) return NextResponse.json({ error: `抓取商品页失败：HTTP ${res.status}` }, { status: 502 });
     const ct = res.headers.get("content-type") || "";
@@ -79,10 +94,10 @@ export async function POST(req: NextRequest) {
   const saved: string[] = [];
   for (const [i, img] of product.images.slice(0, MAX_IMAGES).entries()) {
     try {
-      const { filePath } = await downloadStockFile(img, destDir, `ingest_${Date.now()}_${i}`, "image");
+      const filePath = await safeDownloadImage(img, destDir, `ingest_${Date.now()}_${i}`);
       saved.push(`/api/files/${proj.id}/${basename(filePath)}`);
     } catch {
-      /* 单张图下载失败则跳过 */
+      /* 单张图下载失败 / 被 SSRF 拦截则跳过 */
     }
   }
   if (saved.length > 0) {
