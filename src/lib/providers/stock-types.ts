@@ -195,7 +195,9 @@ export async function downloadStockFile(
   }
 
   const ext = inferExtension(url, contentType, mediaType);
-  const filePath = join(destDir, `${fileBaseName}.${ext}`);
+  // 净化文件名：调用方可能把远程素材 id 拼进来，去掉路径分隔符/特殊字符防目录穿越
+  const safeBase = fileBaseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "file";
+  const filePath = join(destDir, `${safeBase}.${ext}`);
   await writeFile(filePath, buffer);
   return { filePath, bytes: buffer.byteLength };
 }
