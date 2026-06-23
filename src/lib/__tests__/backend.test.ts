@@ -251,6 +251,17 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("\\$");
   });
 
+  it("成片音频做响度归一（loudnorm EBU R128，~-14 LUFS）", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      clips: [{ type: "image", filePath: "/data/img1.jpg", duration: 3, transition: "direct_concat", motion: "static", audioPath: "/data/tts1.mp3" }],
+    };
+    const cmd = buildComposeCommand(config);
+    expect(cmd).toContain("loudnorm=I=-14");
+    expect(cmd).toContain("[audio_norm]");
+    expect(cmd).toContain('-map "[audio_norm]"');
+  });
+
   it("成片写入 AIGC 隐式标识元数据（GB 45438），位置正确且不污染 filter_complex", () => {
     const cmd = buildComposeCommand(baseConfig);
     expect(cmd).toContain("-metadata comment=");

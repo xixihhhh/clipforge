@@ -369,6 +369,13 @@ export function buildComposeCommand(config: ComposeConfig): string {
     currentVideoStream = ovStream;
   }
 
+  // 响度归一到社媒标准（~-14 LUFS，EBU R128 / loudnorm）：跨视频音量一致，避免忽大忽小被抖音/TikTok 二次压制。
+  // 置于音频链末端、单趟动态归一；无任何音频流则跳过。
+  if (currentAudioStream) {
+    filterParts.push(`[${currentAudioStream}]loudnorm=I=-14:TP=-1.5:LRA=11[audio_norm]`);
+    currentAudioStream = "audio_norm";
+  }
+
   // 构建完整命令
   const inputStr = inputs.join(" ");
   const filterStr = filterParts.join(";\n");
