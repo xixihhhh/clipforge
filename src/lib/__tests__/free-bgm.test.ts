@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { moodQueryForCategory } from "@/lib/free-bgm";
+import { moodQueryForCategory, moodQueryForMood } from "@/lib/free-bgm";
 
 describe("moodQueryForCategory（品类→配乐情绪检索词）", () => {
   it("各品类映射到不同情绪", () => {
@@ -25,5 +25,23 @@ describe("moodQueryForCategory（品类→配乐情绪检索词）", () => {
     expect(moodQueryForCategory(null)).toBe("ambient background music");
     expect(moodQueryForCategory(undefined)).toBe("ambient background music");
     expect(moodQueryForCategory("other")).toBe("ambient background music");
+  });
+});
+
+describe("moodQueryForMood（用户显式选的配乐情绪→检索词）", () => {
+  it("各情绪映射到不同检索词", () => {
+    expect(moodQueryForMood("upbeat")).toContain("upbeat");
+    expect(moodQueryForMood("chill")).toContain("chill");
+    expect(moodQueryForMood("energetic")).toContain("energetic");
+    expect(moodQueryForMood("emotional")).toContain("emotional");
+  });
+  it("大小写不敏感", () => {
+    expect(moodQueryForMood("UPBEAT")).toBe(moodQueryForMood("upbeat"));
+  });
+  it("none / 未知 / 空 回退通用 ambient", () => {
+    expect(moodQueryForMood("none")).toBe("ambient background music");
+    expect(moodQueryForMood("")).toBe("ambient background music");
+    expect(moodQueryForMood(null)).toBe("ambient background music");
+    expect(moodQueryForMood("xyz")).toBe("ambient background music");
   });
 });

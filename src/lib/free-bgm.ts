@@ -33,6 +33,20 @@ export function moodQueryForCategory(category?: string | null): string {
   return CATEGORY_BGM_MOOD[key] || "ambient background music";
 }
 
+// 用户在视频页显式选的配乐情绪（none/upbeat/chill/energetic/emotional）→ 检索词。
+const MOOD_BGM_QUERY: Record<string, string> = {
+  upbeat: "upbeat pop instrumental background",
+  chill: "chill lofi calm background",
+  energetic: "energetic electronic upbeat background",
+  emotional: "emotional cinematic piano background",
+};
+
+/** 由用户显式选择的配乐情绪得到检索词；未知/空（含 none）回退通用 ambient。纯函数可单测。 */
+export function moodQueryForMood(mood?: string | null): string {
+  const key = (mood || "").toLowerCase().trim();
+  return MOOD_BGM_QUERY[key] || "ambient background music";
+}
+
 /**
  * 为项目取一条免费 CC 背景音乐并下载到 uploads/<project>/bgm/。
  * 偏好时长 ≥ 8s 的曲目（太短循环噪点大）。任何失败都吞掉返回 null，绝不阻塞合成。

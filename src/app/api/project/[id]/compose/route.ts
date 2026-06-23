@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 import { composeVideo, FADE_DURATION, chunkCaption, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import { buildComplianceOverlays } from "@/lib/compliance-overlays";
-import { fetchFreeBgm, moodQueryForCategory } from "@/lib/free-bgm";
+import { fetchFreeBgm, moodQueryForCategory, moodQueryForMood } from "@/lib/free-bgm";
 import type { Shot } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
@@ -283,8 +283,12 @@ export async function POST(
     // 背景音乐（可选）：① 用户上传的 bgmPath；② freeBgm=true 时自动取一条免费 CC 音乐。合成时混入并自动压低。
     let bgmLocal = body.bgmPath ? toLocalPath(body.bgmPath) : undefined;
     if (!bgmLocal && body.freeBgm === true) {
-      // 按商品品类挑配乐情绪（美妆→upbeat / 美食→warm / 数码→energetic…），而非千篇一律 ambient
-      const free = await fetchFreeBgm(id, moodQueryForCategory(project.productCategory));
+      // 配乐情绪：① 用户在视频页显式选的 bgmMood 优先；② 否则按商品品类自动挑（美妆→upbeat / 美食→warm…）
+      const moodQuery =
+        typeof body.bgmMood === "string" && body.bgmMood
+          ? moodQueryForMood(body.bgmMood)
+          : moodQueryForCategory(project.productCategory);
+      const free = await fetchFreeBgm(id, moodQuery);
       if (free) {
         bgmLocal = free.localPath;
         // CC 音乐多需署名：记录来源，便于导出 credits / 用户在成片署名（CC BY 等）
