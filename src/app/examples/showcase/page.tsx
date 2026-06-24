@@ -38,9 +38,10 @@ export default function ShowcasePage() {
                 <span className="ml-1">{tc("back")}</span>
               </Button>
             </Link>
-            <div className="h-5 w-px bg-border/50" />
-            <span className="text-sm font-semibold">{t("navTitle")}</span>
-            <Badge variant="secondary" className="text-[10px]">{t("navBadge")}</Badge>
+            {/* 分隔线+标题+徽章在窄屏放不下，移动端隐藏，保留返回与「做同款」CTA */}
+            <div className="hidden sm:block h-5 w-px bg-border/50" />
+            <span className="hidden sm:inline text-sm font-semibold">{t("navTitle")}</span>
+            <Badge variant="secondary" className="hidden sm:inline-flex text-[10px]">{t("navBadge")}</Badge>
           </div>
           <div className="flex items-center gap-1">
             <LanguageToggle />

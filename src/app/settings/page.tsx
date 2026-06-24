@@ -481,7 +481,7 @@ export default function SettingsPage() {
 
         {/* 标签页 */}
         <Tabs defaultValue={0}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 max-w-full overflow-x-auto">
             <TabsTrigger value={0}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="4" y="4" width="16" height="16" rx="2" />
