@@ -22,6 +22,10 @@ export interface KaraokeStyleOpts {
   playResY?: number;
   /** 底部边距（px，PlayRes 坐标系） */
   marginV?: number;
+  /** 含数字的单位（价格/折扣/数量）自动放大+换热色高亮，默认 true */
+  emphasizeNumbers?: boolean;
+  /** 强调高亮色（ASS &HAABBGGRR），默认橙红 */
+  accentColour?: string;
 }
 
 const DEFAULTS = {
@@ -33,6 +37,8 @@ const DEFAULTS = {
   playResX: 1080,
   playResY: 1920,
   marginV: 240,
+  emphasizeNumbers: true,
+  accentColour: "&H000050FF", // 橙红，价格/折扣强调
 };
 
 /** 秒 → ASS 时间戳 H:MM:SS.cc（厘秒） */
@@ -83,8 +89,26 @@ export function splitKaraokeUnits(text: string): string[] {
   return units.map((u) => u).filter((u) => u.length > 0);
 }
 
-/** 为一行生成 {\k..}逐字 文本：把行时长按各单位字符长占比换算成厘秒 \k */
-function buildKaraokeLineText(text: string, durationSec: number): string {
+/** ASS 颜色 &HAABBGGRR → 内联 \1c 用的 &HBBGGRR&（去掉 alpha） */
+function toInlineColour(assColour: string): string {
+  const hex = String(assColour || "").replace(/^&H/i, "").replace(/&$/, "");
+  const bgrr = hex.length >= 8 ? hex.slice(2) : hex;
+  return `&H${bgrr || "FFFFFF"}&`;
+}
+
+interface LineCfg {
+  baseFs: number;
+  primaryC: string; // 内联 \1c（普通字填充目标色）
+  accentC: string; // 内联 \1c（强调字填充目标色，热色）
+  emphasize: boolean;
+  emphScale: number;
+}
+
+/**
+ * 为一行生成 {\k..}逐字 文本：行时长按各单位字符长占比换算成厘秒 \k；
+ * 含数字的单位（价格/折扣/数量，如 50% / 9.9 / ¥39）自动放大 + 换热色高亮（带货爆款强调技法）。
+ */
+function buildKaraokeLineText(text: string, durationSec: number, cfg: LineCfg): string {
   const units = splitKaraokeUnits(text);
   if (units.length === 0) return "";
   const totalCs = Math.max(1, Math.round(durationSec * 100));
@@ -96,7 +120,10 @@ function buildKaraokeLineText(text: string, durationSec: number): string {
       // 末单位吃掉余数，保证 \k 之和恰为 totalCs
       const k = i === units.length - 1 ? totalCs - used : Math.max(1, Math.round((lens[i] / sumLen) * totalCs));
       used += k;
-      return `{\\k${k}}${assEscapeText(u)}`;
+      const emph = cfg.emphasize && /\d/.test(u); // 含数字 → 价格/折扣/数量，强调
+      const fs = emph ? Math.round(cfg.baseFs * cfg.emphScale) : cfg.baseFs;
+      const c = emph ? cfg.accentC : cfg.primaryC;
+      return `{\\k${k}\\fs${fs}\\1c${c}}${assEscapeText(u)}`;
     })
     .join("");
 }
@@ -120,10 +147,17 @@ export function buildKaraokeAss(lines: KaraokeLine[], opts: KaraokeStyleOpts = {
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
+  const cfg: LineCfg = {
+    baseFs: o.fontSize,
+    primaryC: toInlineColour(o.primaryColour),
+    accentC: toInlineColour(o.accentColour),
+    emphasize: o.emphasizeNumbers !== false,
+    emphScale: 1.35,
+  };
   const events = (lines || [])
     .filter((l) => l && l.text && l.endTime > l.startTime)
     .map((l) => {
-      const body = buildKaraokeLineText(l.text, l.endTime - l.startTime);
+      const body = buildKaraokeLineText(l.text, l.endTime - l.startTime, cfg);
       return `Dialogue: 0,${toAssTime(l.startTime)},${toAssTime(l.endTime)},K,,0,0,0,,${body}`;
     });
   return header.concat(events).join("\n") + "\n";

@@ -64,6 +64,25 @@ describe("buildKaraokeAss", () => {
     expect(ass).toContain("&H0000FF00");
   });
 
+  it("含数字单位自动强调：放大字号 + 热色 \\1c（价格/折扣突出）", () => {
+    const d = buildKaraokeAss([{ text: "立省50%闭眼入", startTime: 0, endTime: 3 }])
+      .split("\n")
+      .find((l) => l.startsWith("Dialogue:"))!;
+    const fsVals = [...d.matchAll(/\\fs(\d+)/g)].map((m) => Number(m[1]));
+    expect(new Set(fsVals).size).toBeGreaterThan(1); // 强调字号 ≠ 普通字号
+    expect(Math.max(...fsVals)).toBeGreaterThan(Math.min(...fsVals)); // 数字被放大
+    expect(d).toContain("&H0050FF&"); // 橙红强调色出现
+  });
+
+  it("emphasizeNumbers:false 关闭数字强调", () => {
+    const d = buildKaraokeAss([{ text: "立省50%", startTime: 0, endTime: 2 }], { emphasizeNumbers: false })
+      .split("\n")
+      .find((l) => l.startsWith("Dialogue:"))!;
+    const fsVals = [...d.matchAll(/\\fs(\d+)/g)].map((m) => Number(m[1]));
+    expect(new Set(fsVals).size).toBe(1); // 全同字号
+    expect(d).not.toContain("&H0050FF&"); // 无强调色
+  });
+
   it("过滤非法行（endTime<=startTime / 空文本）", () => {
     const ass = buildKaraokeAss([
       { text: "好物", startTime: 0, endTime: 2 },
