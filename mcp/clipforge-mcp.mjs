@@ -48,6 +48,8 @@ function composeBody(args) {
   if (ASPECT_RATIOS.includes(args.aspectRatio)) body.aspectRatio = args.aspectRatio;
   if (QUALITY_PRESETS.includes(args.quality)) body.renderPreset = args.quality;
   if (args.bgm === true) body.freeBgm = true; // 自动加一段免费 CC 背景音乐
+  if (args.karaoke === true) body.karaoke = true; // 卡拉OK逐字字幕
+  if (args.productCard === true) body.productCard = true; // 商品卡贴片（有商品图才生效）
   return body;
 }
 
@@ -59,6 +61,14 @@ const OUTPUT_OPTION_PROPS = {
   bgm: {
     type: "boolean",
     description: "是否自动加一段免费 CC 背景音乐（Openverse keyless，混在旁白下方自动压低）。CC 音乐多需署名，默认 false",
+  },
+  karaoke: {
+    type: "boolean",
+    description: "卡拉OK逐字高亮字幕（整句留屏、逐字随旁白变色，2026 爆款字幕样式）。默认 false（默认是 rapid 短句卡字幕）",
+  },
+  productCard: {
+    type: "boolean",
+    description: "带货商品卡贴片（左下角商品图缩略+名+价+购买引导）。仅对有商品图的带货项目生效，topic 视频无效。默认 false",
   },
 };
 
