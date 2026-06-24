@@ -172,6 +172,28 @@ describe("buildComposeCommand", () => {
     expect(cmd).toContain("amix=inputs=2");
     expect(cmd).toContain("normalize=0"); // 不把旁白腰斩到 ~50%
     expect(cmd).toContain("aloop=loop=-1"); // BGM 循环铺满全片
+    // BGM 结尾淡出 3s，落在成片总时长(3 + 5 - 0.5 = 7.5)末尾 → st=4.500
+    expect(cmd).toContain("afade=t=out");
+    expect(cmd).toContain("st=4.500");
+    expect(cmd).not.toContain("atrim=start="); // 默认不跳前奏
+  });
+
+  it("BGM 前奏跳过为 opt-in（bgmIntroSkipSec 设了才出现 atrim=start）", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      clips: [{ type: "image", filePath: "/data/img1.jpg", duration: 3, transition: "direct_concat", motion: "static", audioPath: "/data/tts1.mp3" }],
+      output: { ...baseConfig.output, bgmPath: "/data/bgm.mp3", bgmIntroSkipSec: 2 },
+    };
+    expect(buildComposeCommand(config)).toContain("atrim=start=2");
+  });
+
+  it("bgmFadeOutSec=0 时不加结尾淡出", () => {
+    const config: ComposeConfig = {
+      ...baseConfig,
+      clips: [{ type: "image", filePath: "/data/img1.jpg", duration: 3, transition: "direct_concat", motion: "static", audioPath: "/data/tts1.mp3" }],
+      output: { ...baseConfig.output, bgmPath: "/data/bgm.mp3", bgmFadeOutSec: 0 },
+    };
+    expect(buildComposeCommand(config)).not.toContain("afade=t=out");
   });
 
   it("有音频片段时正确提取音轨", () => {

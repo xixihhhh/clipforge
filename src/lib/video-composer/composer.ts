@@ -157,6 +157,10 @@ export interface ComposeConfig {
     aspectRatio: "9:16" | "16:9" | "1:1";
     bgmPath?: string;
     bgmVolume?: number; // 0-1
+    /** BGM 结尾淡出秒数（默认 3，0=不淡出）：避免 aloop 铺满后被硬切收尾生硬 */
+    bgmFadeOutSec?: number;
+    /** BGM 跳过前奏秒数（opt-in，默认 0）：跳过开头空白/前奏；设过大且 BGM 短会被清空，故默认 0 */
+    bgmIntroSkipSec?: number;
     /** x264 编码 preset（渲染质量预设映射，缺省 medium）；只接受白名单值 */
     videoPreset?: string;
     /** x264 -crf 质量（缺省 18）；会被夹取到合法范围 */
@@ -327,16 +331,22 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const bgmIndex = inputs.length; // 动态取当前输入数（TTS 音频可能已占用若干输入）
     inputs.push(`-i "${escapeShellPath(config.output.bgmPath)}"`);
     const vol = config.output.bgmVolume ?? 0.3;
+    // 跳过前奏空白（opt-in，默认 0）：atrim 掉开头若干秒再循环
+    const introSkip = config.output.bgmIntroSkipSec ?? 0;
+    const introArg = introSkip > 0 ? `atrim=start=${introSkip},asetpts=PTS-STARTPTS,` : "";
+    // 结尾淡出（默认 3s，落在成片总时长末尾）：避免 aloop 铺满后被 -t/amix 硬切收尾生硬，更像成片
+    const fadeOut = config.output.bgmFadeOutSec ?? 3;
+    const fadeArg = fadeOut > 0 ? `,afade=t=out:st=${Math.max(0, accumulated - fadeOut).toFixed(3)}:d=${fadeOut}` : "";
 
     if (currentAudioStream) {
-      // 有片段音频：BGM 循环铺满全片（aloop，避免 BGM 短于视频时尾部没声），压低音量后与旁白混音。
+      // 有片段音频：BGM 循环铺满全片（aloop，避免 BGM 短于视频时尾部没声），压低音量 + 结尾淡出后与旁白混音。
       // amix 必须 normalize=0：默认 normalize=1 会把每路按 1/inputs 缩放，等于把旁白音量腰斩到 ~50%（带货旁白要听清）。
-      filterParts.push(`[${bgmIndex}:a]aloop=loop=-1:size=2e9,volume=${vol}[bgm_vol]`);
+      filterParts.push(`[${bgmIndex}:a]${introArg}aloop=loop=-1:size=2e9,volume=${vol}${fadeArg}[bgm_vol]`);
       filterParts.push(`[${currentAudioStream}][bgm_vol]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[audio_final]`);
       currentAudioStream = "audio_final";
     } else {
-      // 无片段音频：只有 BGM，同样循环铺满（由输出 -t 截到视频时长）
-      filterParts.push(`[${bgmIndex}:a]aloop=loop=-1:size=2e9,volume=${vol}[audio_final]`);
+      // 无片段音频：只有 BGM，同样循环铺满 + 结尾淡出（由输出 -t 截到视频时长）
+      filterParts.push(`[${bgmIndex}:a]${introArg}aloop=loop=-1:size=2e9,volume=${vol}${fadeArg}[audio_final]`);
       currentAudioStream = "audio_final";
     }
   }
