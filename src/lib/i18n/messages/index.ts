@@ -8,6 +8,7 @@ import { clone } from "./clone";
 import { batch } from "./batch";
 import { products } from "./products";
 import { settings } from "./settings";
+import { generationSettings } from "./generationSettings";
 import { showcase } from "./showcase";
 import { script } from "./script";
 import { assets } from "./assets";
@@ -25,6 +26,7 @@ const namespaces = {
   batch,
   products,
   settings,
+  generationSettings,
   showcase,
   script,
   assets,

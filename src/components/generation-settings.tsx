@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
+import { useT } from "@/lib/i18n";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import {
   ASPECT_RATIO_OPTIONS,
@@ -30,11 +31,6 @@ const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "volcengine", label: "火山引擎" },
   { value: "alibaba", label: "阿里百炼" },
   { value: "siliconflow", label: "硅基流动" },
-];
-
-const MEDIA_OPTIONS: { value: GenMediaType; label: string }[] = [
-  { value: "image", label: "生图" },
-  { value: "video", label: "生视频" },
 ];
 
 const labelOf = (opts: { value: string; label: string }[], v: string) =>
@@ -62,7 +58,7 @@ function NumberField({
         step={step}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-        placeholder={placeholder ?? "平台默认"}
+        placeholder={placeholder}
         className="font-mono text-xs"
       />
     </div>
@@ -74,6 +70,7 @@ function NumberField({
  * 让用户在已有平台上挂任意 model id，并设置图/视频生成的全局默认参数。
  */
 export function GenerationSettings() {
+  const t = useT("generationSettings");
   const {
     customModels,
     addCustomModel,
@@ -83,6 +80,16 @@ export function GenerationSettings() {
     setImageParams,
     setVideoParams,
   } = useSettingsStore();
+
+  // 媒体类型选项（label 需随界面语言）
+  const MEDIA_OPTIONS: { value: GenMediaType; label: string }[] = [
+    { value: "image", label: t("mediaImage") },
+    { value: "video", label: t("mediaVideo") },
+  ];
+
+  // 画面比例选项：复用 gen-params 的取值，label 走 i18n（与设置页「默认设置」一致）
+  const ASPECT_KEY: Record<string, string> = { "9:16": "aspect916", "16:9": "aspect169", "1:1": "aspect11" };
+  const ASPECT_OPTIONS = ASPECT_RATIO_OPTIONS.map((o) => ({ value: o.value, label: t(ASPECT_KEY[o.value] ?? o.value) }));
 
   // 新增自定义模型的表单
   const [form, setForm] = useState<{ provider: string; modelId: string; name: string; mediaType: GenMediaType; supportsAudio: boolean }>({
@@ -114,16 +121,16 @@ export function GenerationSettings() {
       <Card className="glass-card">
         <CardContent className="p-5 space-y-4">
           <div>
-            <h3 className="font-semibold text-sm">自定义模型接入点</h3>
+            <h3 className="font-semibold text-sm">{t("customModelTitle")}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              在已有平台上挂任意 model id，添加后即可在上方「默认生图/生视频模型」里选用（平台 Key 复用「AI 平台」配置）。
+              {t("customModelDesc")}
             </p>
           </div>
 
           {/* 新增表单 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">归属平台</Label>
+              <Label className="text-xs text-muted-foreground">{t("fieldProvider")}</Label>
               <Select value={form.provider} onValueChange={(v) => setForm((f) => ({ ...f, provider: v ?? f.provider }))}>
                 <SelectTrigger className="w-full">
                   <SelectValue>{(value: string) => labelOf(PROVIDER_OPTIONS, value)}</SelectValue>
@@ -134,7 +141,7 @@ export function GenerationSettings() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">类型</Label>
+              <Label className="text-xs text-muted-foreground">{t("fieldType")}</Label>
               <Select value={form.mediaType} onValueChange={(v) => setForm((f) => ({ ...f, mediaType: (v ?? "image") as GenMediaType }))}>
                 <SelectTrigger className="w-full">
                   <SelectValue>{(value: string) => labelOf(MEDIA_OPTIONS, value)}</SelectValue>
@@ -145,23 +152,23 @@ export function GenerationSettings() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">model id</Label>
-              <Input value={form.modelId} onChange={(e) => setForm((f) => ({ ...f, modelId: e.target.value }))} placeholder="如 fal-ai/flux-pro/v1.1" className="font-mono text-xs" />
+              <Label className="text-xs text-muted-foreground">{t("fieldModelId")}</Label>
+              <Input value={form.modelId} onChange={(e) => setForm((f) => ({ ...f, modelId: e.target.value }))} placeholder={t("modelIdPlaceholder")} className="font-mono text-xs" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">显示名（选填）</Label>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="不填则用 model id" className="text-xs" />
+              <Label className="text-xs text-muted-foreground">{t("fieldName")}</Label>
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t("namePlaceholder")} className="text-xs" />
             </div>
           </div>
           <div className="flex items-center justify-between">
             {form.mediaType === "video" ? (
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                 <input type="checkbox" checked={form.supportsAudio} onChange={(e) => setForm((f) => ({ ...f, supportsAudio: e.target.checked }))} />
-                该视频模型原生带音频（可省 TTS）
+                {t("audioCheckbox")}
               </label>
             ) : <span />}
             <Button variant="outline" size="sm" onClick={handleAdd} disabled={!canAdd} className="text-xs">
-              <LuPlus className="size-3.5 mr-1" /> 添加模型
+              <LuPlus className="size-3.5 mr-1" /> {t("addModel")}
             </Button>
           </div>
 
@@ -173,11 +180,11 @@ export function GenerationSettings() {
                   <div className="min-w-0">
                     <p className="text-xs font-medium truncate">{m.name}</p>
                     <p className="text-[11px] text-muted-foreground font-mono truncate">
-                      {labelOf(PROVIDER_OPTIONS, m.provider)} · {m.mediaType === "image" ? "生图" : "生视频"} · {m.modelId}
-                      {m.supportsAudio ? " · 带音频" : ""}
+                      {labelOf(PROVIDER_OPTIONS, m.provider)} · {m.mediaType === "image" ? t("mediaImage") : t("mediaVideo")} · {m.modelId}
+                      {m.supportsAudio ? t("audioSuffix") : ""}
                     </p>
                   </div>
-                  <button onClick={() => removeCustomModel(m.id)} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors" title="删除">
+                  <button onClick={() => removeCustomModel(m.id)} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors" title={t("delete")}>
                     <LuTrash2 className="size-4" />
                   </button>
                 </div>
@@ -191,53 +198,53 @@ export function GenerationSettings() {
       <Card className="glass-card">
         <CardContent className="p-5 space-y-5">
           <div>
-            <h3 className="font-semibold text-sm">生成参数（全局默认）</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">生成图片/动态镜头时统一使用，留空的数值项走对应模型默认。</p>
+            <h3 className="font-semibold text-sm">{t("genParamsTitle")}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("genParamsDesc")}</p>
           </div>
 
           {/* 图片参数 */}
           <div className="space-y-3">
-            <p className="text-xs font-medium">图片</p>
+            <p className="text-xs font-medium">{t("imageSection")}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">画面比例</Label>
+                <Label className="text-xs text-muted-foreground">{t("aspectRatio")}</Label>
                 <Select value={imageParams.aspectRatio} onValueChange={(v) => setImageParams({ ...imageParams, aspectRatio: (v ?? "9:16") as typeof imageParams.aspectRatio })}>
                   <SelectTrigger className="w-full">
-                    <SelectValue>{(value: string) => labelOf(ASPECT_RATIO_OPTIONS, value)}</SelectValue>
+                    <SelectValue>{(value: string) => labelOf(ASPECT_OPTIONS, value)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {ASPECT_RATIO_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                    {ASPECT_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
-              <NumberField label="生成数量" value={imageParams.count} onChange={(v) => setImageParams({ ...imageParams, count: v ?? 1 })} placeholder="1" />
-              <NumberField label="推理步数" value={imageParams.steps} onChange={(v) => setImageParams({ ...imageParams, steps: v })} />
-              <NumberField label="引导系数" value={imageParams.guidanceScale} onChange={(v) => setImageParams({ ...imageParams, guidanceScale: v })} step="0.1" />
-              <NumberField label="随机种子" value={imageParams.seed} onChange={(v) => setImageParams({ ...imageParams, seed: v })} placeholder="随机" />
+              <NumberField label={t("count")} value={imageParams.count} onChange={(v) => setImageParams({ ...imageParams, count: v ?? 1 })} placeholder="1" />
+              <NumberField label={t("steps")} value={imageParams.steps} onChange={(v) => setImageParams({ ...imageParams, steps: v })} placeholder={t("platformDefault")} />
+              <NumberField label={t("guidanceScale")} value={imageParams.guidanceScale} onChange={(v) => setImageParams({ ...imageParams, guidanceScale: v })} step="0.1" placeholder={t("platformDefault")} />
+              <NumberField label={t("seed")} value={imageParams.seed} onChange={(v) => setImageParams({ ...imageParams, seed: v })} placeholder={t("seedPlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">反向提示词（选填）</Label>
-              <Textarea value={imageParams.negativePrompt ?? ""} onChange={(e) => setImageParams({ ...imageParams, negativePrompt: e.target.value || undefined })} rows={2} placeholder="不希望出现的元素，如 模糊、文字、水印" className="text-xs resize-none" />
+              <Label className="text-xs text-muted-foreground">{t("negativePrompt")}</Label>
+              <Textarea value={imageParams.negativePrompt ?? ""} onChange={(e) => setImageParams({ ...imageParams, negativePrompt: e.target.value || undefined })} rows={2} placeholder={t("imageNegativePlaceholder")} className="text-xs resize-none" />
             </div>
           </div>
 
           {/* 视频参数 */}
           <div className="space-y-3 pt-2 border-t border-border/50">
-            <p className="text-xs font-medium">视频（转动态镜头）</p>
+            <p className="text-xs font-medium">{t("videoSection")}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">画面比例</Label>
+                <Label className="text-xs text-muted-foreground">{t("aspectRatio")}</Label>
                 <Select value={videoParams.aspectRatio} onValueChange={(v) => setVideoParams({ ...videoParams, aspectRatio: (v ?? "9:16") as typeof videoParams.aspectRatio })}>
                   <SelectTrigger className="w-full">
-                    <SelectValue>{(value: string) => labelOf(ASPECT_RATIO_OPTIONS, value)}</SelectValue>
+                    <SelectValue>{(value: string) => labelOf(ASPECT_OPTIONS, value)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {ASPECT_RATIO_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                    {ASPECT_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">分辨率</Label>
+                <Label className="text-xs text-muted-foreground">{t("resolution")}</Label>
                 <Select value={videoParams.resolution} onValueChange={(v) => setVideoParams({ ...videoParams, resolution: (v ?? "1080p") as typeof videoParams.resolution })}>
                   <SelectTrigger className="w-full">
                     <SelectValue>{(value: string) => labelOf(RESOLUTION_OPTIONS, value)}</SelectValue>
@@ -247,14 +254,14 @@ export function GenerationSettings() {
                   </SelectContent>
                 </Select>
               </div>
-              <NumberField label="时长（秒）" value={videoParams.duration} onChange={(v) => setVideoParams({ ...videoParams, duration: v })} placeholder="5" />
-              <NumberField label="帧率 fps" value={videoParams.fps} onChange={(v) => setVideoParams({ ...videoParams, fps: v })} />
-              <NumberField label="运动强度" value={videoParams.motionStrength} onChange={(v) => setVideoParams({ ...videoParams, motionStrength: v })} step="0.1" />
-              <NumberField label="随机种子" value={videoParams.seed} onChange={(v) => setVideoParams({ ...videoParams, seed: v })} placeholder="随机" />
+              <NumberField label={t("duration")} value={videoParams.duration} onChange={(v) => setVideoParams({ ...videoParams, duration: v })} placeholder="5" />
+              <NumberField label={t("fps")} value={videoParams.fps} onChange={(v) => setVideoParams({ ...videoParams, fps: v })} placeholder={t("platformDefault")} />
+              <NumberField label={t("motionStrength")} value={videoParams.motionStrength} onChange={(v) => setVideoParams({ ...videoParams, motionStrength: v })} step="0.1" placeholder={t("platformDefault")} />
+              <NumberField label={t("seed")} value={videoParams.seed} onChange={(v) => setVideoParams({ ...videoParams, seed: v })} placeholder={t("seedPlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">反向提示词（选填）</Label>
-              <Textarea value={videoParams.negativePrompt ?? ""} onChange={(e) => setVideoParams({ ...videoParams, negativePrompt: e.target.value || undefined })} rows={2} placeholder="不希望出现的元素" className="text-xs resize-none" />
+              <Label className="text-xs text-muted-foreground">{t("negativePrompt")}</Label>
+              <Textarea value={videoParams.negativePrompt ?? ""} onChange={(e) => setVideoParams({ ...videoParams, negativePrompt: e.target.value || undefined })} rows={2} placeholder={t("videoNegativePlaceholder")} className="text-xs resize-none" />
             </div>
           </div>
         </CardContent>
