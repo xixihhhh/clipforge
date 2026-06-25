@@ -139,6 +139,7 @@ export default function ExportPage() {
           productName: productMeta?.productName || projectName,
           category: productMeta?.category,
           productDescription: productMeta?.description,
+          locale: locale === "en" ? "en" : "zh", // 跟随界面语言：英文用户的 LLM 也出英文文案
           llmConfig: { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model },
         }),
       });

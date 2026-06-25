@@ -59,6 +59,40 @@ function clip(s: string, max: number): string {
   return arr.length <= max ? s.trim() : arr.slice(0, max).join("").trim();
 }
 
+/**
+ * 构建发布文案的 LLM 提示词（配了 LLM 的用户走这条拿更优文案）。
+ * 跟随 locale：zh 出中文带货文案，en 出英文 TikTok 文案——避免英文用户的 LLM 输出中文。
+ * 纯函数，提示词内容可确定性单测（LLM 输出本身依赖 key，不在此测）。
+ */
+export function buildPublishPrompt(
+  input: { productName: string; category?: string; productDescription?: string; platform?: string },
+  locale: "zh" | "en" = "zh"
+): string {
+  const { productName, category, productDescription, platform } = input;
+  if (locale === "en") {
+    const platformHint = platform ? `Target platform: ${platform}.` : "Target platform: TikTok / Reels / Shorts.";
+    return `You are a seasoned e-commerce short-video marketer. Write publishing copy for the product below, entirely in ENGLISH. ${platformHint}
+Product: ${productName}
+${category ? `Category: ${category}\n` : ""}${productDescription ? `Selling points: ${productDescription}\n` : ""}
+Output STRICT JSON only (no extra text):
+{
+  "titles": ["3 catchy short titles with emotion/pain-point/number hooks, each <= 60 chars"],
+  "hashtags": ["6-10 hashtags with #, TikTok-style, matching the category and platform trends"],
+  "caption": "one-line caption, conversational, with a clear call to action, <= 150 chars"
+}`;
+  }
+  const platformHint = platform ? `目标平台：${platform}。` : "目标平台：抖音/快手/小红书。";
+  return `你是资深电商带货短视频运营。请为以下商品生成发布文案。${platformHint}
+商品名称：${productName}
+${category ? `品类：${category}\n` : ""}${productDescription ? `卖点：${productDescription}\n` : ""}
+要求严格输出 JSON（不要多余文字）：
+{
+  "titles": ["3 个吸睛短标题，含情绪/痛点/数字钩子，每个 ≤20 字"],
+  "hashtags": ["6-10 个带 # 的话题标签，贴合品类与平台热点"],
+  "caption": "一句话种草文案，口语化，含行动号召，≤40 字"
+}`;
+}
+
 export function buildPublishPack(input: PublishPackInput): PublishPack {
   const en = input.locale === "en";
   const name = clip((input.productName || "").trim() || (en ? "this find" : "这款好物"), en ? 40 : 16);
