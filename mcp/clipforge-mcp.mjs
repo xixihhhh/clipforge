@@ -57,9 +57,22 @@ function composeBody(args) {
   return body;
 }
 
+/**
+ * 按主题文字的书写系统挑默认免费音色（未显式指定 voice 时用）。
+ * 否则英文/日文/韩文主题会被中文默认音色读得发音错乱。返回 null = 用服务端中文默认。
+ * 假名→日，谚文→韩，汉字→中(null)，其余(拉丁等)→英。西语等拉丁语种无法靠脚本区分，需显式指定。
+ */
+export function defaultVoiceForTopic(topic) {
+  const t = String(topic || "");
+  if (/[぀-ヿ]/.test(t)) return "ja-JP-NanamiNeural"; // 平/片假名
+  if (/[가-힯]/.test(t)) return "ko-KR-SunHiNeural"; // 谚文
+  if (/[一-鿿]/.test(t)) return null; // 汉字 → 中文默认
+  return "en-US-AriaNeural"; // 拉丁等 → 英文
+}
+
 /** create_video / compose 共用的「成片选项」JSON-Schema 属性 */
 const OUTPUT_OPTION_PROPS = {
-  voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices），默认 zh-CN-XiaoxiaoNeural" },
+  voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日/韩同理；中文→晓晓）" },
   aspectRatio: { type: "string", enum: ASPECT_RATIOS, description: "画幅，默认 9:16 竖屏" },
   quality: { type: "string", enum: QUALITY_PRESETS, description: "画质预设 fast/standard/hd，默认 standard" },
   bgm: {
@@ -299,7 +312,13 @@ async function handleCreateVideo(args) {
   }
 
   // 3) 合成（免费 Edge TTS 配音 + 字幕；可选音色/画幅/画质）
-  await api(`/api/project/${projectId}/compose`, { method: "POST", body: composeBody(args) });
+  const body = composeBody(args);
+  // 未显式指定音色时，按主题语言挑默认音色（英文主题→英文音色，避免中文音色读英文）
+  if (!body.freeTts.voice) {
+    const v = defaultVoiceForTopic(topic);
+    if (v) body.freeTts.voice = v;
+  }
+  await api(`/api/project/${projectId}/compose`, { method: "POST", body });
   const composition = await pollCompose(projectId);
 
   return ok({
