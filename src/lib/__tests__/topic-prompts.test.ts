@@ -13,6 +13,17 @@ describe("buildTopicPrompt（一句话主题成片，去商品化）", () => {
     expect(p).toContain("必填");
   });
 
+  it("英文主题：追加语言指令，要求旁白/标题用英文（避免英文主题出中文旁白）", () => {
+    const p = buildTopicPrompt({ topic: "how to brew pour-over coffee at home" });
+    expect(p).toContain("LANGUAGE");
+    expect(p).toContain("NOT in Chinese");
+  });
+
+  it("中文主题：不追加英文语言指令（默认中文不变）", () => {
+    const p = buildTopicPrompt({ topic: "在家如何泡手冲咖啡" });
+    expect(p).not.toContain("NOT in Chinese");
+  });
+
   it("以主题立框而非商品（不含带货输入字段）", () => {
     const p = buildTopicPrompt({ topic: "雨天适合做的小事" });
     // 围绕「主题」组织，而非带货的「商品信息」输入块

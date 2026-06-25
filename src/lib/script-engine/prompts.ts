@@ -761,6 +761,14 @@ export function buildTopicPrompt(input: TopicScriptInput): string {
 
   parts.push(`\n${TOPIC_OUTPUT_FORMAT_PROMPT}`);
 
+  // 语言跟随主题语言：英文主题就出英文旁白/标题（否则上面 JSON 规范里的「中文配音文案」会让
+  // 全球用户的英文主题也产出中文旁白——视频本体就错了）。放在最后最显著、覆盖规范里的「中文」。
+  if (!/[一-鿿]/.test(topic)) {
+    parts.push(
+      `\n【LANGUAGE — IMPORTANT, overrides any "中文" wording above】The topic is NOT in Chinese. Write every "title" and "voiceover" field in the SAME language as the topic (e.g. natural English), never Chinese. Keep "searchTerms" in English as usual; "description"/"camera" may be concise English.`
+    );
+  }
+
   return parts.join("\n");
 }
 
