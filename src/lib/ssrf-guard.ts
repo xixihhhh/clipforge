@@ -63,7 +63,8 @@ export async function safeFetch(url: string, init: RequestInit = {}, maxRedirect
   let current = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
     await assertPublicUrl(current);
-    const res = await fetch(current, { ...init, redirect: "manual" });
+    // 每一跳加 15s 超时（除非调用方已自带 signal），避免慢/恶意响应的服务器无限拖住请求
+    const res = await fetch(current, { ...init, redirect: "manual", signal: init.signal ?? AbortSignal.timeout(15000) });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       if (!loc) return res;

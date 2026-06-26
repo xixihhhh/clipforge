@@ -51,7 +51,8 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 async function audioToBuffer(input: string): Promise<Buffer> {
   const s = input.trim();
   if (/^https?:\/\//i.test(s)) {
-    const resp = await fetch(s);
+    // 加 30s 超时：远端音频服务器慢/挂起时不会无限阻塞、连累整个 TTS→合成流程
+    const resp = await fetch(s, { signal: AbortSignal.timeout(30000) });
     if (!resp.ok) throw new Error(`下载音频失败: ${resp.status}`);
     return Buffer.from(await resp.arrayBuffer());
   }
@@ -116,6 +117,7 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
       codec: "mp3",
       ...(config.speed != null && { speed: clamp(config.speed, 0.7, 1.5) }),
     }),
+    signal: AbortSignal.timeout(30000), // 提交加 30s 超时，避免挂起
   });
   if (!submit.ok) {
     const t = await submit.text().catch(() => "");
@@ -128,7 +130,13 @@ async function generateSpeechAtlas(text: string, config: TTSConfig): Promise<Buf
   // 轮询 prediction（TTS 通常数秒内完成）
   for (let i = 0; i < 60; i++) {
     await sleep(1000);
-    const pr = await fetch(`${base}/model/prediction/${taskId}`, { headers });
+    // 每次轮询加 10s 超时，且超时/网络抖动只跳过本轮（下轮再试），避免一次卡顿挂死整个生成
+    let pr: Response;
+    try {
+      pr = await fetch(`${base}/model/prediction/${taskId}`, { headers, signal: AbortSignal.timeout(10000) });
+    } catch {
+      continue;
+    }
     if (!pr.ok) continue;
     const raw = (await pr.json()) as AtlasPrediction;
     const p: AtlasPrediction = raw.data ?? raw;
