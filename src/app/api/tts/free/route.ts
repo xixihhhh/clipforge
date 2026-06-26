@@ -15,8 +15,10 @@ export async function POST(req: NextRequest) {
     /* 允许空 body，用默认试听词 */
   }
   const text = (typeof body.text === "string" && body.text.trim()) || "你好，这是免费配音的试听效果。";
-  const voice = typeof body.voice === "string" ? body.voice : DEFAULT_FREE_VOICE;
-  const rate = typeof body.rate === "string" ? body.rate : undefined;
+  // 校验音色名只含安全字符（Edge 音色形如 en-US-AriaNeural；保留连字符，兼容任意合法 Edge 音色而非仅白名单）——非法落默认，防 SSML 注入
+  const voice = typeof body.voice === "string" && /^[A-Za-z0-9-]{1,40}$/.test(body.voice) ? body.voice : DEFAULT_FREE_VOICE;
+  // 语速须是 SSML prosody rate 格式（如 +10% / -5%）——非法则不传，防 SSML 注入
+  const rate = typeof body.rate === "string" && /^[+-]?\d{1,3}%$/.test(body.rate) ? body.rate : undefined;
 
   try {
     const audio = await generateSpeechFree(text.slice(0, 200), { voice, rate });

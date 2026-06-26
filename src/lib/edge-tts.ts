@@ -146,9 +146,10 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
         `X-Timestamp:${tsString()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
         `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
       ws.send(cfg);
+      // voice/pitch/rate 同样转义：它们落在单引号 SSML 属性里，未转义的 ' 可越界注入 SSML（防御纵深，兜底所有调用方）
       const ssml =
         `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='zh-CN'>` +
-        `<voice name='${voice}'><prosody pitch='${pitch}' rate='${rate}' volume='+0%'>${escapeSsml(clean)}</prosody></voice></speak>`;
+        `<voice name='${escapeSsml(voice)}'><prosody pitch='${escapeSsml(pitch)}' rate='${escapeSsml(rate)}' volume='+0%'>${escapeSsml(clean)}</prosody></voice></speak>`;
       const msg =
         `X-RequestId:${uuidNoDash()}\r\nContent-Type:application/ssml+xml\r\n` +
         `X-Timestamp:${tsString()}Z\r\nPath:ssml\r\n\r\n${ssml}`;

@@ -1,25 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDataDir } from "@/lib/paths";
-import { readFile } from "fs/promises";
-import { join } from "path";
 import { createProvider } from "@/lib/providers";
-
-/** 本地 /api/files 路径转 base64 data URI（远程 provider 无法访问 localhost 首帧） */
-async function toRemoteUsableImage(ref: string | undefined): Promise<string | undefined> {
-  if (!ref) return undefined;
-  if (ref.startsWith("http") || ref.startsWith("data:")) return ref;
-  const m = ref.match(/\/api\/files\/(.+)/);
-  if (!m) return ref;
-  try {
-    const filePath = join(getDataDir(), "uploads", m[1]);
-    const buf = await readFile(filePath);
-    const ext = filePath.split(".").pop()?.toLowerCase() || "png";
-    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
-    return `data:${mime};base64,${buf.toString("base64")}`;
-  } catch {
-    return ref;
-  }
-}
+import { toRemoteUsableImage } from "@/lib/remote-image";
 
 // AI 生视频
 export async function POST(req: NextRequest) {
