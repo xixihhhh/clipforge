@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
-import { buildComposeCommand, resolveChineseFontFamily, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt 构建测试 ====================
 
@@ -573,5 +573,18 @@ describe("内置全 CJK 字幕字体", () => {
     // 内置字体在仓库里(public/fonts/subtitle.otf)，应优先于系统字体被选中；
     // 卡拉OK 走 libass 按族名匹配，必须回字体真实族名才能用上内置字体（否则系统 PingFang 缺谚文→豆腐块）
     expect(resolveChineseFontFamily()).toBe("Noto Sans CJK SC");
+  });
+});
+
+describe("字幕换行宽度估算（多语言）", () => {
+  it("韩文谚文按 CJK 全宽估算换行，每行不溢出安全宽（否则当窄拉丁字→字幕溢出画面）", () => {
+    const fontSize = 48, frameWidth = 720;
+    const maxWidth = frameWidth * 0.86; // 619
+    const ko = "정말 부드럽습니다 너무 좋아요 진짜 최고예요 강력 추천합니다";
+    const lines = wrapCaption(ko, fontSize, frameWidth).split("\n");
+    // 用「谚文/汉字=fontSize，其余=0.55*fontSize」复算每行实际宽——若 isCJK 漏了谚文，wrapCaption 会塞太多字致此处超宽
+    const w = (s: string) => [...s].reduce((acc, c) => acc + (/[가-힣一-鿿]/.test(c) ? fontSize : fontSize * 0.55), 0);
+    for (const l of lines) expect(w(l)).toBeLessThanOrEqual(maxWidth + 1);
+    expect(lines.length).toBeGreaterThan(1); // 该长句确实换了行
   });
 });

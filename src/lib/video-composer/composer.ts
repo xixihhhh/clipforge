@@ -68,7 +68,7 @@ export function resolveChineseFontFamily(): string {
 
 /** 判断是否为 CJK（中日韩）字符——用于估算字宽与换行策略 */
 function isCJK(ch: string): boolean {
-  return /[⺀-鿿豈-﫿＀-￯　-〿]/.test(ch);
+  return /[⺀-鿿豈-﫿＀-￯　-〿가-힣]/.test(ch);
 }
 
 /**
