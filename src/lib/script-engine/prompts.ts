@@ -564,6 +564,16 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
   // 添加输出格式约束
   parts.push(`\n${OUTPUT_FORMAT_PROMPT}`);
 
+  // 语言跟随商品信息语言：英文商品(海外 TikTok Shop/Amazon 带货)就出英文带货脚本/旁白，
+  // 否则上面 OUTPUT_FORMAT 的「中文配音文案」会让英文商品也产出中文旁白（视频本体就错了）。
+  // 放最后最显著、覆盖规范里的「中文」。与 topic 路径(buildTopicPrompt)同一手法。
+  const productText = `${productName || ""} ${productDescription || ""} ${usageAdvantage || ""}`;
+  if (productText.trim() && !/[一-鿿]/.test(productText)) {
+    parts.push(
+      `\n【LANGUAGE — IMPORTANT, overrides any "中文" wording above】The product info is NOT in Chinese. Write every "title" and "voiceover" field in the SAME language as the product (e.g. natural English for an overseas TikTok Shop audience), never Chinese. Keep "searchTerms" in English as usual; "description"/"camera" may be concise English.`
+    );
+  }
+
   return parts.join("\n");
 }
 

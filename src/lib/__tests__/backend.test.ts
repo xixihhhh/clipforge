@@ -110,6 +110,16 @@ describe("buildUserPrompt", () => {
     const prompt = buildUserPrompt(baseInput);
     expect(prompt).toContain("25秒");
   });
+
+  it("英文商品：追加语言指令，要求旁白/标题用英文（海外带货，避免英文商品出中文旁白）", () => {
+    const p = buildUserPrompt({ productName: "Glow Serum", category: "beauty", styleType: "pain_point", productDescription: "fades dark spots in 2 weeks" });
+    expect(p).toContain("LANGUAGE");
+    expect(p).toContain("NOT in Chinese");
+  });
+
+  it("中文商品：不追加英文语言指令（默认中文不变）", () => {
+    expect(buildUserPrompt(baseInput)).not.toContain("NOT in Chinese");
+  });
 });
 
 // ==================== FFmpeg 命令生成测试 ====================
