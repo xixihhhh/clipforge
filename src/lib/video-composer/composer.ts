@@ -504,6 +504,17 @@ export function buildComposeCommand(config: ComposeConfig): string {
   return cmd;
 }
 
+/** 合成的最长时长（毫秒）：超过即杀进程，避免某次渲染卡死无限占用机器 */
+export const COMPOSE_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** 把 ffmpeg 合成的底层错误归类成可操作提示（纯函数，可单测）；非已知类返回 null（原样抛） */
+export function composeErrorMessage(e: { killed?: boolean; signal?: string; stderr?: string; message?: string }): string | null {
+  if (e.killed || e.signal === "SIGTERM") return "视频合成超时（已超过 10 分钟）——可能分镜过多或机器繁忙，请减少分镜或降到「快速」画质重试";
+  const msg = `${e.stderr || ""} ${e.message || ""}`;
+  if (/no space left|ENOSPC/i.test(msg)) return "磁盘空间不足，无法写出成片——请清理磁盘后重试";
+  return null;
+}
+
 // 执行合成
 export async function composeVideo(config: ComposeConfig): Promise<string> {
   const outputDir = join(getDataDir(), "output", config.projectId);
@@ -515,7 +526,14 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
   const { promisify } = await import("util");
   const execAsync = promisify(exec);
 
-  const { stdout, stderr } = await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024 });
+  try {
+    // 加超时（超过即 SIGTERM 杀进程）；磁盘满/超时归类成可读错误
+    await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS });
+  } catch (e) {
+    const friendly = composeErrorMessage(e as { killed?: boolean; signal?: string; stderr?: string; message?: string });
+    if (friendly) throw new Error(friendly);
+    throw e;
+  }
 
   // 从命令中提取输出路径
   const outputMatch = cmd.match(/"([^"]*final_[^"]*\.mp4)"/);

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
-import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt 构建测试 ====================
 
@@ -634,5 +634,20 @@ describe("字幕换行宽度估算（多语言）", () => {
     const w = (s: string) => [...s].reduce((acc, c) => acc + (/[가-힣一-鿿]/.test(c) ? fontSize : fontSize * 0.55), 0);
     for (const l of lines) expect(w(l)).toBeLessThanOrEqual(maxWidth + 1);
     expect(lines.length).toBeGreaterThan(1); // 该长句确实换了行
+  });
+});
+
+describe("composeErrorMessage（ffmpeg 合成错误归类）", () => {
+  it("超时(SIGTERM/killed) → 超时提示", () => {
+    expect(composeErrorMessage({ killed: true, signal: "SIGTERM" })).toMatch(/超时/);
+    expect(composeErrorMessage({ signal: "SIGTERM" })).toMatch(/超时/);
+  });
+  it("磁盘满(ENOSPC/no space) → 磁盘提示", () => {
+    expect(composeErrorMessage({ stderr: "av_interleaved_write_frame(): No space left on device" })).toMatch(/磁盘/);
+    expect(composeErrorMessage({ message: "ENOSPC: no space left" })).toMatch(/磁盘/);
+  });
+  it("其它错误 → null（原样抛）", () => {
+    expect(composeErrorMessage({ message: "Invalid argument" })).toBeNull();
+    expect(composeErrorMessage({})).toBeNull();
   });
 });
