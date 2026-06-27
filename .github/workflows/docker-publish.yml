@@ -1,0 +1,84 @@
+# 把 ClipForge 打成自托管 Docker 镜像，冒烟测试通过后发布到 GitHub Container Registry (ghcr.io)。
+# 触发：发布 Release 时自动出 vX.Y.Z + latest；也可在 Actions 页手动 workflow_dispatch。
+# 发布后镜像出现在仓库 Packages 页：ghcr.io/xixihhhh/clipforge
+name: Publish Docker image (ghcr.io)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write # 推镜像到 ghcr 需要
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 1) 先构建并 load 到本机 docker，用于推送前的冒烟测试
+      - name: 构建镜像（load 本地待测）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: clipforge:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 2) 冒烟测试：起容器，确认能启动 + DB 迁移成功 + 落地页 200 + ffmpeg 可用
+      - name: 冒烟测试（启动 / 页面可达 / ffmpeg）
+        run: |
+          docker run -d -p 3000:3000 --name smoke clipforge:smoke
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/start || true)
+            [ "$code" = "200" ] && break
+            sleep 2
+          done
+          echo "--- 容器日志 ---"; docker logs smoke 2>&1 | tail -30
+          final=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/start || true)
+          echo "final /start = $final"
+          [ "$final" = "200" ] || { echo "::error::冒烟测试失败：/start 未返回 200"; exit 1; }
+          docker exec smoke ffmpeg -version | head -1
+          docker rm -f smoke
+
+      # 3) 测试通过 → 登录 + 打标签 + 推送（构建缓存复用，秒级）
+      - name: 登录 ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成镜像标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - name: 构建并推送（linux/amd64）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

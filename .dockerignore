@@ -1,0 +1,20 @@
+# 构建上下文裁剪：node_modules/.next/data 等由构建阶段自行生成，且不能把宿主机的
+# mac-arm64 原生模块或开发数据(含真实项目)烤进镜像。
+node_modules
+.next
+data
+release
+.git
+.github
+*.log
+.DS_Store
+.env
+.env.*
+Dockerfile
+.dockerignore
+*.dmg
+*.exe
+electron/dist
+coverage
+.vscode
+.idea
