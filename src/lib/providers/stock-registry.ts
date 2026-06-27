@@ -20,6 +20,7 @@ import { searchPexelsVideos, searchPexelsPhotos } from "./pexels";
 import { searchPixabayVideos, searchPixabayImages } from "./pixabay";
 import { searchOpenverseImages, searchOpenverseAudio } from "./openverse";
 import { searchWikimediaImages, searchWikimediaVideos, searchWikimediaAudio } from "./wikimedia";
+import { TtlCache } from "@/lib/ttl-cache";
 
 export interface StockSearchOptions {
   /** 各源 Key：{ pexels: "...", pixabay: "..." }；openverse 可选 token */
@@ -98,6 +99,15 @@ export interface AggregateResult {
  * 聚合检索：对所有支持该 mediaType 且可用的源并发检索，合并候选。
  * keyless 源优先排序；单源失败不影响其余（Promise.allSettled）。
  */
+/** 聚合检索结果缓存：批量配画面逐镜检索时，语义相近的检索词会重复打各源 API（还撞 Pixabay/Openverse 限流）。 */
+const stockCache = new TtlCache<AggregateResult>(5 * 60 * 1000, 64);
+
+/** 缓存键：影响检索结果的参数 + 实际参与的源（源由 apiKeys 决定，故纳入键）。导出便于单测。 */
+export function stockCacheKey(query: string, opts: StockSearchOptions, sourceIds: string[]): string {
+  const { mediaType = "video", orientation, perPage, minSec, maxSec } = opts;
+  return [mediaType, orientation || "", perPage || "", minSec || "", maxSec || "", sourceIds.slice().sort().join(","), query.trim().toLowerCase()].join("|");
+}
+
 export async function searchAllStock(query: string, opts: StockSearchOptions = {}): Promise<AggregateResult> {
   const { mediaType = "video" } = opts;
   const skippedSources: StockSourceId[] = [];
@@ -114,6 +124,11 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
     return true;
   });
 
+  // 命中缓存直接复用候选池（同 query+参数+可用源，5 分钟内）
+  const ck = stockCacheKey(query, opts, usable.map((s) => s.id));
+  const cached = stockCache.get(ck);
+  if (cached) return cached;
+
   const settled = await Promise.allSettled(usable.map((s) => searchStock(s.id, query, opts)));
 
   const merged: StockCandidate[] = [];
@@ -122,7 +137,10 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
     else erroredSources.push(usable[i].id);
   });
 
-  return { candidates: rankStockCandidates(merged, mediaType, opts.orientation), skippedSources, erroredSources };
+  const result = { candidates: rankStockCandidates(merged, mediaType, opts.orientation), skippedSources, erroredSources };
+  // 只缓存有结果的（空结果多半是瞬时失败/无命中，缓存会挡住重试与「永远有素材」兜底）
+  if (result.candidates.length > 0) stockCache.set(ck, result);
+  return result;
 }
 
 /**
