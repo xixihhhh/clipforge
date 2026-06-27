@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse } from "@/lib/script-engine/generator";
-import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt 构建测试 ====================
 
@@ -649,5 +649,28 @@ describe("composeErrorMessage（ffmpeg 合成错误归类）", () => {
   it("其它错误 → null（原样抛）", () => {
     expect(composeErrorMessage({ message: "Invalid argument" })).toBeNull();
     expect(composeErrorMessage({})).toBeNull();
+  });
+});
+
+describe("buildDrawtext（drawtext 构建器：强制转义 + 字段顺序）", () => {
+  it("text 走 escapeDrawText、fontFile 走 escapeSubtitlesPath，% 字面保留", () => {
+    const d = buildDrawtext({ fontFile: "C:\\fonts\\f.ttf", text: "立省50%", fontSize: 48, fontColor: "white", x: "(w-text_w)/2", y: "h*0.8" });
+    expect(d.startsWith("drawtext=")).toBe(true);
+    expect(d).toContain("fontfile='C\\:/fonts/f.ttf'"); // 路径转义器：\\→/ 且 :→\:
+    expect(d).toContain("expansion=none");
+    expect(d).toContain("立省50%"); // % 不被转义（expansion=none 下字面）
+    expect(d).toContain("fontsize=48");
+    expect(d).toContain("x=(w-text_w)/2");
+  });
+  it("可选字段按需出现、缺省不输出", () => {
+    const bare = buildDrawtext({ text: "x", fontSize: 40, fontColor: "white", x: "0", y: "0" });
+    expect(bare).not.toContain("box=1");
+    expect(bare).not.toContain("borderw");
+    expect(bare).not.toContain("enable");
+    const full = buildDrawtext({ text: "x", fontSize: 40, fontColor: "white", borderW: 3, lineSpacing: 10, box: { color: "black@0.45", borderW: 12 }, x: "0", y: "0", enable: "enable='between(t,0,3)'" });
+    expect(full).toContain("borderw=3");
+    expect(full).toContain("line_spacing=10");
+    expect(full).toContain("box=1:boxcolor=black@0.45:boxborderw=12");
+    expect(full).toContain("enable='between(t,0,3)'");
   });
 });

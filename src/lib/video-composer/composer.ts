@@ -51,6 +51,45 @@ function escapeSubtitlesPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
 
+/** drawtext 滤镜参数（text/fontFile 在内部强制转义，新加贴片不会再漏转义——审计曾因字体路径用错转义器出过 bug） */
+export interface DrawtextOpts {
+  fontFile?: string;
+  text: string;
+  fontSize: number;
+  fontColor: string;
+  borderW?: number;
+  lineSpacing?: number;
+  box?: { color: string; borderW: number };
+  x: string;
+  y: string;
+  /** 整段 enable 表达式，如 enable='between(t,0,3)'（可空） */
+  enable?: string;
+}
+
+/**
+ * 统一构建 drawtext 滤镜串：把「文本→escapeDrawText、字体路径→escapeSubtitlesPath」的转义收口到一处。
+ * 字段顺序与各贴片站点历史顺序一致（可选字段缺省即不输出），对现有命令字节等价。
+ */
+export function buildDrawtext(o: DrawtextOpts): string {
+  const p: string[] = [];
+  if (o.fontFile) p.push(`fontfile='${escapeSubtitlesPath(o.fontFile)}'`);
+  p.push("expansion=none");
+  p.push(`text='${escapeDrawText(o.text)}'`);
+  p.push(`fontsize=${o.fontSize}`);
+  p.push(`fontcolor=${o.fontColor}`);
+  if (o.borderW != null) p.push(`borderw=${o.borderW}`);
+  if (o.lineSpacing != null) p.push(`line_spacing=${o.lineSpacing}`);
+  if (o.box) {
+    p.push("box=1");
+    p.push(`boxcolor=${o.box.color}`);
+    p.push(`boxborderw=${o.box.borderW}`);
+  }
+  p.push(`x=${o.x}`);
+  p.push(`y=${o.y}`);
+  if (o.enable) p.push(o.enable);
+  return `drawtext=${p.join(":")}`;
+}
+
 /** 由探测到的中文字体文件推断其 ASS Fontname（libass 跨平台按名匹配；macOS CoreText 一般也能兜底） */
 export function resolveChineseFontFamily(): string {
   const p = (resolveChineseFontFile() || "").toLowerCase();
@@ -392,18 +431,26 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const bottomY = (1 - bottomRatio).toFixed(2); // 有卡 0.83 / 无卡 0.78
     const yPos = config.subtitle.position === "top" ? "h*0.08" : config.subtitle.position === "center" ? "(h-text_h)/2" : `h*${bottomY}-text_h`;
     const lineSpacing = Math.round(fontSize * 0.28);
-    // 半透明底框，提升可读性（带货短视频常见样式）
-    const boxArg = `box=1:boxcolor=black@0.45:boxborderw=${Math.round(fontSize * 0.35)}:`;
-
     // 中文字幕必须显式指定中文字体文件，否则渲染为方块
     const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
-    const fontFileArg = fontFile ? `fontfile='${escapeSubtitlesPath(fontFile)}':` : "";
 
     const drawTexts = config.subtitle.texts
       .map((t) => {
         // 自动换行避免英文/长文案溢出画面（drawtext 原生支持真实换行符）
         const wrapped = wrapCaption(t.text, fontSize, width);
-        return `drawtext=${fontFileArg}expansion=none:text='${escapeDrawText(wrapped)}':fontsize=${fontSize}:fontcolor=${fontColor}:borderw=${borderW}:line_spacing=${lineSpacing}:${boxArg}x=(w-text_w)/2:y=${yPos}:enable='between(t,${t.startTime},${t.endTime})'`;
+        // 半透明底框提升可读性（带货短视频常见样式）
+        return buildDrawtext({
+          fontFile: fontFile || undefined,
+          text: wrapped,
+          fontSize,
+          fontColor,
+          borderW,
+          lineSpacing,
+          box: { color: "black@0.45", borderW: Math.round(fontSize * 0.35) },
+          x: "(w-text_w)/2",
+          y: yPos,
+          enable: `enable='between(t,${t.startTime},${t.endTime})'`,
+        });
       })
       .join(",");
 
@@ -414,7 +461,6 @@ export function buildComposeCommand(config: ComposeConfig): string {
   // 文字贴片：价格贴/卖点贴/标题贴（叠在画面上方，带货醒目样式）
   if (config.overlays?.length) {
     const ovFont = config.subtitle?.fontFile ?? resolveChineseFontFile();
-    const ovFontArg = ovFont ? `fontfile='${escapeSubtitlesPath(ovFont)}':` : "";
     // 各样式：字号、字色、底框色、纵向位置（画面上方）
     const styleOf = (style: "title" | "highlight" | "price") => {
       if (style === "price")
@@ -427,7 +473,17 @@ export function buildComposeCommand(config: ComposeConfig): string {
       .map((o) => {
         const s = styleOf(o.style);
         const bb = Math.round(s.size * 0.4);
-        return `drawtext=${ovFontArg}expansion=none:text='${escapeDrawText(o.text)}':fontsize=${s.size}:fontcolor=${s.color}:borderw=2:box=1:boxcolor=${s.box}:boxborderw=${bb}:x=(w-text_w)/2:y=${s.y}:enable='between(t,${o.startTime},${o.endTime})'`;
+        return buildDrawtext({
+          fontFile: ovFont || undefined,
+          text: o.text,
+          fontSize: s.size,
+          fontColor: s.color,
+          borderW: 2,
+          box: { color: s.box, borderW: bb },
+          x: "(w-text_w)/2",
+          y: s.y,
+          enable: `enable='between(t,${o.startTime},${o.endTime})'`,
+        });
       })
       .join(",");
     const ovStream = "ov_out";
@@ -452,7 +508,6 @@ export function buildComposeCommand(config: ComposeConfig): string {
     const end = Math.min(5, accumulated);
     const en = `enable='between(t,${start},${end})'`;
     const cardFont = config.subtitle?.fontFile ?? resolveChineseFontFile();
-    const cardFontArg = cardFont ? `fontfile='${escapeSubtitlesPath(cardFont)}':` : "";
     // 1) 统一卡片底：半透明深色，把缩略图与文字裹成一张卡
     filterParts.push(`[${currentVideoStream}]drawbox=x=${mx - pad}:y=${cardY - pad}:w=${cardW + 2 * pad}:h=${thumb + 2 * pad}:color=black@0.5:t=fill:${en}[pcard_bg]`);
     currentVideoStream = "pcard_bg";
@@ -465,9 +520,10 @@ export function buildComposeCommand(config: ComposeConfig): string {
       const tx = mx + thumb + pad;
       const price = (config.productCard.price || "").trim().slice(0, 12);
       const draws: string[] = [];
-      draws.push(`drawtext=${cardFontArg}expansion=none:text='${escapeDrawText(nm)}':fontsize=${Math.round(width * 0.036)}:fontcolor=white:x=${tx}:y=${cardY + Math.round(thumb * 0.12)}:${en}`);
-      if (price) draws.push(`drawtext=${cardFontArg}expansion=none:text='${escapeDrawText(price)}':fontsize=${Math.round(width * 0.05)}:fontcolor=0xff3b30:x=${tx}:y=${cardY + Math.round(thumb * 0.4)}:${en}`);
-      draws.push(`drawtext=${cardFontArg}expansion=none:text='点击下方购买 →':fontsize=${Math.round(width * 0.028)}:fontcolor=0xffd60a:x=${tx}:y=${cardY + Math.round(thumb * 0.72)}:${en}`);
+      const cf = cardFont || undefined;
+      draws.push(buildDrawtext({ fontFile: cf, text: nm, fontSize: Math.round(width * 0.036), fontColor: "white", x: `${tx}`, y: `${cardY + Math.round(thumb * 0.12)}`, enable: en }));
+      if (price) draws.push(buildDrawtext({ fontFile: cf, text: price, fontSize: Math.round(width * 0.05), fontColor: "0xff3b30", x: `${tx}`, y: `${cardY + Math.round(thumb * 0.4)}`, enable: en }));
+      draws.push(buildDrawtext({ fontFile: cf, text: "点击下方购买 →", fontSize: Math.round(width * 0.028), fontColor: "0xffd60a", x: `${tx}`, y: `${cardY + Math.round(thumb * 0.72)}`, enable: en }));
       filterParts.push(`[${currentVideoStream}]${draws.join(",")}[pcard_out]`);
       currentVideoStream = "pcard_out";
     }
