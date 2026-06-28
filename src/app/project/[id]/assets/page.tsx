@@ -57,6 +57,8 @@ export default function AssetsPage() {
   const [productImages, setProductImages] = useState<string[]>([]);
   // 商品保真：AI 生成展示商品的分镜时，用商品原图作参考重绘，避免 AI 篡改商品（带货命门）
   const [productSafe, setProductSafe] = useState(true);
+  // 出图后自动「图生视频」转成真动态镜头（i2v 质量主路，替掉假 Ken-Burns 运镜）。仅配了视频模型时生效。
+  const [autoMotion, setAutoMotion] = useState(true);
   const [projectName, setProjectName] = useState("");
   // 项目类型：topic（无商品一句话成片）走免费素材库自动配画面
   const [contentType, setContentType] = useState<string>("");
@@ -244,9 +246,11 @@ export default function AssetsPage() {
 
   // 转动态镜头：用该分镜已生成的图作首帧，调图生视频模型，结果存为该分镜素材（视频）
   const generateMotion = useCallback(
-    async (shotId: number) => {
+    async (shotId: number, firstFrameOverride?: string) => {
       const asset = assets.find((a) => a.shotId === shotId);
-      if (!asset?.thumbnailUrl) return;
+      // 首帧优先用传入的新鲜 URL：自动接力时 React state 还没刷新，闭包里的 thumbnailUrl 是旧的
+      const firstFrame = firstFrameOverride || asset?.thumbnailUrl;
+      if (!firstFrame) return;
       if (!videoModelTarget) {
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, error: t("errorNoVideoModel") } : a))
@@ -264,8 +268,8 @@ export default function AssetsPage() {
             apiKey: videoModelTarget.apiKey,
             baseUrl: videoModelTarget.baseUrl,
             mode: "image-to-video",
-            prompt: asset.prompt || asset.description,
-            imageUrl: asset.thumbnailUrl,
+            prompt: asset?.prompt || asset?.description,
+            imageUrl: firstFrame,
             // 用户自定义视频参数（比例/分辨率/时长/帧率/运动/种子/反向词）
             options: buildVideoOptions(videoParams),
           }),
@@ -280,7 +284,7 @@ export default function AssetsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             shotId, type: "ai_generate", sourceUrl: url,
-            prompt: asset.prompt, provider: videoModelTarget.provider, model: videoModelTarget.model,
+            prompt: asset?.prompt, provider: videoModelTarget.provider, model: videoModelTarget.model,
           }),
         });
         let savedUrl = url;
@@ -325,6 +329,8 @@ export default function AssetsPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ shotId, type: "product_image", sourceUrl: productImages[0] }),
           }).catch(() => {});
+          // 自动转动态：商品原图当首帧跑图生视频（让真货动起来），失败自动回退静图
+          if (autoMotion && videoModelTarget) await generateMotion(shotId, productImages[0]);
         }
         return;
       }
@@ -394,6 +400,8 @@ export default function AssetsPage() {
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl } : a))
         );
+        // 自动转动态：刚生成的图当首帧跑图生视频（真运镜替掉假 Ken-Burns），失败自动回退静图
+        if (autoMotion && videoModelTarget) await generateMotion(shotId, savedUrl);
       } catch (e) {
         setAssets((prev) =>
           prev.map((a) =>
@@ -402,7 +410,7 @@ export default function AssetsPage() {
         );
       }
     },
-    [assets, modelTarget, productImages, productSafe, imageParams]
+    [assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, generateMotion]
   );
 
   // 一键全部生成（串行，避免并发打满平台限流）
@@ -479,6 +487,21 @@ export default function AssetsPage() {
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${productSafe ? "bg-primary" : "bg-muted-foreground/40"}`} />
                 {t("productSafe")}{productSafe ? t("on") : t("off")}
+              </button>
+            )}
+            {videoModelTarget && (
+              <button
+                type="button"
+                onClick={() => setAutoMotion((v) => !v)}
+                title={t("autoMotionTip")}
+                className={`flex items-center gap-1.5 rounded-full border px-3 h-8 text-xs font-medium transition-all ${
+                  autoMotion
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/60 bg-muted/20 text-muted-foreground"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${autoMotion ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                {t("autoMotion")}{autoMotion ? t("on") : t("off")}
               </button>
             )}
             <Link href={`/project/${id}/script`}>
