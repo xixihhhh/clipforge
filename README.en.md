@@ -225,6 +225,17 @@ Scripts auto-adapt to platform algorithms; every video outputs a full SEO pack:
 
 ## Quick start
 
+### 🐳 Self-host with Docker (fastest — no Node / FFmpeg needed)
+
+```bash
+docker run -d -p 3000:3000 -v clipforge-data:/data ghcr.io/xixihhhh/clipforge
+# Open http://localhost:3000 — make videos keyless (free stock + Edge TTS)
+```
+
+The image bundles ffmpeg and the CJK subtitle font; your data (projects / product images / renders) persists in the `clipforge-data` volume. To enable AI image/video or paid TTS, open **Settings** and add the relevant provider key. Image: `ghcr.io/xixihhhh/clipforge` (see the repo **Packages**), auto-built and smoke-tested on every Release.
+
+### Local development
+
 > This project uses **pnpm** (declared in `packageManager`). Don't use `npm install` — pnpm's symlink layout makes npm error. No pnpm? Run `corepack enable` or `npm i -g pnpm`.
 
 ```bash
