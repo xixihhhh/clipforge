@@ -68,6 +68,48 @@ claude mcp add clipforge -- node /绝对路径/clipforge/mcp/clipforge-mcp.mjs
 # 然后在该 MCP 的 env 里补上 CLIPFORGE_LLM_* （或先 export 再启动）
 ```
 
+## 零安装接入（发布到 npm 后）
+
+把 `mcp/` 发布为 npm 包 `clipforge-mcp` 后，客户端无需克隆仓库、直接 `npx` 接入：
+
+```json
+{
+  "mcpServers": {
+    "clipforge": {
+      "command": "npx",
+      "args": ["-y", "clipforge-mcp"],
+      "env": {
+        "CLIPFORGE_BASE_URL": "http://localhost:3000",
+        "CLIPFORGE_LLM_BASE_URL": "https://api.atlascloud.ai/v1",
+        "CLIPFORGE_LLM_API_KEY": "sk-...",
+        "CLIPFORGE_LLM_MODEL": "deepseek-ai/deepseek-v3.2"
+      }
+    }
+  }
+}
+```
+
+> `CLIPFORGE_BASE_URL` 指向一个运行中的 ClipForge 实例——最省事是 Docker：
+> `docker run -d -p 3000:3000 -v clipforge-data:/data ghcr.io/xixihhhh/clipforge`
+
+## 发布到 npm 与官方 MCP Registry
+
+让任意 MCP 客户端 `npx` 即装，并被 Glama / Smithery / PulseMCP 等生态自动收录（本仓库已备好 `mcp/package.json`）：
+
+```bash
+# 1) 发布 npm 包（在 mcp/ 目录，用你的 npm 账号）
+cd mcp && npm publish --access public
+#   若 clipforge-mcp 名被占用，把 package.json 的 name 改成 @xixihhhh/clipforge-mcp 再发
+
+# 2) 发布到官方 MCP Registry（registry.modelcontextprotocol.io）
+#   装 mcp-publisher，生成并校验「当前 schema」的 server.json：
+mcp-publisher init
+#   编辑 server.json：name 用 io.github.xixihhhh/clipforge（GitHub OAuth 自动验证归属、免 DNS），
+#   packages 指向 npm 包 clipforge-mcp，环境变量按上表补全（均可选）
+mcp-publisher login github
+mcp-publisher publish
+```
+
 ## 试一试 / Try it
 
 启动 ClipForge（`pnpm dev`）后，在客户端里直接说：

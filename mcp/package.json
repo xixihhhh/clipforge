@@ -1,0 +1,42 @@
+{
+  "name": "clipforge-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for ClipForge — drive the keyless AI 带货/short-video pipeline (create_video, generate_script, list_voices, get_video …) from any MCP client. Thin stdio wrapper over a running ClipForge instance; stock + Edge-TTS are keyless, only script generation needs an LLM key.",
+  "type": "module",
+  "bin": {
+    "clipforge-mcp": "clipforge-mcp.mjs"
+  },
+  "files": [
+    "clipforge-mcp.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "video",
+    "short-video",
+    "tiktok",
+    "douyin",
+    "ecommerce",
+    "ai-video",
+    "text-to-video",
+    "ffmpeg",
+    "clipforge"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xixihhhh/clipforge",
+    "directory": "mcp"
+  },
+  "homepage": "https://github.com/xixihhhh/clipforge/tree/main/mcp",
+  "bugs": "https://github.com/xixihhhh/clipforge/issues",
+  "license": "AGPL-3.0",
+  "author": "xixihhhh"
+}
