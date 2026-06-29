@@ -1,9 +1,8 @@
 /**
- * 黄金3秒钩子模式库（带货语境，原创内容）。
+ * 黄金3秒钩子模式库（带货语境）。
  *
- * 方法论借鉴自开源项目 thumb-brake-3s（MIT）：把「钩子」当成一个 3 秒留人结构而非一句俏皮话——
+ * 把「钩子」当成一个 3 秒留人结构、而非一句俏皮话：
  *   0–1s 截停拇指 → 1–3s 证明相关 → 3–7s 接到产品；并按品类优选机制、标注慎用场景。
- * 模式卡内容为本项目为抖音/快手/小红书带货原创编写，未复制其数据。
  *
  * 纯数据 + 选择/渲染函数，可单测；由 script-engine prompts 注入 LLM。
  */
@@ -59,7 +58,7 @@ export const HOOK_PATTERNS: HookPattern[] = [
     arousal: "high",
     categories: ["beauty", "fashion", "tech"],
     avoidWhen: "没有真实可证的反差（绝不虚标）",
-    example: "左边柜台价，右边是它——你猜得到差多少吗？",
+    example: "左边专柜价，右边是它，价差你绝对想不到。",
   },
   {
     id: "pain_strike",
@@ -70,7 +69,7 @@ export const HOOK_PATTERNS: HookPattern[] = [
     arousal: "mid",
     categories: ["beauty", "home", "food"],
     avoidWhen: "痛点太泛、谁都不疼",
-    example: "还在为这件事发愁？这个问题我替你解决了。",
+    example: "还在为这事儿头疼？解法我都给你找好了。",
   },
   {
     id: "before_after",
@@ -81,7 +80,7 @@ export const HOOK_PATTERNS: HookPattern[] = [
     arousal: "high",
     categories: ["beauty", "home"],
     avoidWhen: "前后变化不明显或无法演示",
-    example: "用之前、用之后——中间只多了这一下。",
+    example: "用之前长这样，用之后长这样，中间只多了这一步。",
   },
   {
     id: "sound_hook",

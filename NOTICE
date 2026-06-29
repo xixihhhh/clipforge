@@ -5,17 +5,3 @@ Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
 See the LICENSE file for the full text. <https://www.gnu.org/licenses/agpl-3.0.txt>
 
 修改或再发布（含以网络服务形式提供）须公开源码、继续以 AGPL-3.0 发布，并保留本版权署名。
-
----
-
-致谢 / Acknowledgements
-
-脚本引擎的「黄金3秒钩子」采用了三拍留人结构（0–1s 截停拇指 / 1–3s 证明相关 / 3–7s 接到产品）
-与「品类化钩子资源」的方法论，该方法论借鉴自开源项目 thumb-brake-3s
-（MIT 协议，https://github.com/NBrangerF/thumb-brake-3s）。
-本项目的钩子模式卡内容为抖音/快手/小红书带货语境原创编写，未复制其数据。
-
-The script engine's golden-3s hook design adopts the 3-beat retention structure and the
-category-aware hook-resource methodology from the open-source project thumb-brake-3s
-(MIT, https://github.com/NBrangerF/thumb-brake-3s). ClipForge's hook pattern-card content
-is originally written for e-commerce short video.
