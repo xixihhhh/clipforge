@@ -6,8 +6,8 @@
  * 然后统一下载到 data/uploads 落 assets 表，被 composer 当普通 video/image/audio 片段消费。
  */
 
-/** 已接入的素材源 id */
-export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia";
+/** 已接入的素材源 id（local = 项目自带本地 B-roll 池，对标 the reference tool 的 a local source） */
+export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia" | "local";
 
 export type StockMediaType = "video" | "image" | "audio";
 export type StockOrientation = "portrait" | "landscape" | "square";
@@ -95,6 +95,13 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
     envKey: "PIXABAY_API_KEY",
     note: "免费 Key，视频+图片，带货实拍主力补充源",
   },
+  {
+    id: "local",
+    label: "本地素材",
+    keyless: true,
+    mediaTypes: ["video", "image"],
+    note: "用项目里上传的自拍/自有 B-roll 配画面，免网络免 Key（对标 the reference tool a local source）",
+  },
 ];
 
 /** 单次下载体积上限（80MB） */
@@ -177,8 +184,22 @@ export async function downloadStockFile(
   fileBaseName: string,
   mediaType?: StockMediaType
 ): Promise<DownloadResult> {
-  const { writeFile } = await import("fs/promises");
+  const { writeFile, copyFile, stat } = await import("fs/promises");
   const { join } = await import("path");
+
+  const safeBaseName = fileBaseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "file";
+
+  // 本地素材分支：url 是本地绝对路径 / file://（仅由 scanLocalMaterials 从项目素材池 readdir 构造，非用户输入），
+  // 直接复制而非走网络 fetch（fetch 不支持文件路径）。带体积上限，与网络下载一致。
+  if (url.startsWith("/") || url.startsWith("file://")) {
+    const srcPath = url.startsWith("file://") ? new URL(url).pathname : url;
+    const st = await stat(srcPath);
+    if (st.size > MAX_DOWNLOAD_BYTES) throw new Error(`素材体积 ${st.size} 超过上限 ${MAX_DOWNLOAD_BYTES}`);
+    const localExt = inferExtension(srcPath, null, mediaType);
+    const destPath = join(destDir, `${safeBaseName}.${localExt}`);
+    await copyFile(srcPath, destPath);
+    return { filePath: destPath, bytes: st.size };
+  }
 
   const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error(`素材下载失败 ${res.status}: ${url}`);
@@ -195,9 +216,8 @@ export async function downloadStockFile(
   }
 
   const ext = inferExtension(url, contentType, mediaType);
-  // 净化文件名：调用方可能把远程素材 id 拼进来，去掉路径分隔符/特殊字符防目录穿越
-  const safeBase = fileBaseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "file";
-  const filePath = join(destDir, `${safeBase}.${ext}`);
+  // safeBaseName 已在函数顶部净化（去路径分隔符/特殊字符，防目录穿越）
+  const filePath = join(destDir, `${safeBaseName}.${ext}`);
   await writeFile(filePath, buffer);
   return { filePath, bytes: buffer.byteLength };
 }

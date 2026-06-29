@@ -20,6 +20,7 @@ import { searchPexelsVideos, searchPexelsPhotos } from "./pexels";
 import { searchPixabayVideos, searchPixabayImages } from "./pixabay";
 import { searchOpenverseImages, searchOpenverseAudio } from "./openverse";
 import { searchWikimediaImages, searchWikimediaVideos, searchWikimediaAudio } from "./wikimedia";
+import { scanLocalMaterials } from "./local-stock";
 import { TtlCache } from "@/lib/ttl-cache";
 
 export interface StockSearchOptions {
@@ -30,6 +31,8 @@ export interface StockSearchOptions {
   orientation?: StockOrientation;
   minSec?: number;
   maxSec?: number;
+  /** 本地素材池目录（绝对路径）；设置后 local 源参与检索，否则跳过 */
+  localDir?: string;
 }
 
 /** 从 opts 或环境变量解析某源的 Key（keyless 源返回空串即可） */
@@ -82,6 +85,11 @@ export async function searchStock(
       if (mediaType === "image") return searchWikimediaImages(query, { perPage });
       return searchWikimediaVideos(query, { perPage });
 
+    case "local":
+      // 本地素材池（项目自带 B-roll）：无网络，扫 opts.localDir；未提供目录或请求音频则不参与
+      if (!opts.localDir || mediaType === "audio") return [];
+      return scanLocalMaterials(opts.localDir, query, { mediaType, perPage });
+
     default:
       return [];
   }
@@ -115,6 +123,7 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
 
   // 选出支持该 mediaType 的源（openverse 视频请求时也参与——它会回退图片）
   const usable = STOCK_SOURCES.filter((s) => {
+    if (s.id === "local" && !opts.localDir) return false; // 本地源仅在提供素材池目录时参与
     const supports = s.mediaTypes.includes(mediaType) || (s.id === "openverse" && mediaType === "video");
     if (!supports) return false;
     if (!isSourceAvailable(s, opts.apiKeys)) {
