@@ -245,6 +245,20 @@ async function cmdVoices() {
   return { ok: true, default: res.default, voices: res.voices ?? [] };
 }
 
+// Cover/thumbnail: render a cover image from the latest composed video with a bold title overlay
+async function cmdCover(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const title = String(flags.title || "").trim();
+  if (!title) throw new Error('--title 不能为空（如 --title "手冲咖啡 三步搞定"）');
+  const body = { title };
+  if (["center", "lower", "upper"].includes(flags.position)) body.position = flags.position;
+  if (flags.frame && Number.isFinite(Number(flags.frame))) body.frameAt = Number(flags.frame);
+  const res = await api(`/api/project/${projectId}/cover`, { method: "POST", body });
+  step(`封面已生成：${res.cover}`);
+  return { ok: true, projectId, cover: res.cover };
+}
+
 // Trending topics: fetch daily trending searches for a region and suggest what topic to produce next (then use create --topic)
 async function cmdTrends(flags) {
   const geo = typeof flags.geo === "string" ? flags.geo : "US";
@@ -302,6 +316,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge trends [--geo US]   拉热搜选题(不知道做什么时)
   clipforge list                列出项目
   clipforge voices              列出免费 Edge TTS 音色
+  clipforge cover --project <id> --title "手冲咖啡 三步搞定" [--position center|lower|upper]   生成封面图
   clipforge get --project <id>  查最新成片地址
   clipforge --help | --version
 
@@ -312,7 +327,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));

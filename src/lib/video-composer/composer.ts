@@ -15,7 +15,7 @@ import { CAPTION_SAFE_BOTTOM_RATIO, CAPTION_SAFE_BOTTOM_RATIO_NOCARD } from "./s
  * causing Chinese subtitles to render as boxes/blanks.
  * Prefers the project's bundled font (deployment-stable), then falls back to common macOS/Linux fonts.
  */
-function resolveChineseFontFile(): string | undefined {
+export function resolveChineseFontFile(): string | undefined {
   const candidates = [
     // bundled project font (recommended: place a CJK ttf in public/fonts for consistent deployment)
     join(process.cwd(), "public", "fonts", "subtitle.ttf"),
