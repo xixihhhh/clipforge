@@ -21,6 +21,8 @@ import { searchPixabayVideos, searchPixabayImages } from "./pixabay";
 import { searchOpenverseImages, searchOpenverseAudio } from "./openverse";
 import { searchWikimediaImages, searchWikimediaVideos, searchWikimediaAudio } from "./wikimedia";
 import { scanLocalMaterials } from "./local-stock";
+import { searchNasaVideos, searchNasaImages } from "./nasa";
+import { searchArchiveVideos, searchArchiveImages } from "./archive";
 import { TtlCache } from "@/lib/ttl-cache";
 
 export interface StockSearchOptions {
@@ -90,6 +92,16 @@ export async function searchStock(
       if (!opts.localDir || mediaType === "audio") return [];
       return scanLocalMaterials(opts.localDir, query, { mediaType, perPage });
 
+    case "nasa":
+      // NASA 公共领域影像（两步取材），无音频
+      if (mediaType === "audio") return [];
+      return mediaType === "image" ? searchNasaImages(query, { perPage }) : searchNasaVideos(query, { perPage });
+
+    case "archive":
+      // Internet Archive 公共领域影像（两步取材，强制 publicdomain），无音频
+      if (mediaType === "audio") return [];
+      return mediaType === "image" ? searchArchiveImages(query, { perPage }) : searchArchiveVideos(query, { perPage });
+
     default:
       return [];
   }
@@ -124,6 +136,7 @@ export async function searchAllStock(query: string, opts: StockSearchOptions = {
   // 选出支持该 mediaType 的源（openverse 视频请求时也参与——它会回退图片）
   const usable = STOCK_SOURCES.filter((s) => {
     if (s.id === "local" && !opts.localDir) return false; // 本地源仅在提供素材池目录时参与
+    if (s.aggregate === false) return false; // 档案源（NASA/Archive）不进默认聚合，仅显式选用
     const supports = s.mediaTypes.includes(mediaType) || (s.id === "openverse" && mediaType === "video");
     if (!supports) return false;
     if (!isSourceAvailable(s, opts.apiKeys)) {

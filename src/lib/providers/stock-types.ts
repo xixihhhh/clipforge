@@ -6,8 +6,8 @@
  * 然后统一下载到 data/uploads 落 assets 表，被 composer 当普通 video/image/audio 片段消费。
  */
 
-/** 已接入的素材源 id（local = 项目自带本地 B-roll 池：用户上传的自有素材） */
-export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia" | "local";
+/** 已接入的素材源 id（local = 项目自带本地 B-roll 池；nasa/archive = 公共领域档案影像，显式选用） */
+export type StockSourceId = "pexels" | "pixabay" | "openverse" | "wikimedia" | "local" | "nasa" | "archive";
 
 export type StockMediaType = "video" | "image" | "audio";
 export type StockOrientation = "portrait" | "landscape" | "square";
@@ -56,6 +56,8 @@ export interface StockSourceMeta {
   envKey?: string;
   /** 一句话说明 */
   note?: string;
+  /** 是否参与默认聚合检索（source="all"）；默认 true。档案源（两步取材、题材偏纪录/科学）设 false，仅显式选用以免拖慢自动配画面 */
+  aggregate?: boolean;
 }
 
 /** 已接入素材源注册表（前端据此渲染源选择，keyless 排前） */
@@ -101,6 +103,22 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
     keyless: true,
     mediaTypes: ["video", "image"],
     note: "用项目里上传的自拍/自有 B-roll 配画面，免网络免 Key",
+  },
+  {
+    id: "nasa",
+    label: "NASA 影像库",
+    keyless: true,
+    mediaTypes: ["video", "image"],
+    aggregate: false,
+    note: "免 Key，公共领域地球/太空/科学实拍（纪录/科普题材首选），显式选用",
+  },
+  {
+    id: "archive",
+    label: "Internet Archive",
+    keyless: true,
+    mediaTypes: ["video", "image"],
+    aggregate: false,
+    note: "免 Key，公共领域历史影片/纪录素材（强制 publicdomain 授权可商用），显式选用",
   },
 ];
 
