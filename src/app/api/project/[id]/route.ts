@@ -18,6 +18,8 @@ const PATCHABLE_FIELDS = [
   "productDescription",
   "productImages",
   "productAnalysis",
+  "shopUrl",
+  "affiliateCode",
   "productId",
   "brandId",
   "templateId",

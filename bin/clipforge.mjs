@@ -259,6 +259,20 @@ async function cmdCover(flags) {
   return { ok: true, projectId, cover: res.cover };
 }
 
+// Shop QR: generate a scannable "scan to buy" QR for the project's shop link (UTM-tagged)
+async function cmdQr(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const body = {};
+  if (typeof flags.url === "string" && flags.url.trim()) body.url = flags.url.trim();
+  if (typeof flags.platform === "string" && flags.platform.trim()) body.platform = flags.platform.trim();
+  if (flags.size && Number.isFinite(Number(flags.size))) body.size = Number(flags.size);
+  const res = await api(`/api/project/${projectId}/shop-qr`, { method: "POST", body });
+  step(`商品二维码已生成：${res.qr}`);
+  if (res.shopLink) step(`追踪链接：${res.shopLink}`);
+  return { ok: true, projectId, qr: res.qr, shopLink: res.shopLink };
+}
+
 // GIF preview: turn a slice of the latest composed video into a shareable looping GIF
 async function cmdPreview(flags) {
   const projectId = String(flags.project || "").trim();
@@ -344,6 +358,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge list                列出项目
   clipforge voices              列出免费 Edge TTS 音色
   clipforge cover --project <id> --title "手冲咖啡 三步搞定" [--position center|lower|upper]   生成封面图
+  clipforge qr --project <id> [--platform douyin --url <shopUrl> --size 512]   生成商品「扫码购买」二维码(UTM追踪)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
   clipforge carousel --project <id> [--theme night|warm|mint|mono|rose]   生成小红书图文卡片(标题+逐条要点)
   clipforge get --project <id>  查最新成片地址
@@ -356,7 +371,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));

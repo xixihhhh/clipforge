@@ -330,6 +330,21 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_shop_qr",
+    description:
+      "为某项目的商品链接生成「扫码购买」二维码 PNG（可放片尾引导转化）。编码的链接自动打 UTM 追踪参数（utm_source=平台、campaign=clipforge）。项目需已有商品链接（ingest 商品链接会自动保留），或用 url 传入。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+        url: { type: "string", description: "商品链接（不填则用项目已存的 shopUrl）" },
+        platform: { type: "string", description: "投放平台（作为 utm_source，如 douyin/tiktok/xiaohongshu）" },
+        size: { type: "number", description: "二维码边长像素，默认 512" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "clipforge_preview_gif",
     description:
       "从某项目最新成片切一小段转成循环 GIF 预览（分享 / 嵌入 / 列表 hover 用）。需先合成过视频。不需要 LLM。",
@@ -598,6 +613,18 @@ async function handleCover(args) {
   return ok({ ok: true, projectId, cover: res.cover ? `${BASE_URL}${res.cover}` : null });
 }
 
+// Shop "scan to buy" QR from the project's shop link (UTM-tagged)
+async function handleShopQr(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const body = {};
+  if (typeof args.url === "string" && args.url.trim()) body.url = args.url.trim();
+  if (typeof args.platform === "string" && args.platform.trim()) body.platform = args.platform.trim();
+  if (Number.isFinite(args.size)) body.size = args.size;
+  const res = await api(`/api/project/${projectId}/shop-qr`, { method: "POST", body });
+  return ok({ ok: true, projectId, qr: res.qr ? `${BASE_URL}${res.qr}` : null, shopLink: res.shopLink ?? null });
+}
+
 // GIF preview from the latest composed video
 async function handlePreviewGif(args) {
   const projectId = String(args.projectId || "").trim();
@@ -645,6 +672,7 @@ const HANDLERS = {
   clipforge_import_script: handleImportScript,
   clipforge_dub: handleDub,
   clipforge_cover: handleCover,
+  clipforge_shop_qr: handleShopQr,
   clipforge_preview_gif: handlePreviewGif,
   clipforge_export_subtitle: handleExportSubtitle,
   clipforge_carousel: handleCarousel,

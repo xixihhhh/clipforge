@@ -13,6 +13,11 @@ export const projects = sqliteTable("projects", {
   productCategory: text("product_category"),
   productDescription: text("product_description"),
   productPrice: text("product_price"), // Product price display text (e.g. "¥39.9" / "£63.00", mainly sourced from link ingest, used for product-card overlays)
+  // Shop / affiliate link (2026 commerce monetization): the storefront URL the video drives buyers to,
+  // and an optional affiliate/partner code for commission tracking. Preserved from product-link ingest;
+  // flows into publish copy (UTM-tagged link) and an end-card QR code.
+  shopUrl: text("shop_url"),
+  affiliateCode: text("affiliate_code"),
   productImages: text("product_images", { mode: "json" }).$type<string[]>().default([]),
   productAnalysis: text("product_analysis"), // LLM visual analysis result
   productId: text("product_id"), // Linked product library entry (optional; can also be filled in directly)

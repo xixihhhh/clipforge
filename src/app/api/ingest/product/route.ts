@@ -87,6 +87,8 @@ export async function POST(req: NextRequest) {
       productName: name,
       productDescription: product.description ?? null,
       productPrice: product.priceText ?? null,
+      // Preserve the storefront link so it can flow into publish copy (UTM-tagged) and an end-card QR code
+      shopUrl: url,
       productImages: [],
     })
     .returning();

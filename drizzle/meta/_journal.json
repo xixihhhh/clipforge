@@ -43,6 +43,13 @@
       "when": 1782730746949,
       "tag": "0005_fluffy_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782919292496,
+      "tag": "0006_add_shop_affiliate",
+      "breakpoints": true
     }
   ]
 }

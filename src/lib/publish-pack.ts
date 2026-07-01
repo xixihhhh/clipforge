@@ -4,10 +4,14 @@
  * Pure function, deterministic (same input → same output), unit-testable; users with an LLM still go through /api/llm/publish for higher-quality copy.
  */
 
+import { buildShopLink } from "@/lib/shop-link";
+
 export interface PublishPack {
   titles: string[];
   hashtags: string[]; // already prefixed with # and deduplicated
   caption: string;
+  /** UTM-tagged storefront link (only present when a shopUrl was provided) — creators paste it where the platform allows (bio / cart / description) */
+  shopLink?: string;
 }
 
 export interface PublishPackInput {
@@ -16,6 +20,8 @@ export interface PublishPackInput {
   sellingPoints?: string; // selling points / description, may be multiple sentences
   platform?: string; // douyin/kuaishou/xiaohongshu/tiktok
   locale?: "zh" | "en"; // copy language, defaults to zh; en uses English titles/hashtags/CTA for overseas markets (avoids delivering Chinese copy to English-speaking users)
+  shopUrl?: string; // storefront link to drive buyers to (from ingest or set manually); UTM-tagged into shopLink
+  affiliateCode?: string; // optional affiliate/partner code for commission tracking
 }
 
 // Category trending hashtags (tuned for Douyin/Kuaishou/Xiaohongshu commerce context)
@@ -179,5 +185,8 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
   const capMax = en ? 130 : 40;
   const caption = clip(lead, capMax - Array.from(cta).length) + cta;
 
-  return { titles, hashtags, caption };
+  // UTM-tagged storefront link (only when a shopUrl was supplied) so the creator can attribute traffic per platform
+  const shopLink = buildShopLink(input.shopUrl, { platform, affiliateCode: input.affiliateCode });
+
+  return { titles, hashtags, caption, ...(shopLink && { shopLink }) };
 }
