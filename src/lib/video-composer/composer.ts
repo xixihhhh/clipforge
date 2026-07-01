@@ -489,17 +489,27 @@ export function buildComposeCommand(config: ComposeConfig): string {
       .map((o) => {
         const s = styleOf(o.style);
         const bb = Math.round(s.size * 0.4);
-        return buildDrawtext({
-          fontFile: ovFont || undefined,
-          text: o.text,
-          fontSize: s.size,
-          fontColor: s.color,
-          borderW: 2,
-          box: { color: s.box, borderW: bb },
-          x: "(w-text_w)/2",
-          y: s.y,
-          enable: `enable='between(t,${o.startTime},${o.endTime})'`,
-        });
+        // Wrap long tag text to the frame width and render each line as its own centered boxed
+        // drawtext, stacked downward from the style's base y — these are large-font tags, so a long
+        // selling-point/title string would otherwise overflow the frame edges (short tags stay a single
+        // line, rendered identically to before). lineH clears the chunky per-line box padding.
+        const lines = wrapCaption(o.text, s.size, width).split("\n");
+        const lineH = Math.round(s.size * 1.9);
+        return lines
+          .map((line, i) =>
+            buildDrawtext({
+              fontFile: ovFont || undefined,
+              text: line || " ",
+              fontSize: s.size,
+              fontColor: s.color,
+              borderW: 2,
+              box: { color: s.box, borderW: bb },
+              x: "(w-text_w)/2",
+              y: `${s.y}+${i * lineH}`,
+              enable: `enable='between(t,${o.startTime},${o.endTime})'`,
+            }),
+          )
+          .join(",");
       })
       .join(",");
     const ovStream = "ov_out";

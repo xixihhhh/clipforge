@@ -323,6 +323,21 @@ describe("buildComposeCommand", () => {
     expect(cmd).not.toContain("30\\%");
   });
 
+  it("长标签文本自动换行为多行居中（避免大字号贴片横向溢出画面）", () => {
+    const short: ComposeConfig = {
+      ...baseConfig,
+      overlays: [{ text: "好物", style: "title", startTime: 0, endTime: 3 }],
+    };
+    const long: ComposeConfig = {
+      ...baseConfig,
+      overlays: [{ text: "同事以为我花了三千块做的脸其实只用了这一瓶精华", style: "title", startTime: 0, endTime: 3 }],
+    };
+    const shortLines = (buildComposeCommand(short).match(/drawtext=/g) || []).length;
+    const longLines = (buildComposeCommand(long).match(/drawtext=/g) || []).length;
+    // everything else identical → the extra drawtext entries are the wrapped lines of the long tag
+    expect(longLines).toBeGreaterThan(shortLines);
+  });
+
   it("文件路径含特殊字符时正确转义", () => {
     const config: ComposeConfig = {
       ...baseConfig,
