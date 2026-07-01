@@ -239,6 +239,20 @@ export const PLATFORM_SEO_DIRECTIVES: Record<string, string> = {
 - 多分享使用体验和对比，少说"赶紧买"
 - 封面要精致，标题用关键词（品牌名+品类+核心卖点）`,
 
+  shipinhao: `
+【视频号（微信）算法优化策略】
+社交推荐（视频号最大特点）：
+- 视频号靠"朋友点赞/在看"进入社交推荐流，开头 3 秒要能让人愿意转发给朋友、家人群
+- 内容偏信任感与实用价值，避免硬广腔；真实、接地气、可信度高的更易被转发
+- 完播 + 转发（转发权重高于点赞）是核心信号
+
+生态联动与转化：
+- 可引导关注视频号、跳转关联公众号看长图文/领券
+- 直播预约 + 视频号小店挂车承接转化；口播自然引导"点下方小店"
+- 中老年与下沉人群占比高，语速可稍慢、卖点讲清楚、价格与实惠说透
+
+合规：字幕全程在屏；AI 生成内容打标识，避免夸大与未经证实的功效宣称`,
+
   tiktok: `
 【TikTok Shop 算法优化策略】
 官方推荐三段式结构（更易进推荐、提转化）：
@@ -289,6 +303,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   douyin: "抖音",
   kuaishou: "快手",
   xiaohongshu: "小红书",
+  shipinhao: "视频号",
   tiktok: "TikTok",
   reels: "Instagram Reels",
   shorts: "YouTube Shorts",

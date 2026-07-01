@@ -43,6 +43,7 @@ const PLATFORM_TAGS: Record<string, string[]> = {
   douyin: ["抖音好物", "抖音电商"],
   kuaishou: ["快手好物", "快手电商"],
   xiaohongshu: ["小红书", "好物推荐"],
+  shipinhao: ["视频号", "视频号好物", "视频号小店"],
   tiktok: ["TikTokMadeMeBuyIt", "TikTokShop"],
   reels: ["Reels", "InstagramReels", "ReelsFinds"],
   shorts: ["Shorts", "YouTubeShorts"],

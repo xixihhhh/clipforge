@@ -48,6 +48,11 @@ describe("buildPublishPack（免 Key 发布文案包）", () => {
     expect(p.hashtags).toContain("#抖音好物");
   });
 
+  it("视频号话题追加（域内平台）", () => {
+    const p = buildPublishPack({ productName: "拖把", category: "home", platform: "shipinhao" });
+    expect(p.hashtags).toContain("#视频号");
+  });
+
   it("海外平台话题追加（Reels / Shorts）", () => {
     const r = buildPublishPack({ productName: "Serum", category: "beauty", platform: "reels", locale: "en" });
     expect(r.hashtags).toContain("#InstagramReels");

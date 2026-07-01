@@ -2,8 +2,12 @@ import { describe, it, expect } from "vitest";
 import { PLATFORM_SPECS, getPlatformSpec } from "@/lib/platform-specs";
 
 describe("platform-specs（多平台导出规格）", () => {
-  it("含国内外六个带货平台（含 TikTok / Instagram Reels / YouTube Shorts）", () => {
-    expect(Object.keys(PLATFORM_SPECS).sort()).toEqual(["douyin", "kuaishou", "reels", "shorts", "tiktok", "xiaohongshu"]);
+  it("含国内外带货平台（域内含视频号；海外含 TikTok / Reels / Shorts）", () => {
+    expect(Object.keys(PLATFORM_SPECS).sort()).toEqual(["douyin", "kuaishou", "reels", "shipinhao", "shorts", "tiktok", "xiaohongshu"]);
+  });
+
+  it("视频号 = 1080x1920 竖屏 9:16（微信生态域内平台）", () => {
+    expect(getPlatformSpec("shipinhao")).toEqual({ name: "视频号", w: 1080, h: 1920, ratio: "9:16" });
   });
 
   it("TikTok Shop = 1080x1920 竖屏 9:16", () => {

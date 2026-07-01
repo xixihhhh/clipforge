@@ -16,6 +16,7 @@ export const PLATFORM_SPECS: Record<string, PlatformSpec> = {
   douyin: { name: "抖音", w: 1080, h: 1920, ratio: "9:16" },
   kuaishou: { name: "快手", w: 1080, h: 1920, ratio: "9:16" },
   xiaohongshu: { name: "小红书", w: 1080, h: 1440, ratio: "3:4" },
+  shipinhao: { name: "视频号", w: 1080, h: 1920, ratio: "9:16" },
   tiktok: { name: "TikTok Shop", w: 1080, h: 1920, ratio: "9:16" },
   reels: { name: "Instagram Reels", w: 1080, h: 1920, ratio: "9:16" },
   shorts: { name: "YouTube Shorts", w: 1080, h: 1920, ratio: "9:16" },
