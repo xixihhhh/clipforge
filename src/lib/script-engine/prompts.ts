@@ -256,6 +256,32 @@ export const PLATFORM_SEO_DIRECTIVES: Record<string, string> = {
 - 节奏更快：每 2-3 秒切一个信息点，字幕全程在屏（多为静音观看）
 - 价格/优惠用画面贴片强化，别只靠口播
 - 面向海外受众时口播可用英文/目标语言；AI 生成内容需打标识，避免夸大与未经证实的功效宣称`,
+
+  reels: `
+【Instagram Reels 算法优化策略】
+分发与完播：
+- 竖屏满屏 9:16，前 2 秒强钩子；Reels 靠 Explore/推荐分发给非粉丝，开场要能拦住陌生人
+- 时长偏短更易复看（loop），完播 + 复看是核心信号
+- 可借势 trending audio 提升分发（注意商用授权；带货口播为主时音乐压低做背景）
+
+版式与互动：
+- 文字避开底部 caption 区与右侧按钮区（点赞/评论/分享/头像），别被 UI 挡住
+- 引导 Save（收藏）与 Share（转发）——Instagram 对这两个动作权重高
+- 引导点主页链接（link in bio）承接转化，Reels 内不可直接挂链
+
+合规：字幕全程在屏（静音观看为主）；AI 生成内容打标识，避免夸大与未证实功效宣称`,
+
+  shorts: `
+【YouTube Shorts 算法优化策略】
+留存与复看：
+- 竖屏满屏 9:16，前 3 秒留人；结尾能自然接回开头（loop 友好）提升重复播放
+- YouTube 兼具搜索属性：标题/口播里自然带核心关键词，利于被搜到与推荐
+
+涨粉与互动：
+- Shorts 涨粉是核心目标，片尾自然引导 Subscribe（关注）
+- 引导评论互动；标 #Shorts 帮助平台识别为短视频
+
+版式与合规：字幕全程在屏（静音观看）；价格/优惠用画面贴片强化；AI 生成内容打标识，避免夸大与未证实功效宣称`,
 };
 
 /** Platform code → human-readable label used in the prompt's "target platform" line. */

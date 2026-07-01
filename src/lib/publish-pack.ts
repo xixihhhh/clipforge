@@ -44,6 +44,8 @@ const PLATFORM_TAGS: Record<string, string[]> = {
   kuaishou: ["快手好物", "快手电商"],
   xiaohongshu: ["小红书", "好物推荐"],
   tiktok: ["TikTokMadeMeBuyIt", "TikTokShop"],
+  reels: ["Reels", "InstagramReels", "ReelsFinds"],
+  shorts: ["Shorts", "YouTubeShorts"],
 };
 
 /** Extract the first selling point: split on CJK/ASCII punctuation and newlines, trim whitespace, clip to max length (English points are longer, so max is tunable) */

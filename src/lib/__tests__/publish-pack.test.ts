@@ -48,6 +48,13 @@ describe("buildPublishPack（免 Key 发布文案包）", () => {
     expect(p.hashtags).toContain("#抖音好物");
   });
 
+  it("海外平台话题追加（Reels / Shorts）", () => {
+    const r = buildPublishPack({ productName: "Serum", category: "beauty", platform: "reels", locale: "en" });
+    expect(r.hashtags).toContain("#InstagramReels");
+    const s = buildPublishPack({ productName: "Serum", category: "beauty", platform: "shorts", locale: "en" });
+    expect(s.hashtags).toContain("#YouTubeShorts");
+  });
+
   it("未知品类回退到通用话题", () => {
     const p = buildPublishPack({ productName: "x", category: "不存在的品类" });
     expect(p.hashtags).toContain("#好物推荐");
