@@ -42,6 +42,7 @@ export const exportPage: NamespaceMessages = {
     publishHashtagsLabel: "话题标签",
     publishCopyAll: "复制全部",
     publishCaptionLabel: "种草文案",
+    publishShopLinkLabel: "带追踪的商品链接（点击复制）",
     // 多平台导出
     multiExportTitle: "多平台导出",
     multiExportDesc: "一键重编码为各平台比例（模糊填充，不裁掉字幕/贴片）",
@@ -121,6 +122,7 @@ export const exportPage: NamespaceMessages = {
     publishHashtagsLabel: "Hashtags",
     publishCopyAll: "Copy all",
     publishCaptionLabel: "Caption",
+    publishShopLinkLabel: "Trackable shop link (click to copy)",
     multiExportTitle: "Multi-platform export",
     multiExportDesc: "Re-encode to each platform's aspect ratio in one click (blurred fill, no cropping of subtitles/overlays)",
     ratioLabel: "Ratio: {ratio}",

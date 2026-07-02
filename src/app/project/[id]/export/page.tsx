@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { buildPublishPack } from "@/lib/publish-pack";
+import { buildShopLink } from "@/lib/shop-link";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { PerformanceFeedback } from "@/components/performance-feedback";
@@ -66,8 +67,8 @@ export default function ExportPage() {
   const [fileSize, setFileSize] = useState<string>("");
   // publish copy
   const { llm } = useSettingsStore();
-  const [productMeta, setProductMeta] = useState<{ productName: string; category: string; description: string } | null>(null);
-  const [publish, setPublish] = useState<{ loading: boolean; titles: string[]; hashtags: string[]; caption: string; error?: string; template?: boolean }>({ loading: false, titles: [], hashtags: [], caption: "" });
+  const [productMeta, setProductMeta] = useState<{ productName: string; category: string; description: string; shopUrl?: string; affiliateCode?: string } | null>(null);
+  const [publish, setPublish] = useState<{ loading: boolean; titles: string[]; hashtags: string[]; caption: string; shopLink?: string; error?: string; template?: boolean }>({ loading: false, titles: [], hashtags: [], caption: "" });
   // A/B variant generation (re-render with different subtitle styles and BGM, one each, for ad comparison)
   const [abVariants, setAbVariants] = useState<{ key: string; labelKey: string; status: "running" | "done" | "error"; url?: string }[]>([]);
   const [abRunning, setAbRunning] = useState(false);
@@ -123,6 +124,9 @@ export default function ExportPage() {
   };
 
   const generatePublish = async () => {
+    // UTM-tagged shop link (only when the project has a shopUrl) — surfaced alongside the copy so the
+    // creator can paste a trackable link wherever the platform allows (bio / cart / description)
+    const shopLink = buildShopLink(productMeta?.shopUrl, { affiliateCode: productMeta?.affiliateCode });
     // LLM not configured: fall back to the key-free template copy pack so users can still "copy and publish" (with LLM configured, the AI path below produces better copy)
     if (!llm.apiKey) {
       const pack = buildPublishPack({
@@ -131,7 +135,7 @@ export default function ExportPage() {
         sellingPoints: productMeta?.description,
         locale: locale === "en" ? "en" : "zh", // follow the UI language: English users receive English copy
       });
-      setPublish({ loading: false, titles: pack.titles, hashtags: pack.hashtags, caption: pack.caption, template: true });
+      setPublish({ loading: false, titles: pack.titles, hashtags: pack.hashtags, caption: pack.caption, template: true, ...(shopLink && { shopLink }) });
       return;
     }
     setPublish((p) => ({ ...p, loading: true, error: undefined, template: false }));
@@ -149,7 +153,7 @@ export default function ExportPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("publishFailed"));
-      setPublish({ loading: false, titles: data.titles ?? [], hashtags: data.hashtags ?? [], caption: data.caption ?? "" });
+      setPublish({ loading: false, titles: data.titles ?? [], hashtags: data.hashtags ?? [], caption: data.caption ?? "", ...(shopLink && { shopLink }) });
     } catch (e) {
       setPublish((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : t("publishFailed") }));
     }
@@ -173,6 +177,8 @@ export default function ExportPage() {
               productName: proj.productName ?? proj.name ?? "",
               category: proj.productCategory ?? "",
               description: proj.productDescription ?? "",
+              shopUrl: proj.shopUrl ?? undefined,
+              affiliateCode: proj.affiliateCode ?? undefined,
             });
           }
         }
@@ -461,6 +467,14 @@ export default function ExportPage() {
                     <p className="text-xs text-muted-foreground mb-1.5">{t("publishCaptionLabel")}</p>
                     <button onClick={() => copyText(publish.caption)} className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
                       {publish.caption}
+                    </button>
+                  </div>
+                )}
+                {publish.shopLink && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">{t("publishShopLinkLabel")}</p>
+                    <button onClick={() => copyText(publish.shopLink!)} className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors break-all">
+                      {publish.shopLink}
                     </button>
                   </div>
                 )}
