@@ -154,12 +154,19 @@ function requireLlm() {
   }
 }
 
-/** Poll for compose result until done/failed (compose is async: it returns compositionId immediately and runs in the background) */
-async function pollCompose(projectId, { timeoutMs = 300000, intervalMs = 2500 } = {}) {
+/**
+ * Poll for compose result until done/failed (compose is async: it returns compositionId immediately and runs in the background).
+ * Pass the compositionId returned by POST to poll that exact run — polling "latest" is racy when
+ * concurrent composes (retries, A/B variants) exist. No-id fallback kept for older servers whose
+ * GET does not support ?compositionId=. Client deadline (660s) intentionally exceeds the server-side
+ * render timeout (600s, composer COMPOSE_TIMEOUT_MS) so slow-but-successful renders aren't misreported.
+ */
+async function pollCompose(projectId, { compositionId, timeoutMs = 660000, intervalMs = 2500 } = {}) {
   const deadline = Date.now() + timeoutMs;
+  const query = compositionId ? `?compositionId=${encodeURIComponent(compositionId)}` : "";
   // Note: loops within the given time budget; Date.now() is used only for timeout control, not randomness
   for (;;) {
-    const { composition } = await api(`/api/project/${projectId}/compose`);
+    const { composition } = await api(`/api/project/${projectId}/compose${query}`);
     const status = composition?.status;
     if (status === "done") return composition;
     if (status === "failed") throw new Error("合成失败（FFmpeg/TTS 出错），请检查素材与脚本");
@@ -448,8 +455,9 @@ async function handleCreateVideo(args) {
   }
   // actual voice sent to the backend (including auto-detection above); do NOT call composeBody(args) again — that would produce a fresh body without detection, reporting the wrong voice
   const usedVoice = body.freeTts.voice || "zh-CN-XiaoxiaoNeural";
-  await api(`/api/project/${projectId}/compose`, { method: "POST", body });
-  const composition = await pollCompose(projectId);
+  // POST returns the compositionId of this run — poll that exact one, not "latest"
+  const { compositionId } = await api(`/api/project/${projectId}/compose`, { method: "POST", body });
+  const composition = await pollCompose(projectId, { compositionId });
 
   return ok({
     ok: true,
@@ -542,8 +550,9 @@ async function handleCompose(args) {
     const v = proj && proj.topic ? defaultVoiceForTopic(String(proj.topic)) : null;
     if (v) body.freeTts.voice = v;
   }
-  await api(`/api/project/${projectId}/compose`, { method: "POST", body });
-  const composition = await pollCompose(projectId);
+  // POST returns the compositionId of this run — poll that exact one, not "latest"
+  const { compositionId } = await api(`/api/project/${projectId}/compose`, { method: "POST", body });
+  const composition = await pollCompose(projectId, { compositionId });
   return ok({ ok: true, projectId, voice: body.freeTts.voice || "zh-CN-XiaoxiaoNeural", videoUrl: absVideoUrl(composition), status: composition.status });
 }
 

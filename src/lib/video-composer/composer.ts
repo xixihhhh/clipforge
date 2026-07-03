@@ -6,6 +6,7 @@ import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
 import { MOTIONS, DEFAULT_MOTION } from "./motions";
 import { safeEncodeParams } from "@/lib/compose-presets";
+import { createLimiter } from "@/lib/concurrency";
 import { buildAigcMetadataArgs } from "@/lib/compliance-metadata";
 import { CAPTION_SAFE_BOTTOM_RATIO, CAPTION_SAFE_BOTTOM_RATIO_NOCARD } from "./safe-zone";
 
@@ -591,6 +592,18 @@ export function buildComposeCommand(config: ComposeConfig): string {
 /** maximum composition duration in milliseconds; the process is killed if exceeded to prevent a stuck render monopolising the machine indefinitely */
 export const COMPOSE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Resolve the global ffmpeg render cap from COMPOSE_MAX_CONCURRENCY (default 2, clamped 1-8); exported for testability */
+export function resolveComposeMaxConcurrency(raw = process.env.COMPOSE_MAX_CONCURRENCY): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 2;
+  return Math.min(8, Math.max(1, Math.floor(n)));
+}
+
+// Module-level render gate: N concurrent compose requests used to spawn N parallel ffmpeg
+// processes (each up to 10 min), starving CPU so every render slowed down and collectively
+// timed out. Excess renders now queue in FIFO order instead of stampeding.
+const composeLimiter = createLimiter(resolveComposeMaxConcurrency());
+
 /** Classify low-level ffmpeg composition errors into actionable messages (pure function, unit-testable); returns null for unknown error types (to be rethrown as-is) */
 export function composeErrorMessage(e: { killed?: boolean; signal?: string; stderr?: string; message?: string }): string | null {
   if (e.killed || e.signal === "SIGTERM") return "视频合成超时（已超过 10 分钟）——可能分镜过多或机器繁忙，请减少分镜或降到「快速」画质重试";
@@ -611,8 +624,10 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
   const execAsync = promisify(exec);
 
   try {
+    // Only the expensive ffmpeg exec goes through the gate (cheap setup above runs unguarded);
+    // exec's timeout starts inside the limited fn, so time spent queueing never counts against it.
     // apply timeout (sends SIGTERM if exceeded); disk-full / timeout errors are mapped to readable messages
-    await execAsync(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS });
+    await composeLimiter(() => execAsync(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS }));
   } catch (e) {
     const friendly = composeErrorMessage(e as { killed?: boolean; signal?: string; stderr?: string; message?: string });
     if (friendly) throw new Error(friendly);

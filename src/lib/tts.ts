@@ -13,6 +13,7 @@
 
 import type { TTSProvider } from "./tts-presets";
 import { CircuitBreaker } from "@/lib/circuit-breaker";
+import { ttsCacheKey, readTtsCache, writeTtsCache } from "@/lib/tts-cache";
 
 export interface TTSConfig {
   /** Platform; defaults to "openai" */
@@ -48,6 +49,22 @@ export async function generateSpeech(text: string, config: TTSConfig): Promise<B
   const clean = (text || "").trim();
   if (!clean) throw new Error("配音文本为空");
   const provider = config.provider || "openai";
+  // Content-addressed cache: identical text + voice params reuse the previously synthesized
+  // audio, so a re-compose (e.g. after a BGM tweak) doesn't re-bill the paid TTS provider.
+  // baseUrl is part of the identity — the same model/voice names on different endpoints
+  // (OpenAI vs SiliconFlow vs Ark…) are different engines producing different audio.
+  // apiKey/groupId are deliberately excluded: they select the account, not the sound.
+  // Checked before the circuit breaker so cached audio still works while the breaker is open.
+  const cacheKey = ttsCacheKey({
+    provider,
+    baseUrl: config.baseUrl,
+    model: config.model,
+    voice: config.voice,
+    speed: config.speed,
+    text: clean,
+  });
+  const cached = await readTtsCache(cacheKey);
+  if (cached) return cached;
   const breaker = ttsBreaker(provider);
   if (breaker.isOpen()) {
     throw new Error(`配音服务(${provider})连续失败已暂时熔断——请检查对应平台 Key/服务，约 30 秒后自动重试`);
@@ -55,6 +72,8 @@ export async function generateSpeech(text: string, config: TTSConfig): Promise<B
   try {
     const buf = await dispatchTTS(clean, config);
     breaker.recordSuccess();
+    // Write-through on success only (failures are never cached); cache errors degrade silently
+    await writeTtsCache(cacheKey, buf);
     return buf;
   } catch (e) {
     breaker.recordFailure();

@@ -30,6 +30,10 @@ if (process.env.NEXT_PHASE !== "phase-production-build") {
 }
 // Enable foreign-key constraints (a per-connection pragma — does not write to the DB file or contend on locks, safe during build)
 sqlite.pragma("foreign_keys = ON");
+// Wait up to 5s on a locked database instead of failing instantly with SQLITE_BUSY —
+// a second process (CLI/MCP alongside the web server) touching the DB would otherwise error immediately.
+// Per-connection pragma, safe during build (same as foreign_keys).
+sqlite.pragma("busy_timeout = 5000");
 
 // Create the Drizzle ORM instance with the schema bound for relational queries
 export const db = drizzle(sqlite, { schema });
@@ -46,6 +50,26 @@ if (process.env.NEXT_PHASE !== "phase-production-build") {
     }
   } catch (err) {
     console.error("Database migration failed:", err);
+  }
+
+  // Crash-recovery sweep: compose jobs run as in-memory fire-and-forget tasks, so if the
+  // process dies mid-render the composition row stays 'composing'/'pending' forever — the web
+  // spinner never stops and CLI/MCP pollers hang until their own timeout. On startup, mark
+  // rows stuck in a non-terminal status for over 15 minutes as 'failed' so the UI can recover.
+  // created_at is stored as unix-epoch SECONDS (drizzle integer { mode: "timestamp" }).
+  // Failure here must never break startup (e.g. fresh DB where migration hasn't created the table).
+  try {
+    const staleCutoff = Math.floor(Date.now() / 1000) - 15 * 60;
+    const swept = sqlite
+      .prepare(
+        "UPDATE compositions SET status = 'failed' WHERE status IN ('composing', 'pending') AND created_at < ?"
+      )
+      .run(staleCutoff);
+    if (swept.changes > 0) {
+      console.warn(`Recovered ${swept.changes} stale composition(s) stuck in composing/pending → marked failed`);
+    }
+  } catch (err) {
+    console.warn("Stale composition sweep failed (non-fatal):", err);
   }
 }
 

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { apiError } from "@/lib/api-error";
-import { readFile, stat } from "fs/promises";
+import { parseRangeHeader } from "@/lib/http-range";
+import { stat } from "fs/promises";
 import { join, normalize, sep } from "path";
-import { existsSync } from "fs";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
 
-// File server for composed output (video) — serves finished clips under data/output for playback and download
+// File server for composed output (video) — serves finished clips under data/output for playback and download.
+// Streams from disk (no whole-file buffering) and supports single-range HTTP Range requests (206),
+// so <video> seeking and iOS Safari playback work without re-downloading the entire file.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -25,7 +29,12 @@ export async function GET(
     return apiError(req, "文件不存在", "File not found", 404);
   }
 
-  const buffer = await readFile(filePath);
+  const fileStat = await stat(filePath);
+  if (!fileStat.isFile()) {
+    return apiError(req, "文件不存在", "File not found", 404);
+  }
+  const size = fileStat.size;
+
   const ext = filePath.split(".").pop()?.toLowerCase();
   const mimeTypes: Record<string, string> = {
     mp4: "video/mp4",
@@ -37,11 +46,46 @@ export async function GET(
   const download = req.nextUrl.searchParams.get("download");
   const fileName = filePath.split(sep).pop() ?? "video.mp4";
 
-  return new NextResponse(new Uint8Array(buffer), {
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": mimeTypes[ext || ""] || "application/octet-stream",
+    "Cache-Control": "public, max-age=3600",
+    "Accept-Ranges": "bytes",
+    ...(download ? { "Content-Disposition": `attachment; filename="${fileName}"` } : {}),
+  };
+
+  const range = parseRangeHeader(req.headers.get("range"), size);
+
+  if (range === "unsatisfiable") {
+    return new NextResponse(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${size}`,
+        "Accept-Ranges": "bytes",
+      },
+    });
+  }
+
+  if (range) {
+    // Partial content: stream only the requested byte window
+    const stream = Readable.toWeb(
+      createReadStream(filePath, { start: range.start, end: range.end })
+    ) as ReadableStream;
+    return new NextResponse(stream, {
+      status: 206,
+      headers: {
+        ...baseHeaders,
+        "Content-Range": `bytes ${range.start}-${range.end}/${size}`,
+        "Content-Length": String(range.end - range.start + 1),
+      },
+    });
+  }
+
+  // Full content: still stream from disk instead of buffering the whole file in memory
+  const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+  return new NextResponse(stream, {
     headers: {
-      "Content-Type": mimeTypes[ext || ""] || "application/octet-stream",
-      "Cache-Control": "public, max-age=3600",
-      ...(download ? { "Content-Disposition": `attachment; filename="${fileName}"` } : {}),
+      ...baseHeaders,
+      "Content-Length": String(size),
     },
   });
 }

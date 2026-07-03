@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { apiError } from "@/lib/api-error";
-import { readFile } from "fs/promises";
+import { parseRangeHeader } from "@/lib/http-range";
+import { stat } from "fs/promises";
 import { join, normalize, sep } from "path";
-import { existsSync } from "fs";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
 
-// Static file server - serves uploaded images/videos
+// Static file server - serves uploaded images/videos.
+// Streams from disk (no whole-file buffering) and supports single-range HTTP Range requests (206),
+// so video previews can seek without re-downloading and memory stays flat under concurrent loads.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -27,7 +31,12 @@ export async function GET(
     return apiError(req, "文件不存在", "File not found", 404);
   }
 
-  const buffer = await readFile(filePath);
+  const fileStat = await stat(filePath);
+  if (!fileStat.isFile()) {
+    return apiError(req, "文件不存在", "File not found", 404);
+  }
+  const size = fileStat.size;
+
   const ext = filePath.split(".").pop()?.toLowerCase();
 
   const mimeTypes: Record<string, string> = {
@@ -40,10 +49,45 @@ export async function GET(
     webm: "video/webm",
   };
 
-  return new NextResponse(buffer, {
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": mimeTypes[ext || ""] || "application/octet-stream",
+    "Cache-Control": "public, max-age=31536000",
+    "Accept-Ranges": "bytes",
+  };
+
+  const range = parseRangeHeader(req.headers.get("range"), size);
+
+  if (range === "unsatisfiable") {
+    return new NextResponse(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${size}`,
+        "Accept-Ranges": "bytes",
+      },
+    });
+  }
+
+  if (range) {
+    // Partial content: stream only the requested byte window
+    const stream = Readable.toWeb(
+      createReadStream(filePath, { start: range.start, end: range.end })
+    ) as ReadableStream;
+    return new NextResponse(stream, {
+      status: 206,
+      headers: {
+        ...baseHeaders,
+        "Content-Range": `bytes ${range.start}-${range.end}/${size}`,
+        "Content-Length": String(range.end - range.start + 1),
+      },
+    });
+  }
+
+  // Full content: still stream from disk instead of buffering the whole file in memory
+  const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+  return new NextResponse(stream, {
     headers: {
-      "Content-Type": mimeTypes[ext || ""] || "application/octet-stream",
-      "Cache-Control": "public, max-age=31536000",
+      ...baseHeaders,
+      "Content-Length": String(size),
     },
   });
 }

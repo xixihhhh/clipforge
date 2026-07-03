@@ -14,6 +14,8 @@
  * allowing a fix without a code change.
  */
 
+import { ttsCacheKey, readTtsCache, writeTtsCache } from "@/lib/tts-cache";
+
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const WSS_BASE = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
 /** Tracks the current Edge/Chromium version; returns 403 when expired — override via EDGE_TTS_VERSION */
@@ -114,6 +116,14 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
   const pitch = opts.pitch || "+0Hz";
   const timeoutMs = opts.timeoutMs ?? 20000;
 
+  // Content-addressed cache: identical text + voice params reuse the previous audio, sparing
+  // the free Edge endpoint (hammering it on every re-compose risks rate-limits / 403).
+  // Keyed over the RESOLVED defaults so an omitted rate and an explicit "+0%" share one entry;
+  // timeoutMs doesn't affect the audio bytes and is excluded.
+  const cacheKey = ttsCacheKey({ provider: "edge", voice, rate, pitch, text: clean });
+  const cached = await readTtsCache(cacheKey);
+  if (cached) return cached;
+
   const gec = await secMsGec();
   const url =
     `${WSS_BASE}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}` +
@@ -137,7 +147,7 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
   } as unknown as string[]);
   ws.binaryType = "arraybuffer";
 
-  return await new Promise<Buffer>((resolve, reject) => {
+  const audio = await new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
     let settled = false;
     const finish = (fn: () => void) => {
@@ -186,4 +196,8 @@ export async function generateSpeechFree(text: string, opts: FreeTTSOptions = {}
       finish(() => (chunks.length ? resolve(Buffer.concat(chunks)) : reject(new Error(`Edge TTS 连接关闭(code=${ev?.code ?? "?"})`))));
     };
   });
+
+  // Write-through on success only (failures throw above and are never cached); cache errors degrade silently
+  await writeTtsCache(cacheKey, audio);
+  return audio;
 }
