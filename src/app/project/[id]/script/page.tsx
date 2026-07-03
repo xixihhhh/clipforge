@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoaderCircle, LuTriangleAlert, LuCircleCheck, LuCircleX, LuPencil } from "react-icons/lu";
 import { checkScriptCompliance } from "@/lib/ad-compliance";
 import { checkPublishReadiness } from "@/lib/publish-readiness";
@@ -52,6 +52,7 @@ export default function ScriptPage() {
   const tc = useT("common");
   const locale = useLocale();
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [selectedScript, setSelectedScript] = useState(0);
   const [scripts, setScripts] = useState<
     { id: string; title: string; styleType: string; totalDuration: number; shots: Shot[] }[]
@@ -304,6 +305,57 @@ export default function ScriptPage() {
     setEditingShotId(null);
     setEditStatus("");
   };
+  // ---- one-click auto-finish: script → auto-fill footage → compose → export, all keyless.
+  // Mirrors the batch page's autoCompose so the single-project web flow isn't the only path that
+  // can't run end-to-end automatically. Compose is polled by the exact compositionId (precise, race-free). ----
+  const [autoFinishing, setAutoFinishing] = useState(false);
+  const [autoFinishStage, setAutoFinishStage] = useState("");
+  const [autoFinishError, setAutoFinishError] = useState("");
+  const autoFinish = async () => {
+    if (!currentScript || autoFinishing) return;
+    setAutoFinishing(true);
+    setAutoFinishError("");
+    try {
+      // 0) make sure the picked variant is the one the pipeline uses
+      setAutoFinishStage(t("autoFinishSelecting"));
+      await fetch(`/api/project/${id}/scripts`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedScriptId: currentScript.id }),
+      }).catch(() => {});
+      // 1) auto-match free footage (per-shot video, fall back to image) — non-fatal
+      setAutoFinishStage(t("autoFinishAssets"));
+      await fetch(`/api/project/${id}/stock-fill`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "all", mediaType: "auto" }),
+      }).catch(() => {});
+      // 2) compose (free Edge TTS)
+      setAutoFinishStage(t("autoFinishComposing"));
+      const composeRes = await fetch(`/api/project/${id}/compose`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeTts: { enabled: true } }),
+      });
+      if (!composeRes.ok) throw new Error(t("autoFinishFailed"));
+      const composeData = await composeRes.json().catch(() => ({}));
+      const compositionId: string | undefined = composeData?.compositionId;
+      const query = compositionId ? `?compositionId=${encodeURIComponent(compositionId)}` : "";
+      // 3) poll until done/failed (up to ~11 min, > server render timeout)
+      let done = false;
+      for (let i = 0; i < 264; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const c = await fetch(`/api/project/${id}/compose${query}`).then((x) => x.json()).catch(() => ({}));
+        const st = c?.composition?.status;
+        if (st === "done") { done = true; break; }
+        if (st === "failed") throw new Error(c?.composition?.errorMessage || t("autoFinishFailed"));
+      }
+      if (!done) throw new Error(t("autoFinishFailed"));
+      // 4) land on export
+      router.push(`/project/${id}/export`);
+    } catch (err) {
+      setAutoFinishError(friendlyError(err, locale));
+      setAutoFinishing(false);
+    }
+  };
+
   const saveEditShot = async (shotId: number) => {
     if (!currentScript) return;
     setEditStatus("saving");
@@ -531,14 +583,40 @@ export default function ScriptPage() {
                   <TabsTrigger value="timeline">{t("tabTimeline")}</TabsTrigger>
                   <TabsTrigger value="text">{t("tabText")}</TabsTrigger>
                 </TabsList>
-                <Link href={`/project/${id}/assets`}>
-                  <Button className="brand-gradient text-white text-sm">
-                    {t("nextStepAssets")}
-                    <LuArrowRight className="w-4 h-4 ml-1" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-sm"
+                    disabled={autoFinishing}
+                    onClick={autoFinish}
+                    title={t("autoFinishHint")}
+                  >
+                    {autoFinishing ? (
+                      <>
+                        <LuLoaderCircle className="w-4 h-4 mr-1 animate-spin" />
+                        {autoFinishStage || t("autoFinish")}
+                      </>
+                    ) : (
+                      <>
+                        <LuWand className="w-4 h-4 mr-1" />
+                        {t("autoFinish")}
+                      </>
+                    )}
                   </Button>
-                </Link>
+                  <Link href={`/project/${id}/assets`}>
+                    <Button className="brand-gradient text-white text-sm" disabled={autoFinishing}>
+                      {t("nextStepAssets")}
+                      <LuArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
               </div>
 
+              {autoFinishError && (
+                <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-xs text-red-400">
+                  {autoFinishError}
+                </div>
+              )}
               <TabsContent value="timeline" className="mt-0">
                 <div className="space-y-3">
                   {readiness && (

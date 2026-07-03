@@ -72,6 +72,13 @@ export const script: NamespaceMessages = {
     editSaved: "已保存",
     editSaveFailed: "保存失败，请重试",
     selectionSaved: "已选用该方案",
+    // 一键成片
+    autoFinish: "一键成片",
+    autoFinishHint: "自动完成剩余步骤：配画面 → 配音合成 → 直达导出（全程免 Key）",
+    autoFinishSelecting: "确认脚本…",
+    autoFinishAssets: "配画面中…",
+    autoFinishComposing: "合成中…",
+    autoFinishFailed: "自动成片失败，可改用「下一步」手动逐步完成",
     // 保存模板弹窗
     saveTemplateTitle: "保存为模板",
     saveTemplateDesc: "保存当前脚本结构为模板，下次可直接套用到其他商品",
@@ -147,6 +154,13 @@ export const script: NamespaceMessages = {
     editSaved: "Saved",
     editSaveFailed: "Save failed, please retry",
     selectionSaved: "Variant selected",
+    // one-click auto-finish
+    autoFinish: "Auto-finish",
+    autoFinishHint: "Auto-complete the rest: match footage → voiceover & compose → straight to export (fully key-free)",
+    autoFinishSelecting: "Confirming script…",
+    autoFinishAssets: "Matching footage…",
+    autoFinishComposing: "Composing…",
+    autoFinishFailed: "Auto-finish failed — use “Next” to complete the steps manually",
     // 保存模板弹窗
     saveTemplateTitle: "Save as template",
     saveTemplateDesc: "Save this script structure as a template to reuse on other products",
