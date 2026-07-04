@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/xixihhhh-clipforge-badge.png)](https://mseep.ai/app/xixihhhh-clipforge)
+
 <p align="center"><img src="docs/banner.png" alt="ClipForge — 开源 AI 带货短视频神器，一张商品图自动产出抖音小店/快手/小红书/TikTok Shop 卖货短视频" width="820"/></p>
 
 # ClipForge — 开源 AI 带货短视频神器 ｜ 一张商品图，自动出卖货视频
