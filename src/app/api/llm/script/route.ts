@@ -3,12 +3,14 @@ import { getDataDir } from "@/lib/paths";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { generateScript, analyzeProduct } from "@/lib/script-engine/generator";
-import type { ScriptStyleType } from "@/lib/script-engine/prompts";
+import { styleNameMap, type ScriptStyleType } from "@/lib/script-engine/prompts";
+import { hookPatternName } from "@/lib/script-engine/hook-patterns";
 import type { ProductCategory } from "@/lib/script-engine/templates";
 import { getDb } from "@/lib/db";
-import { scripts as scriptsTable, projects } from "@/lib/db/schema";
+import { scripts as scriptsTable, projects, publishMetrics } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
+import { topConvertingStyle, topConvertingHook, buildPerformanceHint, type MetricInput } from "@/lib/performance-insights";
 
 /** Allowed enum values for the styleType column in the scripts table */
 const VALID_SCRIPT_STYLE = new Set(["pain_point", "scene", "comparison", "story", "custom"]);
@@ -75,6 +77,44 @@ function normalizeStyle(raw: unknown): ScriptStyleType {
   return map[String(raw ?? "").toLowerCase()] ?? "pain_point";
 }
 
+/**
+ * Data-flywheel read side: turn the creator's real published-video metrics into a generation hint.
+ * Prefers same-category conversion signal, falls back to the global aggregate when a category lacks
+ * enough samples, and degrades to an empty hint on cold start or any DB error (never blocks generation).
+ * Returns the hint text plus the top-converting style key (used to bias "auto"/smart-recommend mode).
+ */
+async function loadInsights(category: string): Promise<{ hint: string; topStyle: string | null }> {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(publishMetrics);
+    if (rows.length === 0) return { hint: "", topStyle: null };
+    const toRec = (r: (typeof rows)[number]): MetricInput => ({
+      style: r.style,
+      hookId: r.hookId ?? undefined,
+      views: r.views,
+      likes: r.likes,
+      comments: r.comments,
+      shares: r.shares,
+      orders: r.orders,
+    });
+    const scoped = rows.filter((r) => r.category === category).map(toRec);
+    const all = rows.map(toRec);
+    // same-category signal first (topConvertingStyle/Hook require >=2 samples and return null otherwise),
+    // then global fallback so a creator with cross-category history still gets a useful prior
+    const topStyle = topConvertingStyle(scoped) ?? topConvertingStyle(all);
+    const topHook = topConvertingHook(scoped) ?? topConvertingHook(all);
+    const hint = buildPerformanceHint(topStyle, topHook, {
+      styleLabel: (s) => styleNameMap[s as ScriptStyleType] ?? s,
+      hookLabel: hookPatternName,
+    });
+    return { hint, topStyle: topStyle?.style ?? null };
+  } catch (e) {
+    // Feedback is best-effort — never let a metrics read failure break script generation
+    console.warn("读取历史转化数据失败（已跳过反馈）:", e);
+    return { hint: "", topStyle: null };
+  }
+}
+
 // Generate commerce script
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -87,8 +127,14 @@ export async function POST(req: NextRequest) {
 
   // Support both frontend field naming conventions: category/productCategory, targetDuration/duration
   const category = normalizeCategory(body.category ?? body.productCategory);
-  const styleType = normalizeStyle(body.styleType);
+  // detect smart-recommend ("auto"/unset) BEFORE normalizing, so the flywheel can pick a data-driven
+  // default instead of the hardcoded pain_point fallback; an explicit style is always respected
+  const rawStyle = String(body.styleType ?? "").toLowerCase();
+  const isAutoStyle = rawStyle === "" || rawStyle === "auto";
+  let styleType = normalizeStyle(body.styleType);
   const duration = body.targetDuration ?? body.duration ?? 30;
+  // data flywheel: performance feedback is on by default; pass insightMode:false to opt out
+  const useInsights = body.insightMode !== false;
 
   if (!productName) {
     return apiError(req, "请填写商品名称", "Please enter the product name");
@@ -113,6 +159,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Data flywheel (read side): pull the creator's real conversion feedback for this category.
+    // Used two ways: (1) bias smart-recommend ("auto") mode toward the top-converting style,
+    // (2) inject an advisory hint into the prompt so generated variants lean toward what sells.
+    const insights = useInsights ? await loadInsights(category) : { hint: "", topStyle: null };
+    if (useInsights && isAutoStyle && insights.topStyle) {
+      styleType = normalizeStyle(insights.topStyle);
+    }
+
     // Generate script (category/styleType/duration already normalized above)
     const scripts = await generateScript({
       productName,
@@ -127,6 +181,7 @@ export async function POST(req: NextRequest) {
       usageAdvantage: body.usageAdvantage,
       targetAudience: body.targetAudience,
       referenceStructure: body.referenceStructure,
+      performanceHint: insights.hint,
       llmConfig,
     });
 

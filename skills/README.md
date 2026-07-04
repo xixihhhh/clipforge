@@ -6,10 +6,15 @@ It complements ClipForge's [MCP server](../mcp/README.md): the MCP exposes calla
 
 ## Install
 
-Copy the skill folder into your assistant's skills directory, e.g. for Claude Code:
+Copy the skill folder into your assistant's skills directory:
 
 ```bash
-cp -r skills/clipforge ~/.claude/skills/      # or your project's .claude/skills/
+# Claude Code (user-level, or your project's .claude/skills/)
+cp -r skills/clipforge ~/.claude/skills/
+
+# Cursor / Windsurf / Copilot: copy into the project's rules/skills folder, e.g.
+cp -r skills/clipforge .cursor/skills/          # Cursor
+cp -r skills/clipforge .windsurf/skills/        # Windsurf
 ```
 
-Then start a ClipForge instance (`pnpm dev`), set `CLIPFORGE_LLM_*` for script generation, and ask your assistant to create a video. See [`clipforge/SKILL.md`](clipforge/SKILL.md) for prerequisites, the three drive methods (MCP / CLI / HTTP), and all workflows.
+Then start a ClipForge instance (`pnpm dev`), set `CLIPFORGE_LLM_*` for script generation, and ask your assistant to create a video — e.g. *"make me a 9:16 video from this product link …"* (drives the one-shot `clipforge_product_script`). See [`clipforge/SKILL.md`](clipforge/SKILL.md) for prerequisites, the three drive methods (MCP / CLI / HTTP), and all workflows.

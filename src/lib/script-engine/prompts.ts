@@ -517,6 +517,8 @@ export interface ScriptGenerationInput {
   platforms?: string;
   /** product usage and advantages */
   usageAdvantage?: string;
+  /** performance-feedback directive (data flywheel): pre-rendered hint that biases style/hook toward what historically converts; empty when there is no data */
+  performanceHint?: string;
 }
 
 /**
@@ -538,6 +540,7 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
     priceRange,
     platforms,
     usageAdvantage,
+    performanceHint,
   } = input;
 
   // fetch category templates
@@ -621,6 +624,12 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
 
   // append style directive
   parts.push(`\n${styleDirective}`);
+
+  // append performance feedback (data flywheel): real published-video conversion data biases
+  // the chosen style + opening hook; empty string when the creator has no metrics yet (cold start)
+  if (performanceHint) {
+    parts.push(`\n${performanceHint}`);
+  }
 
   // append golden-3-second hook guidance (category-preferred patterns + three-beat structure)
   parts.push(`\n${buildHookGuidance(category)}`);

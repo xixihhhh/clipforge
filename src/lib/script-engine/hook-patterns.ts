@@ -138,6 +138,11 @@ export const HOOK_PATTERNS: HookPattern[] = [
   },
 ];
 
+/** Look up a hook pattern's display name by its id (used to render performance-feedback hints); returns the id unchanged if unknown */
+export function hookPatternName(id: string): string {
+  return HOOK_PATTERNS.find((p) => p.id === id)?.name ?? id;
+}
+
 /** Category-preference hook selection: matched-category patterns first, then universal ones; deduplicated, top n returned */
 export function selectHookPatterns(category: ProductCategory, n = 5): HookPattern[] {
   const matched = HOOK_PATTERNS.filter((p) => p.categories?.includes(category));

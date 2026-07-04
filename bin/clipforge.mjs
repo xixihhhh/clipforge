@@ -220,6 +220,72 @@ async function cmdCreate(flags) {
   };
 }
 
+// Product link → commerce script (→ optional full render). Chains ingest + /api/llm/script so a
+// single command turns a shop URL into a ready带货脚本; add --compose to render all the way to a video.
+async function cmdProduct(flags) {
+  requireLlm();
+  const url = String(flags.url || "").trim();
+  if (!/^https?:\/\/.+/i.test(url)) throw new Error('--url 必须是合法的 http/https 商品链接，如 --url "https://item.example.com/123"');
+
+  step(`抓取商品信息：${url}`);
+  const ingest = await api("/api/ingest/product", { method: "POST", body: { url, createProject: true } });
+  const projectId = ingest.projectId;
+  if (!projectId) throw new Error("未能从该链接建项目（可能被反爬或缺少标准商品标签），请换一个链接。");
+  const productName = ingest.product?.title?.trim();
+  if (!productName) throw new Error("未能解析出商品标题，无法生成带货脚本，请换一个带标准 OG/JSON-LD 标签的链接。");
+  step(`商品：${productName}${ingest.product?.priceText ? ` · ${ingest.product.priceText}` : ""} · 图 ${ingest.productImages?.length ?? 0} 张`);
+
+  const styleType = ["pain_point", "scene", "comparison", "story", "auto"].includes(flags.style) ? flags.style : "auto";
+  const targetDuration = Number.isFinite(Number(flags.duration)) && flags.duration ? Number(flags.duration) : 30;
+  step(`写带货脚本（${styleType} · ${targetDuration}s）…`);
+  const scriptRes = await api("/api/llm/script", {
+    method: "POST",
+    body: {
+      projectId,
+      productName,
+      productDescription: ingest.product?.description ?? "",
+      productImages: ingest.productImages ?? [],
+      ...(flags.category ? { category: String(flags.category) } : {}),
+      styleType,
+      targetDuration,
+      llmConfig: LLM,
+    },
+  });
+  const scripts = Array.isArray(scriptRes?.scripts) ? scriptRes.scripts : [];
+  step(`脚本完成：${scripts.length} 套方案 · 项目 ${projectId}`);
+
+  // Without --compose, stop at scripts (mirrors clipforge_product_script MCP tool)
+  if (!flags.compose) {
+    step(`下一步：clipforge compose --project ${projectId}（配画面+配音+合成出片）`);
+    return { ok: true, projectId, product: ingest.product ?? null, scripts: scripts.length };
+  }
+
+  // --compose: go all the way to a rendered video (product-image + free stock fill)
+  const mediaType = FOOTAGE_KINDS.includes(flags.footage) ? flags.footage : "auto";
+  step(`配画面（${mediaType}，商品图 + 免费素材库）…`);
+  const fill = await api(`/api/project/${projectId}/stock-fill`, {
+    method: "POST",
+    body: { source: "all", mediaType, apiKeys: STOCK_KEYS },
+  });
+  step(`画面就绪：${fill.filled ?? 0}/${fill.total ?? 0}`);
+
+  const body = composeBodyFromFlags(flags);
+  const usedVoice = body.freeTts.voice || "zh-CN-XiaoxiaoNeural";
+  step(`合成中（Edge TTS 配音 · 音色 ${usedVoice}）…`);
+  const { compositionId } = await api(`/api/project/${projectId}/compose`, { method: "POST", body });
+  const composition = await pollCompose(projectId, { compositionId });
+  return {
+    ok: true,
+    projectId,
+    product: ingest.product ?? null,
+    scripts: scripts.length,
+    voice: usedVoice,
+    footageFilled: `${fill.filled ?? 0}/${fill.total ?? 0}`,
+    videoUrl: absVideoUrl(composition),
+    status: composition.status,
+  };
+}
+
 async function cmdCompose(flags) {
   const projectId = String(flags.project || "").trim();
   if (!projectId) throw new Error("--project 不能为空");
@@ -374,6 +440,8 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge create --topic "在家手冲咖啡" [--duration 25] [--style knowledge]
                    [--footage auto|image|video] [--voice <id>] [--aspect 9:16|16:9|1:1]
                    [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--cta "..."] [--json]
+  clipforge product --url "<商品链接>" [--style pain_point|scene|comparison|story|auto] [--duration 30]
+                   [--category beauty|food|home|fashion|tech|other] [--compose 同款成片选项]   贴链接→带货脚本(加 --compose 直接出片)
   clipforge import --project <id> (--file <路径> | --text "你的脚本") [--title "..."]   自带脚本出片
   clipforge dub --project <id> --lang en                                              配音译制(换语种,出海)
   clipforge compose --project <id> [同款成片选项] [--no-fill]
@@ -395,7 +463,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));

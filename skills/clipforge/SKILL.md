@@ -1,11 +1,17 @@
 ---
 name: clipforge-video
 description: Create short vertical videos (TikTok / Reels / Shorts / 抖音 / 快手 / 小红书) from a topic, a product link/image, or a script you already wrote. ClipForge runs the full pipeline — script → footage → voiceover → subtitles → BGM → compose — with a free, no-API-key path (free stock + Edge TTS + local FFmpeg). Use when the user wants to turn an idea, product, or written narration into a finished short video.
+version: 0.8.32
+license: AGPL-3.0-only
+homepage: https://github.com/xixihhhh/clipforge
+keywords: [ai-video, faceless-video, text-to-video, tiktok, reels, shorts, 抖音, 快手, 小红书, product-video, tiktok-shop, ugc, ffmpeg, edge-tts]
 ---
 
 # ClipForge — AI short-video production
 
 ClipForge produces a finished vertical short video end to end. You drive it through its **MCP tools** (preferred), its **CLI**, or its **HTTP API**. The free path needs no API keys; only AI script generation needs one LLM key.
+
+**Install this skill:** copy this folder into your assistant's skills directory — e.g. `cp -r skills/clipforge ~/.claude/skills/` (or your project's `.claude/skills/`). See [../README.md](../README.md) for per-assistant paths (Claude Code / Cursor / Copilot / Windsurf).
 
 ## Prerequisites
 
@@ -15,8 +21,8 @@ ClipForge produces a finished vertical short video end to end. You drive it thro
 
 ## Three ways to create
 
-- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_preview_gif`, `clipforge_export_subtitle`, `clipforge_carousel`.
-- **CLI**: `node bin/clipforge.mjs <create|import|compose|list|voices|get> [flags]` (`--help` for all).
+- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_product_script`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_carousel`, `clipforge_shop_qr`, `clipforge_end_card`, `clipforge_preview_gif`, `clipforge_export_subtitle`.
+- **CLI**: `node bin/clipforge.mjs <create|product|import|compose|dub|cover|qr|endcard|carousel|list|voices|get|trends> [flags]` (`--help` for all).
 - **HTTP**: `POST /api/topic/script` → `POST /api/project/[id]/stock-fill` → `POST /api/project/[id]/compose` → poll `GET /api/project/[id]/compose`.
 
 ## Workflows
@@ -27,8 +33,10 @@ Give a topic; ClipForge writes the narration, auto-fills free footage, voices it
 - CLI: `node bin/clipforge.mjs create --topic "..." --quality hd --bgm`
 
 ### 2. Product / e-commerce video
-Paste a product URL (auto-extracts title/price/images) or upload a product image; ClipForge writes a selling script and keeps the product image faithful.
-- MCP: `clipforge_ingest_product { url: "https://..." }` then generate a script and `clipforge_compose`.
+Paste a product URL (auto-extracts title/price/images) or upload a product image; ClipForge writes a selling script and keeps the product image faithful. It also folds in the performance flywheel — historical conversion data biases the script toward the style/hook that actually sells.
+- MCP (one shot): `clipforge_product_script { url: "https://...", styleType: "auto", durationSec: 30 }` → returns `projectId` + commerce scripts; then `clipforge_compose { projectId }`.
+- CLI (link → video in one line): `node bin/clipforge.mjs product --url "https://..." --compose --bgm`.
+- Low-level: `clipforge_ingest_product { url }` then generate a script and `clipforge_compose` separately.
 
 ### 3. Bring your own script
 You already wrote the narration — import it, ClipForge splits it into shots and composes.

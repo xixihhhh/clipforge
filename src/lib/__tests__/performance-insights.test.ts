@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateByStyle, topConvertingStyle, aggregateByHook, topConvertingHook, type MetricInput } from "@/lib/performance-insights";
+import { aggregateByStyle, topConvertingStyle, aggregateByHook, topConvertingHook, buildPerformanceHint, type MetricInput } from "@/lib/performance-insights";
 
 const recs: MetricInput[] = [
   { style: "pain_point", views: 10000, likes: 500, comments: 100, shares: 50, orders: 80 },
@@ -79,5 +79,43 @@ describe("aggregateByHook / topConvertingHook（钩子 A/B 回流）", () => {
   it("style 聚合不受 hookId 影响（向后兼容，4 条同 style 计入）", () => {
     expect(aggregateByStyle(recs)[0].style).toBe("x");
     expect(aggregateByStyle(recs)[0].samples).toBe(4);
+  });
+});
+
+describe("buildPerformanceHint（数据飞轮·回流指令）", () => {
+  it("有 style + hook → 生成含标题的双行指令，套用 label 解析器", () => {
+    const topStyle = topConvertingStyle(recs)!;
+    const topHook = topConvertingHook([
+      { style: "x", hookId: "visual_shock", views: 10000, orders: 100 },
+      { style: "x", hookId: "visual_shock", views: 10000, orders: 120 },
+    ])!;
+    const hint = buildPerformanceHint(topStyle, topHook, {
+      styleLabel: (s) => (s === "pain_point" ? "痛点种草" : s),
+      hookLabel: (h) => (h === "visual_shock" ? "视觉冲击" : h),
+    });
+    expect(hint).toContain("历史转化数据反馈");
+    expect(hint).toContain("痛点种草");
+    expect(hint).toContain("视觉冲击");
+    expect(hint.split("\n").length).toBe(3); // header + 2 bullets
+  });
+
+  it("冷启动（都为 null）→ 返回空串，调用方不注入任何内容", () => {
+    expect(buildPerformanceHint(null, null)).toBe("");
+  });
+
+  it("只有 style → 单行；无 label 解析器时回落到原始 key", () => {
+    const topStyle = topConvertingStyle(recs)!;
+    const hint = buildPerformanceHint(topStyle, null);
+    expect(hint).toContain(topStyle.style); // raw key fallback
+    expect(hint).not.toContain("开场钩子机制");
+  });
+
+  it("转化率以百分比呈现（一位小数）", () => {
+    // 220/20000 = 1.1%
+    const hint = buildPerformanceHint(
+      { style: "s", samples: 2, avgViews: 10000, engagementRate: 0, conversionRate: 220 / 20000, totalOrders: 220 },
+      null
+    );
+    expect(hint).toContain("1.1%");
   });
 });

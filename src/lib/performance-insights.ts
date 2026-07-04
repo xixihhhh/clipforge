@@ -94,3 +94,40 @@ export function topConvertingHook(records: MetricInput[], minSamples = 2): HookI
   const ranked = aggregateByHook(records).filter((i) => i.samples >= minSamples && i.conversionRate > 0);
   return ranked[0] ?? null;
 }
+
+/** Optional display-name resolvers so the feedback hint reads with human labels instead of raw keys */
+export interface PerformanceHintLabels {
+  /** style key → display name (e.g. pain_point → 痛点种草) */
+  styleLabel?: (style: string) => string;
+  /** hookId → display name (e.g. visual_shock → 视觉冲击) */
+  hookLabel?: (hookId: string) => string;
+}
+
+/**
+ * The last mile of the data flywheel: turn the top-converting style/hook (from real published-video
+ * metrics) into a prompt-injectable Chinese directive so newly generated scripts lean toward what
+ * actually sells. Returns "" when there is insufficient data (cold start) — callers inject nothing.
+ * Pure function (no DB/label deps beyond the optional resolvers), so it is fully unit-testable.
+ */
+export function buildPerformanceHint(
+  topStyle: StyleInsight | null,
+  topHook: HookInsight | null,
+  labels: PerformanceHintLabels = {}
+): string {
+  const styleLabel = labels.styleLabel ?? ((s) => s);
+  const hookLabel = labels.hookLabel ?? ((h) => h);
+  const asPct = (rate: number) => Math.round(rate * 1000) / 10;
+  const lines: string[] = [];
+  if (topStyle) {
+    lines.push(
+      `- 转化最高的脚本风格是「${styleLabel(topStyle.style)}」（近 ${topStyle.samples} 条实测，转化率约 ${asPct(topStyle.conversionRate)}%）——本次优先采用或明显倾斜该风格。`
+    );
+  }
+  if (topHook) {
+    lines.push(
+      `- 转化最高的开场钩子机制是「${hookLabel(topHook.hookId)}」（近 ${topHook.samples} 条实测，转化率约 ${asPct(topHook.conversionRate)}%）——开场三秒优先采用该机制。`
+    );
+  }
+  if (lines.length === 0) return "";
+  return `【历史转化数据反馈（来自你已发布视频的真实成效，务必参考）】\n${lines.join("\n")}`;
+}

@@ -223,6 +223,29 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_product_script",
+    description:
+      "带货脚本一条龙：贴商品链接 → 自动抓取商品信息（标题/价/图）→ LLM 生成多套带货分镜脚本，返回 projectId 与脚本数据。等于 clipforge_ingest_product + 网页端「生成带货脚本」两步合一，agent 一句话即可从链接到脚本。生成时会自动结合你已发布视频的转化数据（数据飞轮）偏向更能卖的风格/钩子。之后用 clipforge_compose { projectId } 出片。需要 LLM 环境变量。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "商品页链接（http/https）" },
+        styleType: {
+          type: "string",
+          enum: ["pain_point", "scene", "comparison", "story", "auto"],
+          description: "脚本风格：痛点种草/场景安利/对比测评/剧情故事，默认 auto（按历史转化数据智能推荐）",
+        },
+        durationSec: { type: "number", description: "目标时长（秒），默认 30" },
+        category: {
+          type: "string",
+          enum: ["beauty", "food", "home", "fashion", "tech", "other"],
+          description: "商品品类（美妆/食品/家居/服饰/数码/其他），用于风格模板与转化数据分品类回流；不填则按 beauty 兜底",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
     name: "clipforge_generate_script",
     description:
       "只生成去商品化的旁白分镜脚本（不配画面/不合成），返回 projectId 与各分镜（含英文素材检索词）。需要 LLM 环境变量。",
@@ -582,8 +605,63 @@ async function handleIngestProduct(args) {
     product: data.product ?? null,
     productImages: data.productImages ?? [],
     hint: data.projectId
-      ? "已建带货项目并抓取商品图。下一步：在网页端为该项目生成带货脚本后，用 clipforge_compose 出片（带货脚本需 LLM，暂未走 MCP）。"
+      ? "已建带货项目并抓取商品图。下一步：用 clipforge_product_script 直接从链接生成带货脚本（需 LLM），或 clipforge_compose 出片。"
       : "仅解析、未建项目（createProject=false）。",
+  });
+}
+
+// One-shot commerce script: ingest a product URL → generate a commerce script server-side (needs LLM).
+// Chains the two existing routes (/api/ingest/product then /api/llm/script) so agents skip the manual
+// hand-off. The script route already folds in the performance-feedback flywheel by category.
+async function handleProductScript(args) {
+  requireLlm();
+  const url = String(args.url || "").trim();
+  if (!/^https?:\/\/.+/i.test(url)) throw new Error("url 必须是合法的 http/https 商品链接");
+
+  // Step 1: ingest the product (creates the project + downloads images; no LLM needed)
+  const ingest = await api("/api/ingest/product", { method: "POST", body: { url, createProject: true } });
+  const projectId = ingest.projectId;
+  if (!projectId) throw new Error("未能从该链接建项目（可能被反爬或缺少标准商品标签），请换一个链接或改用网页端上传商品图。");
+  const productName = ingest.product?.title?.trim();
+  if (!productName) throw new Error("未能解析出商品标题，无法生成带货脚本。请换一个带标准 OG/JSON-LD 标签的链接。");
+
+  // Step 2: generate the commerce script from the ingested product data (LLM)
+  const styleType = ["pain_point", "scene", "comparison", "story", "auto"].includes(args.styleType) ? args.styleType : "auto";
+  const targetDuration = Number.isFinite(args.durationSec) ? Number(args.durationSec) : 30;
+  const scriptRes = await api("/api/llm/script", {
+    method: "POST",
+    body: {
+      projectId,
+      productName,
+      productDescription: ingest.product?.description ?? "",
+      productImages: ingest.productImages ?? [],
+      ...(args.category ? { category: args.category } : {}),
+      styleType,
+      targetDuration,
+      llmConfig: LLM,
+    },
+  });
+
+  const scripts = Array.isArray(scriptRes?.scripts) ? scriptRes.scripts : [];
+  return ok({
+    ok: true,
+    projectId,
+    product: ingest.product ?? null,
+    productImages: ingest.productImages ?? [],
+    scripts: scripts.map((s) => ({
+      id: s.id,
+      title: s.title ?? "",
+      styleType: s.styleType,
+      totalDuration: s.totalDuration ?? 0,
+      selected: s.selected ?? false,
+      shots: (s.shots ?? []).map((sh) => ({
+        shotId: sh.shotId,
+        duration: sh.duration,
+        voiceover: sh.voiceover,
+        stockKeywords: sh.stockKeywords ?? [],
+      })),
+    })),
+    next: `已生成 ${scripts.length} 套带货脚本（默认选中第一套）。下一步用 clipforge_compose { projectId: "${projectId}" } 配画面+配音+合成出片。`,
   });
 }
 
@@ -700,6 +778,7 @@ async function handleCarousel(args) {
 const HANDLERS = {
   clipforge_create_video: handleCreateVideo,
   clipforge_ingest_product: handleIngestProduct,
+  clipforge_product_script: handleProductScript,
   clipforge_generate_script: handleGenerateScript,
   clipforge_search_stock: handleSearchStock,
   clipforge_list_projects: handleListProjects,
