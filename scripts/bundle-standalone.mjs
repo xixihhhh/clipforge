@@ -30,23 +30,31 @@ for (const [from, to] of copies) {
   console.log(`✓ ${from} → ${to}`);
 }
 
-// Note: standalone/node_modules retains pnpm's original symlink structure (afterPack uses cp -R to copy the whole tree with links, so no dependencies are lost).
+// Note: node-linker=hoisted (.npmrc) makes standalone/node_modules a flat, symlink-free tree of real files.
+// This is deliberate: the pnpm symlink layout, when reproduced in the standalone, breaks on Windows packaging
+// (robocopy follows the links and flattens `next` to the top level, detaching it from its .pnpm peers such as
+// @swc/helpers -> MODULE_NOT_FOUND, issue #10). A flat tree copies cleanly on every OS with any copy method.
 
 // === Replace the standalone better-sqlite3 copy with the Electron runtime ABI prebuilt ===
 // The copy in the main node_modules keeps the system Node ABI (needed by next build's collect page data step);
 // the packaged App runs server.js via Electron's built-in Node fork, which must match Electron's ABI (e.g. Electron 42=146),
 // otherwise any DB route will 500 due to NODE_MODULE_VERSION mismatch. Pull the official electron-vXXX prebuilt; do not compile from source.
-// Note: cp/tar commands target mac/linux build machines; add platform branches for Windows packaging (CI matrix) when needed.
+// Note: `tar` is available on macOS/Linux and on Windows 10+ (bsdtar), so the extract step works on the whole CI matrix.
 await rebuildBetterSqlite3ForElectron();
 
 async function rebuildBetterSqlite3ForElectron() {
-  const pnpmDir = join(standalone, "node_modules", ".pnpm");
-  const bsEntry = existsSync(pnpmDir) ? readdirSync(pnpmDir).find((d) => d.startsWith("better-sqlite3@")) : null;
-  if (!bsEntry) {
+  // Flat (hoisted) layout: better-sqlite3 lives directly at node_modules/better-sqlite3.
+  // Fallback keeps the legacy .pnpm store path in case a build ever runs without node-linker=hoisted.
+  let bsDir = join(standalone, "node_modules", "better-sqlite3");
+  if (!existsSync(join(bsDir, "package.json"))) {
+    const pnpmDir = join(standalone, "node_modules", ".pnpm");
+    const bsEntry = existsSync(pnpmDir) ? readdirSync(pnpmDir).find((d) => d.startsWith("better-sqlite3@")) : null;
+    if (bsEntry) bsDir = join(pnpmDir, bsEntry, "node_modules", "better-sqlite3");
+  }
+  if (!existsSync(join(bsDir, "package.json"))) {
     console.warn("⚠ standalone 未找到 better-sqlite3，跳过 Electron ABI 重建");
     return;
   }
-  const bsDir = join(pnpmDir, bsEntry, "node_modules", "better-sqlite3");
   const bsVer = JSON.parse(readFileSync(join(bsDir, "package.json"), "utf8")).version;
 
   // Ask Electron itself for its module ABI (most reliable; does not depend on node-abi version mapping)
