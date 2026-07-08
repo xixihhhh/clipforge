@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipForge — 开源 AI 带货短视频神器:一张商品图,秒变会卖货的短视频</title>
+<meta name="description" content="ClipForge 是开源免费的 AI 带货短视频工具:上传商品图或粘贴商品链接,AI 提炼卖点、写种草脚本,商品原图保真出镜,自动配音+字幕+BGM,几十秒产出能直接发抖音小店/快手/小红书/视频号/TikTok Shop 的卖货视频。0 成本免 Key 出整片、无水印、批量出片、合规默认开。">
+<link rel="canonical" href="https://xixihhhh.github.io/clipforge/">
+<link rel="alternate" hreflang="zh-CN" href="https://xixihhhh.github.io/clipforge/">
+<link rel="alternate" hreflang="en" href="https://xixihhhh.github.io/clipforge/en.html">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ClipForge — 开源 AI 带货短视频神器:一张商品图,秒变会卖货的短视频">
+<meta property="og:description" content="AI 提炼卖点 · 商品保真不变形 · 自动配音字幕,一键发抖音小店 / 快手 / 小红书 / TikTok Shop。免费 0 Key · 无水印 · 批量出片。">
+<meta property="og:image" content="https://xixihhhh.github.io/clipforge/banner.png">
+<meta property="og:url" content="https://xixihhhh.github.io/clipforge/">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ClipForge",
+  "alternateName": "带货剪手",
+  "operatingSystem": "Windows, macOS, Web (self-hosted)",
+  "applicationCategory": "MultimediaApplication",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "description": "开源免费的 AI 带货短视频工具:上传商品图或粘贴商品链接,AI 提炼卖点、写种草脚本,商品原图保真出镜,自动配音+字幕+BGM,产出可直接发抖音小店/快手/小红书/视频号/TikTok Shop 的卖货视频。0 成本免 Key、无水印、批量出片、合规默认开。",
+  "url": "https://xixihhhh.github.io/clipforge/",
+  "downloadUrl": "https://github.com/xixihhhh/clipforge/releases/latest",
+  "screenshot": "https://xixihhhh.github.io/clipforge/screenshots/04-script.png",
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "sameAs": ["https://github.com/xixihhhh/clipforge"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "ClipForge 是免费的吗?", "acceptedAnswer": { "@type": "Answer", "text": "是。开源(AGPL-3.0)、无水印、不限条数。免费素材 + 免费微软 Edge TTS 配音 + 免费 BGM + 本地 FFmpeg 合成,没有任何 AI Key 也能出整片;想要更高画质再自带 Key 接 GPT Image 2 / Seedance 2.0 等 30+ 模型。" } },
+    { "@type": "Question", "name": "会把我的商品图改变形吗?", "acceptedAnswer": { "@type": "Answer", "text": "不会,这是 ClipForge 的命门功能:image-to-image 锁定商品原图,换背景、打光都不改商品本体,避免『货不对板』的转化损失与售后风险。" } },
+    { "@type": "Question", "name": "需要真人出镜吗?", "acceptedAnswer": { "@type": "Answer", "text": "不需要。整条视频由商品图 + AI 配画面 + 免费配音 + 字幕自动合成,全程不出真人脸(faceless),一个人一天能出几十条。" } },
+    { "@type": "Question", "name": "支持发哪些平台?", "acceptedAnswer": { "@type": "Answer", "text": "抖音小店 9:16、快手、小红书 3:4、视频号、TikTok Shop / Reels / Shorts 规格一键切换导出,并自动产出话题标签、封面文案、互动引导语。" } },
+    { "@type": "Question", "name": "国内发布会因为 AI 内容被限流吗?", "acceptedAnswer": { "@type": "Answer", "text": "ClipForge 合规默认开:成片自动写入 AIGC 隐式标识(对齐国标 GB 45438-2025)、可一键烧显式『AI 生成』标识;发布前还有限流自检(风险词/钩子/时长/字幕/CTA 逐项检查)和广告法违禁词扫描,出片即合规。" } },
+    { "@type": "Question", "name": "怎么部署使用?", "acceptedAnswer": { "@type": "Answer", "text": "两种方式:下载 Windows 桌面版双击即用;或自部署开源 Web 版(Next.js,可 Docker)。还内置 MCP Server + CLI + agent Skill,在 Claude / Cursor 里一句话贴商品链接直接出片。" } }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="forgeline"></div>
+<div class="container">
+
+<nav>
+  <img src="logo.svg" alt="ClipForge logo">
+  <span class="name">ClipForge<em>带货剪手</em></span>
+  <span class="spacer"></span>
+  <a class="plain" href="#compare">对比</a>
+  <a class="plain" href="#faq">FAQ</a>
+  <a class="plain" href="en.html">English</a>
+  <a class="plain" href="https://github.com/xixihhhh/clipforge">GitHub&nbsp;★</a>
+</nav>
+
+<header class="hero">
+  <p class="kicker"><span class="live">● LIVE</span> 1 张商品图 → 00:30 三套脚本 → 02:00 挂车成片</p>
+  <h1>一张商品图,<br>秒变<span class="hl">会卖货</span>的短视频</h1>
+  <p class="sub">上传商品图或粘贴商品链接,AI 提炼卖点、写种草脚本,商品原图保真出镜,自动配音 + 字幕 + BGM,几十秒产出能直接发抖音小店 / 快手 / 小红书 / 视频号 / TikTok Shop 的带货视频。</p>
+  <div class="chips">
+    <span class="chip gold">免费 0 Key 也能出整片</span>
+    <span class="chip">开源 AGPL-3.0 · 自部署</span>
+    <span class="chip">无水印</span>
+    <span class="chip">商品保真不变形</span>
+    <span class="chip green">合规默认开</span>
+  </div>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/xixihhhh/clipforge/releases/latest">免费下载 Windows 桌面版</a>
+    <a class="btn btn-ghost" href="https://github.com/xixihhhh/clipforge">GitHub 源码</a>
+  </div>
+  <p class="note">也可自部署 Web 版 · 内置 MCP + CLI,在 Claude / Cursor 一句话出片</p>
+
+  <!-- 签名演示:锻造流水线——商品图进炉,三站锻造,右边出挂车成片 -->
+  <div class="demo" aria-hidden="true">
+    <div class="forge-console">
+      <div class="console-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="file">云柔加厚抽纸.jpg</span>
+        <span>SKU-0001</span>
+        <span class="scan">AI 锻造中</span>
+      </div>
+      <div class="belt">
+        <span class="spark"></span>
+        <div class="sku">
+          <div class="pic"></div>
+          <div class="sku-name">云柔加厚抽纸</div>
+          <div class="sku-tag">原图 · 未修改</div>
+        </div>
+        <div class="station">
+          <span class="st-tag">01 卖点</span>
+          <h4>AI 提炼卖点</h4>
+          <p>加厚 4 层 / 一抽顶两抽<br>母婴可用 / 全家囤货装<br><b>✓ 5 条已提炼</b></p>
+        </div>
+        <div class="station">
+          <span class="st-tag">02 脚本</span>
+          <h4>3 套种草脚本</h4>
+          <p>痛点种草 / 场景安利 / 对比测评<br>黄金 3 秒钩子 + 话题标签<br><b>✓ 违禁词 0 处</b></p>
+        </div>
+        <div class="station">
+          <span class="st-tag">03 合成</span>
+          <h4>配音 + 字幕 + BGM</h4>
+          <p>免费 TTS 配音 / 烧字幕 / 价格贴<br>FFmpeg 本地真实合成<br><b>✓ AIGC 标识已写入</b></p>
+        </div>
+      </div>
+      <div class="console-foot">
+        <span class="ok">✓ 商品本体未修改 · 限流自检 6/6 通过</span>
+        <span>0 Key · 无水印 · 本地合成</span>
+      </div>
+    </div>
+    <div class="cut"><span>▶</span></div>
+    <div class="phone">
+      <div class="screen">
+        <span class="price">¥39.9</span>
+        <span class="safe">AI 已标识</span>
+        <p class="hook">熬夜党<em>必囤</em>的宝藏纸巾</p>
+        <div class="bottle"></div>
+        <p class="caption"><span>加厚四层</span><span>一抽</span><span>顶两抽</span><span>还不掉屑</span></p>
+        <div class="goods">
+          <div class="g-pic"></div>
+          <div class="g-info">
+            <div class="g-name">云柔加厚抽纸 · 囤货装</div>
+            <span class="g-buy">点击下方购买 →</span>
+          </div>
+        </div>
+        <span class="fmt">9:16 · 1080P</span>
+      </div>
+    </div>
+    <p class="demo-cap">↑ 不是效果图,是 ClipForge 每天在做的事:提炼卖点 → 写脚本 → 商品保真配画面 → 配音字幕 → 挂车成片</p>
+  </div>
+</header>
+
+<section id="how" class="reveal">
+  <div class="sec-head"><span class="no">01 / PIPELINE</span><h2>三步出片,发店就能卖</h2></div>
+  <div class="steps">
+    <div class="step-card">
+      <span class="tc">T+00:00 · 传图/贴链接</span>
+      <h3>把商品丢进来</h3>
+      <p>上传商品图,或直接粘贴商品链接一键导入(自动抓标题 / 价格 / 主图)。选好投放平台:抖音、快手、小红书、TikTok Shop。</p>
+    </div>
+    <div class="step-card">
+      <span class="tc">T+00:30 · AI 写脚本</span>
+      <h3>三套带货脚本任选</h3>
+      <p>AI 提炼卖点,按 5 大品类模板 × 4 种带货风格产出 3 套脚本,自带黄金 3 秒钩子、话题标签、封面文案、互动引导语——不是干巴巴念参数。</p>
+    </div>
+    <div class="step-card">
+      <span class="tc">T+02:00 · 自动成片</span>
+      <h3>配音字幕挂车,一键导出</h3>
+      <p>商品原图保真出镜 + 免费素材配 B-roll,自动配音、烧字幕、价格贴、商品卡、BGM;抖音 9:16 / 小红书 3:4 一键切换,复制文案包就能发。</p>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="reveal">
+  <div class="sec-head"><span class="no">02 / WHY</span><h2>不是又一个 AI 视频工具,<span class="hl">专为带货而生</span></h2></div>
+  <div class="bento">
+    <div class="card wide"><span class="tag red">FIDELITY</span><h3>商品保真,带货命门</h3><p>image-to-image 锁定商品原图,换背景、打光也不改商品本体——绝不把你的产品 P 坏,避免「货不对板」的转化损失与售后风险。</p></div>
+    <div class="card wide"><span class="tag">SCRIPTS</span><h3>会卖货的脚本</h3><p>5 大品类深度模板 × 4 种带货风格(痛点种草 / 场景安利 / 对比测评 / 剧情)+ 黄金 3 秒钩子库,并自动产出话题标签、封面文案、互动引导。</p></div>
+    <div class="card wide"><span class="tag gold">ZERO-KEY</span><h3>0 成本出整片</h3><p>免费素材(Openverse 图 + Wikimedia 实拍视频)+ 免费 Edge TTS 配音(中英日韩西)+ 免费 BGM + 本地 FFmpeg 合成——没有任何 AI Key 也能出整片;要更高画质再自带 Key 接 30+ 模型。</p></div>
+    <div class="card wide"><span class="tag green">COMPLIANT</span><h3>合规默认开,发布不踩坑</h3><p>AIGC 双标识对齐国标 GB 45438-2025、发布前限流自检逐项 ✓⚠✗、广告法违禁词即时高亮附改写建议——出片即合规,不用事后补。</p></div>
+    <div class="card"><span class="tag">BATCH</span><h3>批量 + 爆款复刻</h3><p>大促前 10 个商品一键批量出片;爆款脚本存模板一键套用,输入竞品链接换品重拍,A/B 多版本测转化。</p></div>
+    <div class="card"><span class="tag">GLOBAL</span><h3>一条片,出海多语种</h3><p>脚本一键翻译 + 对应语种免费音色重新配音:中文版发抖音,英文版发 TikTok,同源同画面。</p></div>
+    <div class="card"><span class="tag">FLYWHEEL</span><h3>数据飞轮,学出爆款</h3><p>回填播放 / 点赞 / 成交,按品类聚合出哪种脚本风格更能卖,直接回灌下一次生成——把「凭感觉」变成「用数据」。</p></div>
+    <div class="card wide"><span class="tag">AGENT-NATIVE</span><h3>Agent 一句话出片</h3><p>内置 MCP Server + CLI + agent Skill:在 Claude / Cursor 里贴商品链接直接出带货脚本,一条命令从链接到成片(clipforge product --url … --compose)。</p></div>
+    <div class="card wide"><span class="tag">FACELESS</span><h3>全程不出真人脸</h3><p>商品图 + AI 画面 + 配音字幕自动成片,不用出镜不用拍摄,一个人一天出几十条。</p></div>
+  </div>
+</section>
+
+<section id="shots" class="reveal">
+  <div class="sec-head"><span class="no">03 / LOOK</span><h2>它长这样</h2></div>
+  <div class="filmstrip">
+    <figure class="frame"><img src="screenshots/04-script.png" alt="ClipForge 分镜脚本界面:3 套带货方案,自带黄金 3 秒钩子与话题标签" loading="lazy"><figcaption><b>02</b>分镜脚本——3 套方案任选,钩子 / 标签 / 封面文案全配齐</figcaption></figure>
+    <figure class="frame"><img src="screenshots/03-new.png" alt="ClipForge 新建项目:粘贴商品链接或上传商品图" loading="lazy"><figcaption><b>01</b>新建——贴商品链接一键导入,或直接传图</figcaption></figure>
+    <figure class="frame"><img src="screenshots/04b-video.png" alt="ClipForge 视频合成:配音、字幕、BGM" loading="lazy"><figcaption><b>03</b>合成——配音 / 字幕 / BGM / 价格贴,FFmpeg 真实合成</figcaption></figure>
+    <figure class="frame"><img src="screenshots/05-export.png" alt="ClipForge 成片导出:多平台规格一键切换" loading="lazy"><figcaption><b>04</b>导出——抖音 9:16 / 小红书 3:4 一键切换 + 文案包</figcaption></figure>
+    <figure class="frame"><img src="screenshots/06-batch.png" alt="ClipForge 批量出片" loading="lazy"><figcaption><b>05</b>批量——大促前 10 个商品一键出片</figcaption></figure>
+    <figure class="frame"><img src="screenshots/01-home.png" alt="ClipForge 首页:一句话/商品图成片" loading="lazy"><figcaption><b>06</b>首页——商品带货 / 一句话主题 / 自带脚本,三种玩法</figcaption></figure>
+  </div>
+</section>
+
+<section id="compare" class="reveal">
+  <div class="sec-head"><span class="no">04 / VS</span><h2>做一条带货视频:<span class="hl">传统外包 vs ClipForge</span></h2></div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>环节</th><th>ClipForge</th><th>传统外包</th></tr></thead>
+      <tbody>
+        <tr><td>脚本创作</td><td class="win">AI 30 秒生成 3 套脚本</td><td>编导写脚本 1-2 小时</td></tr>
+        <tr><td>素材制作</td><td class="win">AI 生图/生视频 + 免费素材,分钟级</td><td>拍摄 + 修图 1-3 天</td></tr>
+        <tr><td>视频剪辑</td><td class="win">自动合成 + 转场 + 字幕 + 配音</td><td>剪辑师 2-4 小时</td></tr>
+        <tr><td>多平台适配</td><td class="win">抖音/快手/小红书/视频号/TikTok 一键导出</td><td>手动调比例 / 字幕</td></tr>
+        <tr><td>合规标识</td><td class="win">AIGC 标识 + 限流自检 + 违禁词扫描,默认开</td><td>靠人肉记住,漏了限流</td></tr>
+        <tr><td>成本</td><td class="win">0 成本免 Key,无水印不限条数</td><td>单条数百到数千元</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="aftertable">一个人一天出几十条,大促不求人。</p>
+</section>
+
+<section id="faq" class="reveal">
+  <div class="sec-head"><span class="no">05 / FAQ</span><h2>常见问题</h2></div>
+  <div class="faq-list">
+    <details open><summary>ClipForge 是免费的吗?</summary><p>是。开源(AGPL-3.0)、无水印、不限条数。免费素材 + 免费微软 Edge TTS 配音 + 免费 BGM + 本地 FFmpeg 合成,没有任何 AI Key 也能出整片;想要更高画质再自带 Key,一个接口聚合 7 大平台 30+ 模型(GPT Image 2 / Seedance 2.0 / Kling 3.0…)。</p></details>
+    <details><summary>会把我的商品图改变形吗?</summary><p>不会,这是命门功能:image-to-image 锁定商品原图,换背景、打光也不改商品本体——既保转化,也避免「货不对板」的合规与售后风险。</p></details>
+    <details><summary>需要真人出镜吗?</summary><p>不需要。商品图 + AI 配画面 + 免费配音 + 字幕自动合成,全程不出真人脸(faceless),一个人一天能出几十条。</p></details>
+    <details><summary>支持发哪些平台?</summary><p>抖音小店 9:16、快手、小红书 3:4、视频号、TikTok Shop / Reels / Shorts 规格一键切换导出,自动产出话题标签、封面文案、互动引导语,复制就能发。</p></details>
+    <details><summary>国内发布会因为 AI 内容被限流吗?</summary><p>合规默认开:成片自动写入 AIGC 隐式标识(对齐国标 GB 45438-2025),可一键烧显式「AI 生成」标识;发布前限流自检(风险词 / 钩子 / 时长 / 字幕 / CTA 逐项 ✓⚠✗ 附具体改法)+ 广告法违禁词扫描,出片即合规。</p></details>
+    <details><summary>怎么部署使用?</summary><p>两种方式:下载 Windows 桌面版双击即用;或自部署开源 Web 版(Next.js,可 Docker)。还内置 MCP Server + CLI + agent Skill,在 Claude / Cursor 里贴商品链接一句话出片。</p></details>
+  </div>
+</section>
+
+<div class="last-call reveal">
+  <h2>下一条<span class="hl">爆单视频</span>,从一张商品图开始</h2>
+  <p>免费 · 开源 · 无水印,0 Key 也能出整片。</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/xixihhhh/clipforge/releases/latest">免费下载 Windows 桌面版</a>
+    <a class="btn btn-ghost" href="https://github.com/xixihhhh/clipforge">GitHub 源码</a>
+  </div>
+</div>
+
+<footer>
+  <p>ClipForge(原带货剪手)· 开源 AGPL-3.0 · <a href="https://github.com/xixihhhh/clipforge">GitHub</a> · <a href="https://github.com/xixihhhh/clipforge/releases/latest">下载</a> · <a href="en.html">English</a></p>
+  <p style="margin-top:8px">请遵守各平台广告与 AIGC 标识规则,对发布内容负责。</p>
+</footer>
+
+</div>
+<script>
+// 滚动进场(尊重系统的减少动态偏好)
+(function () {
+  var els = document.querySelectorAll('.reveal');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+    els.forEach(function (el) { el.classList.add('in'); }); return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  els.forEach(function (el) { io.observe(el); });
+})();
+</script>
+</body>
+</html>

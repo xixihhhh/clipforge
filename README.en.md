@@ -6,6 +6,8 @@
 >
 > <sub>📌 Formerly『**带货剪手** / daihuo-jianshou』— repo · stars · history all carried over; also does "one-sentence topic → video" for any non-commerce subject.</sub>
 
+<p align="center"><strong>🌐 Website: <a href="https://xixihhhh.github.io/clipforge/en.html">xixihhhh.github.io/clipforge</a></strong> — see what ClipForge can sell for you in 30 seconds</p>
+
 <p align="right"><strong>English</strong> · <a href="README.md">中文</a></p>
 
 <p align="center">

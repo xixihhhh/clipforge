@@ -6,6 +6,8 @@
 >
 > <sub>📌 原『**带货剪手** / daihuo-jianshou』，仓库 · Star · 历史全部延续；也支持「一句话主题成片」做任意非带货题材。</sub>
 
+<p align="center"><strong>🌐 官网:<a href="https://xixihhhh.github.io/clipforge/">xixihhhh.github.io/clipforge</a></strong> — 30 秒看懂 ClipForge 能帮你卖什么</p>
+
 <p align="right"><a href="README.en.md">English</a> · <strong>中文</strong></p>
 
 <p align="center">
