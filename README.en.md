@@ -449,6 +449,12 @@ pnpm dist       # .dmg installer
 
 ---
 
+## From the same author
+
+✂️ **[HotClip](https://github.com/xixihhhh/hotclip)** — open-source AI long-video clipper: drop in a podcast or stream VOD, AI finds the highlights and cuts publish-ready vertical clips with word-level captions, all on your own machine. **ClipForge builds short videos from a single image; HotClip clips highlights out of long videos** — the "cut long video into viral clips" item above, available today.
+
+---
+
 ## License
 
 [AGPL-3.0](LICENSE) © 2026 xixihhhh

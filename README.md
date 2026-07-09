@@ -485,6 +485,12 @@ pnpm dist       # 出 .dmg 安装包
 
 ---
 
+## 同作者项目
+
+✂️ **[HotClip 爆款切片](https://github.com/xixihhhh/hotclip)** — 开源 AI 长视频切片工具:播客/直播回放丢进去,AI 找爆点,一键切出竖屏+逐字字幕成片,素材全程不出你的电脑。**ClipForge 从一张图造短视频,HotClip 把长视频切成爆款**——上面规划里的「长视频切爆款」,现在就能用它。
+
+---
+
 ## License
 
 [AGPL-3.0](LICENSE) © 2026 xixihhhh
