@@ -21,8 +21,8 @@ ClipForge produces a finished vertical short video end to end. You drive it thro
 
 ## Three ways to create
 
-- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_product_script`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_carousel`, `clipforge_shop_qr`, `clipforge_end_card`, `clipforge_qc`, `clipforge_preview_gif`, `clipforge_export_subtitle`.
-- **CLI**: `node bin/clipforge.mjs <create|product|import|compose|dub|cover|qr|endcard|qc|carousel|list|voices|get|trends> [flags]` (`--help` for all).
+- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_product_script`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_carousel`, `clipforge_shop_qr`, `clipforge_end_card`, `clipforge_qc`, `clipforge_credits`, `clipforge_preview_gif`, `clipforge_export_subtitle`.
+- **CLI**: `node bin/clipforge.mjs <create|product|import|compose|dub|cover|qr|endcard|qc|credits|carousel|list|voices|get|trends> [flags]` (`--help` for all).
 - **HTTP**: `POST /api/topic/script` → `POST /api/project/[id]/stock-fill` → `POST /api/project/[id]/compose` → poll `GET /api/project/[id]/compose`.
 
 ## Workflows

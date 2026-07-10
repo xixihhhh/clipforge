@@ -362,6 +362,27 @@ async function cmdEndcard(flags) {
   return { ok: true, projectId, video: res.video, shopLink: res.shopLink };
 }
 
+// Credits: export the asset license manifest (per-shot provenance + commercial-risk flags + attribution lines)
+async function cmdCredits(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const lang = flags.lang === "en" ? "en" : "zh";
+  if (flags.format === "md") {
+    const res = await api(`/api/project/${projectId}/credits?format=md&lang=${lang}`);
+    // markdown comes back as text (api() wraps non-JSON as { raw }) — print it verbatim for piping to a file
+    process.stdout.write(typeof res.raw === "string" ? res.raw : JSON.stringify(res, null, 2));
+    return { ok: true, projectId };
+  }
+  const m = await api(`/api/project/${projectId}/credits`);
+  step(`素材 ${m.summary.total} 项：需署名 ${m.summary.needsAttribution}，需人工复核 ${m.summary.needsReview}`);
+  step(m.summary.commercialSafe ? "✓ 未发现商用限制素材" : "⚠ 有素材需人工复核，投流前请确认或替换");
+  for (const i of [...(m.items || []), ...(m.bgm ? [m.bgm] : [])]) {
+    if (i.attributionLine) step(`署名: ${i.attributionLine}`);
+    if (i.risk === "review") step(`复核: ${i.shotId >= 0 ? `分镜${i.shotId + 1}` : "BGM"} · ${i.license || "许可未知"}`);
+  }
+  return { ok: true, projectId, summary: m.summary, items: m.items, bgm: m.bgm };
+}
+
 // QC: run the automated quality check over the latest composed video (black frames / silence / loudness / streams)
 async function cmdQc(flags) {
   const projectId = String(flags.project || "").trim();
@@ -465,6 +486,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge qr --project <id> [--platform douyin --url <shopUrl> --size 512]   生成商品「扫码购买」二维码(UTM追踪)
   clipforge endcard --project <id> [--platform douyin --seconds 3 --cta "扫码购买"]   把扫码购买二维码烧进成片片尾(需先合成)
   clipforge qc --project <id> [--composition <id>]   成片质检(黑屏/静音/响度/流完整性,批量出片前把关)
+  clipforge credits --project <id> [--format md --lang zh|en]   素材授权清单(商用风险+署名行,投流审核用)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
   clipforge carousel --project <id> [--theme night|warm|mint|mono|rose]   生成小红书图文卡片(标题+逐条要点)
   clipforge get --project <id>  查最新成片地址
@@ -477,7 +499,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, qc: cmdQc, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, qc: cmdQc, credits: cmdCredits, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));

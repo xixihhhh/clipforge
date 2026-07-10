@@ -184,6 +184,37 @@ export default function ExportPage() {
     } catch (e) { setQc({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
 
+  // asset license manifest: per-shot provenance + commercial-risk flags + attribution lines
+  type CreditsUi = {
+    loading?: boolean;
+    error?: string;
+    summary?: { total: number; needsAttribution: number; needsReview: number; commercialSafe: boolean };
+    attributions?: string[];
+    copiedIdx?: number;
+  };
+  const [credits, setCredits] = useState<CreditsUi>({});
+  const runCredits = async () => {
+    setCredits({ loading: true });
+    try {
+      const r = await fetch(`/api/project/${id}/credits`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || t("moreFailed"));
+      const all = [...(Array.isArray(d.items) ? d.items : []), ...(d.bgm ? [d.bgm] : [])];
+      setCredits({
+        loading: false,
+        summary: d.summary,
+        attributions: all.filter((i) => i.attributionLine).map((i) => i.attributionLine as string),
+      });
+    } catch (e) { setCredits({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
+  };
+  const copyAttribution = async (line: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(line);
+      setCredits((c) => ({ ...c, copiedIdx: idx }));
+      setTimeout(() => setCredits((c) => ({ ...c, copiedIdx: undefined })), 1500);
+    } catch { /* clipboard unavailable (non-secure context) — the text stays selectable */ }
+  };
+
   const genDub = async () => {
     if (!llm.apiKey) { setTool("dub", { error: t("moreDubNeedLlm") }); return; }
     setTool("dub", { loading: true, error: undefined, note: undefined });
@@ -752,6 +783,46 @@ export default function ExportPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+              {/* asset license manifest */}
+              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2"><LuFileText className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("creditsTitle")}</span></div>
+                  <Button size="sm" variant="outline" className="text-xs h-7" disabled={credits.loading} onClick={runCredits}>
+                    {credits.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("creditsRun")}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{t("creditsHint")}</p>
+                {credits.error && <p className="text-[11px] text-destructive mt-1">{credits.error}</p>}
+                {credits.summary && (
+                  <>
+                    <p className={`text-[11px] mt-2 font-medium ${credits.summary.commercialSafe ? "text-emerald-500" : "text-amber-500"}`}>
+                      {credits.summary.commercialSafe ? t("creditsSafe") : t("creditsUnsafe", { n: credits.summary.needsReview })}
+                      {" · "}
+                      <span className="text-muted-foreground font-normal">{t("creditsSummary", { total: credits.summary.total, attr: credits.summary.needsAttribution })}</span>
+                    </p>
+                    {credits.attributions && credits.attributions.length > 0 && (
+                      <div className="mt-1.5">
+                        <p className="text-[11px] text-muted-foreground mb-1">{t("creditsAttrLabel")}</p>
+                        <ul className="space-y-1">
+                          {credits.attributions.map((line, i) => (
+                            <li key={i}>
+                              <button
+                                className="text-left text-[11px] text-foreground/80 hover:text-primary break-all"
+                                onClick={() => copyAttribution(line, i)}
+                              >
+                                {line}{credits.copiedIdx === i && <span className="ml-1.5 text-emerald-500">{t("creditsCopied")}</span>}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <a href={`/api/project/${id}/credits?format=md&lang=${locale === "en" ? "en" : "zh"}`} download>
+                      <Button size="sm" variant="outline" className="text-xs h-7 mt-2"><LuDownload className="w-3 h-3 mr-1" />{t("creditsDownloadMd")}</Button>
+                    </a>
+                  </>
                 )}
               </div>
               {/* multi-language dub */}

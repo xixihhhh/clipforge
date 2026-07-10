@@ -4,7 +4,7 @@
  * Failures do not block composition (returns null). Tracks requiring attribution (CC BY, etc.) return
  * author/license/sourceUrl so the caller can prompt the user to credit them in the finished video.
  */
-import { mkdir } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { getUploadsDir } from "@/lib/paths";
 import { searchWikimediaAudio } from "@/lib/providers/wikimedia";
@@ -80,6 +80,17 @@ export async function fetchFreeBgm(
     for (const pick of pool) {
       try {
         const { filePath } = await downloadStockFile(pick.downloadUrl, bgmDir, `bgm_${Date.now()}`, "audio");
+        // provenance sidecar: the compose route only persists bgmPath, so drop author/license/sourceUrl
+        // next to the audio file for the asset-credits manifest to pick up later (best-effort, non-blocking)
+        try {
+          await writeFile(
+            `${filePath}.credit.json`,
+            JSON.stringify({ author: pick.author, license: pick.license, sourceUrl: pick.pageUrl }),
+            "utf-8"
+          );
+        } catch {
+          /* credits sidecar is optional — never block BGM */
+        }
         return { localPath: filePath, author: pick.author, license: pick.license, sourceUrl: pick.pageUrl };
       } catch {
         // This track failed to download (e.g. auth required, 401) → try the next one

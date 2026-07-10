@@ -404,6 +404,18 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_credits",
+    description:
+      "导出某项目的素材授权清单：逐镜溯源（来源/作者/许可）+ 商用风险分级（NC/ND/未知许可标记「需人工复核」）+ CC BY 素材的可直接粘贴署名行 + BGM 授权。投流/广告审核要授权凭证时用，或发布前自查素材商用安全。返回结构化 JSON（summary.commercialSafe 表示是否无风险项）。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "clipforge_preview_gif",
     description:
       "从某项目最新成片切一小段转成循环 GIF 预览（分享 / 嵌入 / 列表 hover 用）。需先合成过视频。不需要 LLM。",
@@ -764,6 +776,14 @@ async function handleQc(args) {
   return ok({ ok: res.status !== "fail", projectId, compositionId: res.compositionId ?? null, status: res.status, checks: res.checks ?? [] });
 }
 
+// Asset license manifest (per-shot provenance + commercial-risk flags + attribution lines)
+async function handleCredits(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const m = await api(`/api/project/${projectId}/credits`);
+  return ok({ ok: true, projectId, summary: m.summary, items: m.items ?? [], bgm: m.bgm ?? null });
+}
+
 // GIF preview from the latest composed video
 async function handlePreviewGif(args) {
   const projectId = String(args.projectId || "").trim();
@@ -815,6 +835,7 @@ const HANDLERS = {
   clipforge_shop_qr: handleShopQr,
   clipforge_end_card: handleEndCard,
   clipforge_qc: handleQc,
+  clipforge_credits: handleCredits,
   clipforge_preview_gif: handlePreviewGif,
   clipforge_export_subtitle: handleExportSubtitle,
   clipforge_carousel: handleCarousel,
