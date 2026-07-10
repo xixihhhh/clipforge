@@ -77,6 +77,13 @@ export const exportPage: NamespaceMessages = {
     creditsAttrLabel: "需附署名（点击复制）",
     creditsDownloadMd: "下载清单 (Markdown)",
     creditsCopied: "已复制",
+    // 原生感处理
+    feelTitle: "原生感处理（实拍感）",
+    feelHint: "给成片加手持微抖动 + 轻颗粒 + 去精致化调色，让 AI 成片更像手机实拍——应对平台对「过度精致 AI 感」内容的降权。",
+    feelStrengthSubtle: "轻微",
+    feelStrengthMedium: "明显",
+    feelDone: "原生感成片已生成",
+    feelDownload: "下载成片",
     // 多平台导出
     multiExportTitle: "多平台导出",
     multiExportDesc: "一键重编码为各平台比例（模糊填充，不裁掉字幕/贴片）",
@@ -191,6 +198,13 @@ export const exportPage: NamespaceMessages = {
     creditsAttrLabel: "Required attributions (click to copy)",
     creditsDownloadMd: "Download manifest (Markdown)",
     creditsCopied: "Copied",
+    // native feel post-process
+    feelTitle: "Native feel (hand-shot look)",
+    feelHint: "Adds handheld micro-jitter, light grain and a de-polish color tweak so AI output reads like phone footage — counters platforms downranking overly polished AI-looking content.",
+    feelStrengthSubtle: "Subtle",
+    feelStrengthMedium: "Medium",
+    feelDone: "Native-feel video generated",
+    feelDownload: "Download video",
     multiExportTitle: "Multi-platform export",
     multiExportDesc: "Re-encode to each platform's aspect ratio in one click (blurred fill, no cropping of subtitles/overlays)",
     ratioLabel: "Ratio: {ratio}",

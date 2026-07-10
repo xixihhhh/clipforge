@@ -416,6 +416,22 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_native_feel",
+    description:
+      "把某项目最新成片重渲成「原生实拍感」（后处理，不改合成管线）：手持微抖动（确定性正弦驱动，可用 seed 让 A/B 变体动线不同）+ 轻颗粒 + 轻微去精致化调色。应对 2026 平台对「过度精致 AI 感」内容的降权，让 AI 成片更像手机实拍。输出新 mp4。需先合成过视频。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+        strength: { type: "string", enum: ["subtle", "medium"], description: "力度：subtle 轻微(默认) / medium 明显手持感" },
+        seed: { type: "number", description: "抖动相位种子（不同变体传不同值避免动线一致）" },
+        grain: { type: "boolean", description: "是否加颗粒，默认 true" },
+        vignette: { type: "boolean", description: "是否加轻晕影，默认 false（观感明显，按需开）" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "clipforge_preview_gif",
     description:
       "从某项目最新成片切一小段转成循环 GIF 预览（分享 / 嵌入 / 列表 hover 用）。需先合成过视频。不需要 LLM。",
@@ -784,6 +800,19 @@ async function handleCredits(args) {
   return ok({ ok: true, projectId, summary: m.summary, items: m.items ?? [], bgm: m.bgm ?? null });
 }
 
+// Hand-shot look post-process over the latest composed video
+async function handleNativeFeel(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const body = {};
+  if (args.strength === "medium" || args.strength === "subtle") body.strength = args.strength;
+  if (Number.isFinite(args.seed)) body.seed = args.seed;
+  if (typeof args.grain === "boolean") body.grain = args.grain;
+  if (args.vignette === true) body.vignette = true;
+  const res = await api(`/api/project/${projectId}/native-feel`, { method: "POST", body });
+  return ok({ ok: true, projectId, video: res.video ? `${BASE_URL}${res.video}` : null, strength: res.strength ?? null });
+}
+
 // GIF preview from the latest composed video
 async function handlePreviewGif(args) {
   const projectId = String(args.projectId || "").trim();
@@ -836,6 +865,7 @@ const HANDLERS = {
   clipforge_end_card: handleEndCard,
   clipforge_qc: handleQc,
   clipforge_credits: handleCredits,
+  clipforge_native_feel: handleNativeFeel,
   clipforge_preview_gif: handlePreviewGif,
   clipforge_export_subtitle: handleExportSubtitle,
   clipforge_carousel: handleCarousel,

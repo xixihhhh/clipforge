@@ -215,6 +215,18 @@ export default function ExportPage() {
     } catch { /* clipboard unavailable (non-secure context) — the text stays selectable */ }
   };
 
+  // native feel: hand-shot look post-process (handheld jitter + grain + de-polish)
+  const [feelStrength, setFeelStrength] = useState<"subtle" | "medium">("subtle");
+  const genNativeFeel = async () => {
+    setTool("feel", { loading: true, error: undefined, video: undefined });
+    try {
+      const r = await fetch(`/api/project/${id}/native-feel`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ strength: feelStrength }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || t("moreFailed"));
+      setTool("feel", { loading: false, video: d.video, note: t("feelDone") });
+    } catch (e) { setTool("feel", { loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
+  };
+
   const genDub = async () => {
     if (!llm.apiKey) { setTool("dub", { error: t("moreDubNeedLlm") }); return; }
     setTool("dub", { loading: true, error: undefined, note: undefined });
@@ -823,6 +835,28 @@ export default function ExportPage() {
                       <Button size="sm" variant="outline" className="text-xs h-7 mt-2"><LuDownload className="w-3 h-3 mr-1" />{t("creditsDownloadMd")}</Button>
                     </a>
                   </>
+                )}
+              </div>
+              {/* native feel (hand-shot look) */}
+              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2"><LuFilm className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("feelTitle")}</span></div>
+                  <div className="flex items-center gap-2">
+                    <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={feelStrength} onChange={(e) => setFeelStrength(e.target.value === "medium" ? "medium" : "subtle")}>
+                      <option value="subtle">{t("feelStrengthSubtle")}</option>
+                      <option value="medium">{t("feelStrengthMedium")}</option>
+                    </select>
+                    <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.feel?.loading || !composition?.url} onClick={genNativeFeel}>
+                      {more.feel?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{t("feelHint")}</p>
+                {more.feel?.error && <p className="text-[11px] text-destructive mt-1">{more.feel.error}</p>}
+                {more.feel?.video && (
+                  <a href={`${more.feel.video}?download=1`} download>
+                    <Button size="sm" variant="outline" className="text-xs h-7 mt-1"><LuDownload className="w-3 h-3 mr-1" />{t("feelDownload")}</Button>
+                  </a>
                 )}
               </div>
               {/* multi-language dub */}

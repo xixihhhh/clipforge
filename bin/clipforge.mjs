@@ -362,6 +362,20 @@ async function cmdEndcard(flags) {
   return { ok: true, projectId, video: res.video, shopLink: res.shopLink };
 }
 
+// Native feel: hand-shot look post-process (handheld micro-jitter + grain + de-polish color)
+async function cmdNative(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const body = {};
+  if (flags.strength === "medium" || flags.strength === "subtle") body.strength = flags.strength;
+  if (flags.seed && Number.isFinite(Number(flags.seed))) body.seed = Number(flags.seed);
+  if (flags["no-grain"]) body.grain = false;
+  if (flags.vignette) body.vignette = true;
+  const res = await api(`/api/project/${projectId}/native-feel`, { method: "POST", body });
+  step(`原生感成片已生成（${res.strength}）：${res.video}`);
+  return { ok: true, projectId, video: res.video, strength: res.strength };
+}
+
 // Credits: export the asset license manifest (per-shot provenance + commercial-risk flags + attribution lines)
 async function cmdCredits(flags) {
   const projectId = String(flags.project || "").trim();
@@ -487,6 +501,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge endcard --project <id> [--platform douyin --seconds 3 --cta "扫码购买"]   把扫码购买二维码烧进成片片尾(需先合成)
   clipforge qc --project <id> [--composition <id>]   成片质检(黑屏/静音/响度/流完整性,批量出片前把关)
   clipforge credits --project <id> [--format md --lang zh|en]   素材授权清单(商用风险+署名行,投流审核用)
+  clipforge native --project <id> [--strength subtle|medium --seed 3 --no-grain --vignette]   原生感处理(手持感+颗粒,反AI精致感)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
   clipforge carousel --project <id> [--theme night|warm|mint|mono|rose]   生成小红书图文卡片(标题+逐条要点)
   clipforge get --project <id>  查最新成片地址
@@ -499,7 +514,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, qc: cmdQc, credits: cmdCredits, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, qc: cmdQc, credits: cmdCredits, native: cmdNative, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));
