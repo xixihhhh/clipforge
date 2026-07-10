@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// self-hosted Geist via the official npm package (same --font-geist-* variables) — a build-time fetch
+// from Google Fonts is a network dependency that intermittently breaks CI release builds
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { LocaleInitializer } from "@/components/locale-initializer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSans = GeistSans;
+const geistMono = GeistMono;
 
 export const metadata: Metadata = {
   // Title/description are bilingual (Chinese first): prioritize domestic traffic while covering overseas search indexing
