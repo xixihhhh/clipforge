@@ -1,0 +1,65 @@
+# 临时调试工作流：在真实 Windows 环境复现 issue #12 —— 打包版 /api/project 500
+# 步骤：下载 v0.8.41 安装包 → 解包 → 用 Electron-as-Node 直接拉起 standalone 服务 → 请求 DB 路由，抓真实报错
+name: Debug Win DB Repro
+
+on: workflow_dispatch
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: 下载 v0.8.41 Windows 安装包
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.8.41 --repo ${{ github.repository }} --pattern '*.exe' --dir .
+          Get-ChildItem *.exe
+
+      - name: 解包 NSIS 安装程序与 app-64.7z
+        shell: pwsh
+        run: |
+          7z x -y -oexe (Get-ChildItem *.exe).FullName | Out-Null
+          7z x -y -oapp 'exe/$PLUGINSDIR/app-64.7z' | Out-Null
+          Get-ChildItem app/resources/standalone | Select-Object -First 20 Name
+
+      - name: 直接 require better-sqlite3（验证原生模块可加载）
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          & app/ClipForge.exe -e "try { const p = require('path').resolve('app/resources/standalone/node_modules/better-sqlite3'); const D = require(p); const db = new D(':memory:'); console.log('better-sqlite3 加载 OK', db.prepare('select 1 as x').get()); } catch (e) { console.error('加载失败:', e); }"
+
+      - name: 启动 standalone 服务并请求 /api/project
+        shell: pwsh
+        run: |
+          $st = (Resolve-Path 'app/resources/standalone').Path
+          $data = Join-Path $env:RUNNER_TEMP 'clipforge-data'
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = (Resolve-Path 'app/ClipForge.exe').Path
+          $psi.Arguments = '"' + (Join-Path $st 'server.js') + '"'
+          $psi.WorkingDirectory = $st
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.EnvironmentVariables['ELECTRON_RUN_AS_NODE'] = '1'
+          $psi.EnvironmentVariables['NODE_ENV'] = 'production'
+          $psi.EnvironmentVariables['PORT'] = '8399'
+          $psi.EnvironmentVariables['HOSTNAME'] = '127.0.0.1'
+          $psi.EnvironmentVariables['APP_DATA_DIR'] = $data
+          $psi.EnvironmentVariables['APP_MIGRATIONS_DIR'] = (Join-Path $st 'drizzle')
+          $proc = [System.Diagnostics.Process]::Start($psi)
+          Start-Sleep -Seconds 10
+          Write-Host '=== GET /api/project ==='
+          try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8399/api/project' -UseBasicParsing; Write-Host $r.StatusCode $r.Content } catch { Write-Host 'GET 失败:' $_.Exception.Response.StatusCode.value__ ; if ($_.ErrorDetails) { Write-Host $_.ErrorDetails.Message } }
+          Write-Host '=== POST /api/project ==='
+          $body = '{"name":"win复现","productName":"测试品","productCategory":"other","productDescription":"x","productImages":[]}'
+          try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8399/api/project' -Method POST -ContentType 'application/json' -Body $body -UseBasicParsing; Write-Host $r.StatusCode $r.Content } catch { Write-Host 'POST 失败:' $_.Exception.Response.StatusCode.value__; if ($_.ErrorDetails) { Write-Host $_.ErrorDetails.Message } }
+          Start-Sleep -Seconds 2
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Write-Host '=== 服务端输出 ==='
+          Write-Host $proc.StandardOutput.ReadToEnd()
+          Write-Host '=== 服务端错误输出 ==='
+          Write-Host $proc.StandardError.ReadToEnd()
