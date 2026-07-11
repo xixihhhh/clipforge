@@ -174,6 +174,26 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "daihuo-jianshou-settings",
+      // v1：清洗历史版本预设写入的失效模型名（旧预设填过不存在的模型 ID，"测试连接"只验 Key
+      // 不验模型名所以一直显示正常，直到生成脚本才报 Model Not Exist——issue #12 用户即此场景）。
+      // 只在 baseUrl 匹配对应官方端点时改写，避免误伤自建代理上的同名自定义模型。
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as SettingsState;
+        const llm = state?.llm;
+        if (llm?.baseUrl) {
+          const fixes: Array<{ hostRe: RegExp; from: string; to: string }> = [
+            { hostRe: /api\.deepseek\.com/i, from: "deepseek-v3.2", to: "deepseek-v4-flash" },
+            { hostRe: /volces\.com/i, from: "doubao-seed-2.0-pro", to: "doubao-seed-2-0-pro-260215" },
+          ];
+          for (const f of fixes) {
+            if (!f.hostRe.test(llm.baseUrl)) continue;
+            if (llm.model === f.from) llm.model = f.to;
+            if (llm.visionModel === f.from) llm.visionModel = f.to;
+          }
+        }
+        return state;
+      },
     }
   )
 );

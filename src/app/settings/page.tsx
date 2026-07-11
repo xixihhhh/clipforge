@@ -386,6 +386,17 @@ export default function SettingsPage() {
   // LLM connection test state
   const [llmTestStatus, setLlmTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
 
+  // 系统诊断信息（/api/health），报障截图用
+  const [diagnostics, setDiagnostics] = useState("");
+  const loadDiagnostics = async () => {
+    try {
+      const res = await fetch("/api/health");
+      setDiagnostics(JSON.stringify(await res.json(), null, 2));
+    } catch (e) {
+      setDiagnostics(String(e));
+    }
+  };
+
   // test LLM connection
   const [llmTestError, setLlmTestError] = useState("");
   const testLLMConnection = async () => {
@@ -396,7 +407,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/llm/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: llm.baseUrl, apiKey: llm.apiKey }),
+        body: JSON.stringify({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model }),
       });
       const data = await res.json().catch(() => ({ ok: false }));
       setLlmTestStatus(data.ok ? "success" : "error");
@@ -1107,6 +1118,27 @@ export default function SettingsPage() {
               {t("saveSettings")}
             </Button>
           </div>
+        </div>
+
+        {/* 系统诊断：报障时让用户点开截图/复制，一次拿到版本、数据库、迁移、ffmpeg 状态（替代来回追问日志） */}
+        <div className="mt-6 rounded-lg border border-border/40 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{t("diagnosticsTitle")}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={loadDiagnostics}>
+                {diagnostics ? t("diagnosticsRefresh") : t("diagnosticsShow")}
+              </Button>
+              {diagnostics && (
+                <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(diagnostics)}>
+                  {t("diagnosticsCopy")}
+                </Button>
+              )}
+            </div>
+          </div>
+          {diagnostics && (
+            <pre className="mt-3 max-h-64 overflow-auto rounded bg-muted/30 p-3 text-xs leading-relaxed whitespace-pre-wrap break-all">{diagnostics}</pre>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">{t("diagnosticsHint")}</p>
         </div>
       </main>
     </div>

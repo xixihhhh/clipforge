@@ -117,6 +117,11 @@ export const settings: NamespaceMessages = {
     providerCount: "✓ {n} 个 AI 平台已启用",
     noProvider: "⚠ 无 AI 平台启用（素材生成需要）",
     settingsSaved: "设置已保存",
+    diagnosticsTitle: "系统诊断",
+    diagnosticsShow: "查看诊断信息",
+    diagnosticsRefresh: "刷新",
+    diagnosticsCopy: "复制",
+    diagnosticsHint: "反馈问题时，把这里的内容截图或复制到 GitHub issue，能大幅加快定位（不含任何密钥）。",
     saveSettings: "保存设置",
 
     // 出镜人物
@@ -280,6 +285,11 @@ export const settings: NamespaceMessages = {
     providerCount: "✓ {n} AI platforms enabled",
     noProvider: "⚠ No AI platform enabled (required for asset generation)",
     settingsSaved: "Settings saved",
+    diagnosticsTitle: "Diagnostics",
+    diagnosticsShow: "Show diagnostics",
+    diagnosticsRefresh: "Refresh",
+    diagnosticsCopy: "Copy",
+    diagnosticsHint: "When reporting an issue, attach a screenshot or paste of this info to the GitHub issue — it speeds up debugging a lot (contains no secrets).",
     saveSettings: "Save settings",
 
     // Characters

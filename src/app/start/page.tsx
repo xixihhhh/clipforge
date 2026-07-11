@@ -147,7 +147,10 @@ export default function StartPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: t("projectName", { name: productName }), productName, productCategory: "other", productDescription: sellingPoints, productImages: [] }),
     });
-    if (!projectRes.ok) throw new Error(t("errProjectCreate"));
+    if (!projectRes.ok) {
+      const errData = await projectRes.json().catch(() => ({}));
+      throw new Error(errData.error ? `${t("errProjectCreate")}: ${errData.error}` : t("errProjectCreate"));
+    }
     const project = await projectRes.json();
 
     setStage(t("stageUpload"));
@@ -179,7 +182,10 @@ export default function StartPage() {
         llmConfig: llmConfig(),
       }),
     });
-    if (!scriptRes.ok) throw new Error(t("errScript"));
+    if (!scriptRes.ok) {
+      const errData = await scriptRes.json().catch(() => ({}));
+      throw new Error(errData.error ? `${t("errScript")}: ${errData.error}` : t("errScript"));
+    }
     router.push(`/project/${project.id}/script`);
   };
 
