@@ -158,9 +158,15 @@ export function selectHookPatterns(category: ProductCategory, n = 5): HookPatter
   return out;
 }
 
-/** Renders into a "three-beat structure + category-preference" prompt snippet for LLM injection */
-export function buildHookGuidance(category: ProductCategory, n = 5): string {
-  const patterns = selectHookPatterns(category, n);
+/**
+ * Renders into a "three-beat structure + category-preference" prompt snippet for LLM injection.
+ * With pinnedHookId (anti-homogenization batch rotation): only that pattern's card is shown and the
+ * opening MUST use it — so each batch item gets a genuinely different hook mechanism instead of the
+ * LLM free-picking the same favourite every time.
+ */
+export function buildHookGuidance(category: ProductCategory, n = 5, pinnedHookId?: string): string {
+  const pinned = pinnedHookId ? HOOK_PATTERNS.find((p) => p.id === pinnedHookId) : undefined;
+  const patterns = pinned ? [pinned] : selectHookPatterns(category, n);
   const cards = patterns
     .map(
       (p, i) =>
@@ -178,7 +184,11 @@ export function buildHookGuidance(category: ProductCategory, n = 5): string {
   1–3s 证明相关（让刷到的人立刻觉得「这跟我有关」）
   3–7s 自然接到产品 / 效果
 
-为「${categoryNameMap[category] || category}」品类优选以下钩子机制（任选其一；若生成多个脚本，请各用不同机制以便 A/B 对比）：
+${
+  pinned
+    ? `本次开场【必须】使用以下钩子机制（反同质化轮换指定，不要换成其它机制）：`
+    : `为「${categoryNameMap[category] || category}」品类优选以下钩子机制（任选其一；若生成多个脚本，请各用不同机制以便 A/B 对比）：`
+}
 
 ${cards}`;
 }

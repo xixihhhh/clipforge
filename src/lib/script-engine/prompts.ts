@@ -519,6 +519,8 @@ export interface ScriptGenerationInput {
   usageAdvantage?: string;
   /** performance-feedback directive (data flywheel): pre-rendered hint that biases style/hook toward what historically converts; empty when there is no data */
   performanceHint?: string;
+  /** pin the opening hook mechanism (HOOK_PATTERNS id) — anti-homogenization batch rotation assigns a different one per video */
+  preferredHookId?: string;
 }
 
 /**
@@ -541,6 +543,7 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
     platforms,
     usageAdvantage,
     performanceHint,
+    preferredHookId,
   } = input;
 
   // fetch category templates
@@ -631,8 +634,9 @@ export function buildUserPrompt(input: ScriptGenerationInput): string {
     parts.push(`\n${performanceHint}`);
   }
 
-  // append golden-3-second hook guidance (category-preferred patterns + three-beat structure)
-  parts.push(`\n${buildHookGuidance(category)}`);
+  // append golden-3-second hook guidance (category-preferred patterns + three-beat structure);
+  // a pinned hook id (batch anti-homogenization rotation) narrows it to one mandatory mechanism
+  parts.push(`\n${buildHookGuidance(category, 5, preferredHookId)}`);
 
   // append reference template
   parts.push(`\n【参考脚本案例（仅供参考风格和节奏，不要照搬内容）】`);

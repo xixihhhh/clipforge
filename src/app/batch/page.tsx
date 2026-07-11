@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { useProductLibraryStore } from "@/lib/stores/product-library-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { getExampleProducts } from "@/lib/examples";
+import { buildVariationPlan, describeSlot } from "@/lib/variation-plan";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 
@@ -66,6 +67,14 @@ const styleTypeMap: Record<string, string> = {
   auto: "auto",
 };
 
+// Backend styleType → short display name (for variation-slot summaries; kept local to avoid pulling the prompt engine into the client bundle)
+const styleDisplayNames: Record<string, string> = {
+  pain_point: "痛点式",
+  scene: "场景种草",
+  comparison: "对比实测",
+  story: "剧情带货",
+};
+
 // Batch task status (generating=writing script; composing=matching visuals+compositing; done=all finished)
 type TaskStatus = "pending" | "generating" | "composing" | "done" | "failed";
 
@@ -75,6 +84,8 @@ interface BatchTask {
   status: TaskStatus;
   projectId?: string; // project ID after successful generation, used for navigation
   error?: string;
+  /** anti-homogenization slot summary (hook/style/voice/BGM/captions) shown under the task */
+  variation?: string;
 }
 
 // Task status → batch-namespace i18n key (resolved at render time)
@@ -133,6 +144,10 @@ export default function BatchPage() {
   // Whether to auto-compose visuals + render after script generation (free path, no API key needed) — upgrades batch from "script only" to "one-click full video"
   const [autoCompose, setAutoCompose] = useState(true);
   const [productCard, setProductCard] = useState(true); // batch mode defaults to overlaying a product-card sticker (shown only when a product image is available)
+  // anti-homogenization: rotate hook/style/voice/BGM/captions per item so the batch doesn't ship N same-template videos (platforms suppress that account-wide)
+  const [antiHomogeneity, setAntiHomogeneity] = useState(true);
+  // post-batch template self-check (structure fingerprints across recent projects)
+  const [homogeneity, setHomogeneity] = useState<{ verdict: string; message: { zh: string; en: string } } | null>(null);
   // Batch generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchTasks, setBatchTasks] = useState<BatchTask[]>([]);
@@ -170,15 +185,28 @@ export default function BatchPage() {
     setIsComplete(false);
 
     const selected = products.filter((p) => selectedProducts.has(p.id));
-    const tasks: BatchTask[] = selected.map((p) => ({
+    // variation plan: one slot per item; hook pool keys off the first product's category (patterns are
+    // largely universal), a fresh seed each run so consecutive batches don't share the same rotation
+    const plan = antiHomogeneity
+      ? buildVariationPlan({
+          count: selected.length,
+          category: (selected[0]?.category ?? "other") as Parameters<typeof buildVariationPlan>[0]["category"],
+          styleType: styleTypeMap[scriptStyle] ?? "auto",
+          seed: Date.now() % 100000,
+        })
+      : [];
+    setHomogeneity(null);
+    const tasks: BatchTask[] = selected.map((p, i) => ({
       id: p.id,
       productName: p.name,
       status: "pending" as TaskStatus,
+      ...(plan[i] ? { variation: describeSlot(plan[i], styleDisplayNames, locale === "en" ? "en" : "zh") } : {}),
     }));
     setBatchTasks(tasks);
 
-    // Process a single product (updates by task.id, supports out-of-order concurrency)
-    const processOne = async (product: (typeof selected)[number]) => {
+    // Process a single product (updates by task.id, supports out-of-order concurrency);
+    // slot = this item's anti-homogenization assignment (hook/style/voice/BGM/captions/duration)
+    const processOne = async (product: (typeof selected)[number], slot?: (typeof plan)[number]) => {
       setBatchTasks((prev) => prev.map((t) => (t.id === product.id ? { ...t, status: "generating" } : t)));
       try {
         // 1) Create project
@@ -206,8 +234,9 @@ export default function BatchPage() {
             productName: product.name,
             category: product.category,
             productDescription: product.description ?? "",
-            targetDuration: parseInt(duration),
-            styleType: styleTypeMap[scriptStyle] ?? "auto",
+            targetDuration: parseInt(duration) + (slot?.durationOffset ?? 0),
+            styleType: slot?.styleType ?? styleTypeMap[scriptStyle] ?? "auto",
+            ...(slot?.hookId ? { preferredHookId: slot.hookId } : {}),
             videoMode,
             productImages: product.images ?? [],
             llmConfig: {
@@ -234,7 +263,13 @@ export default function BatchPage() {
           const composeRes = await fetch(`/api/project/${project.id}/compose`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ freeTts: { enabled: true }, ...(productCard && { productCard: true }) }),
+            body: JSON.stringify({
+              freeTts: { enabled: true, ...(slot?.voice ? { voice: slot.voice } : {}) },
+              ...(productCard && { productCard: true }),
+              // variation slot: BGM mood / karaoke captions rotate per item (undefined without the plan)
+              ...(slot?.bgm ? { freeBgm: true, ...(slot.bgmMood ? { bgmMood: slot.bgmMood } : {}) } : {}),
+              ...(slot?.karaoke ? { karaoke: true } : {}),
+            }),
           });
           if (!composeRes.ok) throw new Error(t("errorComposeFailed"));
           // Composition is async: poll composition status until done/failed (up to ~3.75 min)
@@ -265,16 +300,26 @@ export default function BatchPage() {
       while (!abortRef.current) {
         const idx = cursor++;
         if (idx >= selected.length) break;
-        await processOne(selected[idx]);
+        await processOne(selected[idx], plan[idx]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, selected.length) }, worker));
 
     if (!abortRef.current) {
       setIsComplete(true);
+      // template self-check across the freshly generated projects (needs ≥2 to compare)
+      if (selected.length >= 2) {
+        try {
+          const r = await fetch(`/api/insights/homogeneity?limit=${Math.min(20, selected.length)}`);
+          const d = await r.json();
+          if (r.ok && d?.message) setHomogeneity({ verdict: d.verdict, message: d.message });
+        } catch {
+          /* self-check is advisory — never block the batch result */
+        }
+      }
     }
     setIsGenerating(false);
-  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, productCard, incrementVideoCount]);
+  }, [selectedProducts, isGenerating, products, llm, videoMode, duration, scriptStyle, autoCompose, productCard, antiHomogeneity, locale, incrementVideoCount]);
 
   // Number of completed tasks
   const doneCount = batchTasks.filter((t) => t.status === "done").length;
@@ -539,6 +584,9 @@ export default function BatchPage() {
                         </div>
                         <div className="min-w-0">
                           <span className="text-sm block truncate">{task.productName}</span>
+                          {task.variation && (
+                            <span className="text-[11px] text-muted-foreground block truncate">{task.variation}</span>
+                          )}
                           {task.status === "failed" && task.error && (
                             <span className="text-xs text-red-400">{task.error}</span>
                           )}
@@ -570,6 +618,20 @@ export default function BatchPage() {
                     <p className="text-sm text-emerald-400 font-medium">
                       {t("completeMsg", { count: doneCount })}
                     </p>
+                  </div>
+                )}
+                {/* template self-check verdict (structure fingerprints across the fresh batch) */}
+                {isComplete && homogeneity && (
+                  <div
+                    className={`mt-2 p-3 rounded-lg border text-center text-sm ${
+                      homogeneity.verdict === "ok"
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                        : homogeneity.verdict === "warn"
+                          ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                          : "bg-red-500/10 border-red-500/20 text-red-400"
+                    }`}
+                  >
+                    {locale === "en" ? homogeneity.message.en : homogeneity.message.zh}
                   </div>
                 )}
               </CardContent>
@@ -609,6 +671,17 @@ export default function BatchPage() {
                 {t("productCardLabel")}
               </label>
             )}
+            {/* anti-homogenization rotation: each item gets a different hook/style/voice/BGM/caption mix */}
+            <label className="flex items-center justify-center gap-2 mb-3 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={antiHomogeneity}
+                onChange={(e) => setAntiHomogeneity(e.target.checked)}
+                disabled={isGenerating}
+                className="w-4 h-4 accent-violet-500"
+              />
+              {t("variationLabel")}
+            </label>
             <Button
               onClick={handleStartBatch}
               disabled={selectedProducts.size === 0 || isGenerating}

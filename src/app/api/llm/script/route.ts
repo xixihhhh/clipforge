@@ -4,7 +4,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { generateScript, analyzeProduct } from "@/lib/script-engine/generator";
 import { styleNameMap, type ScriptStyleType } from "@/lib/script-engine/prompts";
-import { hookPatternName } from "@/lib/script-engine/hook-patterns";
+import { hookPatternName, HOOK_PATTERNS } from "@/lib/script-engine/hook-patterns";
 import type { ProductCategory } from "@/lib/script-engine/templates";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, projects, publishMetrics } from "@/lib/db/schema";
@@ -182,6 +182,11 @@ export async function POST(req: NextRequest) {
       targetAudience: body.targetAudience,
       referenceStructure: body.referenceStructure,
       performanceHint: insights.hint,
+      // anti-homogenization: batch rotation pins a different opening hook mechanism per video (validated against the pattern library)
+      preferredHookId:
+        typeof body.preferredHookId === "string" && HOOK_PATTERNS.some((p) => p.id === body.preferredHookId)
+          ? body.preferredHookId
+          : undefined,
       llmConfig,
     });
 

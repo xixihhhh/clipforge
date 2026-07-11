@@ -474,6 +474,7 @@ pnpm dist       # 出 .dmg 安装包
 - [x] **小红书图文卡片**（把脚本渲成图文笔记卡片：标题卡 + 逐条要点卡，渐变底+逐行居中，3:4，**5 种主题色可选**；视频之外新增图文输出格式；`POST /api/project/[id]/carousel` / CLI `clipforge carousel --theme`）
 - [x] **成片质检 QC**（发布前自动把关成片：流完整性/时长/分辨率校验 + **黑屏（blackdetect）/ 长静音（silencedetect）/ 响度漂移（EBU R128 对 -14 LUFS）/ 画面冻结**检测，结构化双语报告 `ok|warn|fail`，批量出片防「坏片直接发出去」；后处理成片不改合成管线；导出页一键运行 / `POST /api/project/[id]/qc` / CLI `clipforge qc` / MCP `clipforge_qc`）
 - [x] **素材授权清单**（解「免费素材商用授权不明 → 投流拒审/封号」：逐镜溯源来源/作者/许可 + **商用风险分级**（NC/ND/未知许可标「需人工复核」）+ CC BY 素材**可直接复制的署名行** + BGM 授权（下载时落 `.credit.json` 溯源 sidecar）；导出 Markdown 凭证（中英）可直接交广告审核；导出页一键生成 / `GET /api/project/[id]/credits` / CLI `clipforge credits` / MCP `clipforge_credits`）
+- [x] **反同质化变体引擎**（打 2026 政策级风险「同一结构发 5-7 条即被判模板化限流」：批量出片为每条自动轮换**开场钩子机制（prompt 级钉选）/ 脚本风格 / 配音音色 / BGM 情绪 / 字幕样式 / 时长抖动**，确定性轮换保证相邻条目多维不同、显式选择永不覆盖；每条任务下可见本条的变体组合；完批自动跑**结构指纹自检**（跨项目两两相似度，`ok|warn|risk` 三档判定）；批量页开关默认开 / `GET /api/insights/homogeneity`）
 - [x] **逐镜语义配片 + 跨镜去重**（打「画面文不对题」这一同类工具最大差评：配了 LLM 时**一次批量调用**为每个镜头从候选素材里选语义最贴旁白的（`llmConfig` opt-in，web/一键成片/CLI/MCP 自动透传，任何失败回退关键词启发式、绝不阻断配片）；各素材源补齐 **title/tags 归一化**（此前候选文本从未进入评分，关键词重合一直是 0 分）；**跨镜去重真正接线**（同关键词的镜头不再撞同一素材，LLM 选中已用素材时自动改选）；`POST /api/project/[id]/stock-fill` 加 `llmConfig`，返回逐镜 `matchedBy: semantic|heuristic`）
 - [x] **原生感处理（实拍感）**（应对 2026 平台对「过度精致 AI 感」内容的降权：**手持微抖动**（多层正弦驱动、确定性可复现，`seed` 让 A/B 变体动线不同）+ **轻颗粒**（时变噪点）+ 轻微去精致化调色，轻/中两档，晕影 opt-in；后处理成片不改合成管线；导出页一键处理 / `POST /api/project/[id]/native-feel` / CLI `clipforge native` / MCP `clipforge_native_feel`）
 
