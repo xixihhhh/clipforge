@@ -656,7 +656,7 @@ export default function SettingsPage() {
                       {([
                         { label: "Atlas Cloud", baseUrl: "https://api.atlascloud.ai/v1", model: "claude-sonnet-4-20250514", tip: t("presetAtlasTip") },
                         { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-4o", tip: t("presetOpenrouterTip") },
-                        { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-v3.2", tip: t("presetDeepseekTip") },
+                        { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash", tip: t("presetDeepseekTip") },
                         { label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "kimi-k2.5", tip: t("presetKimiTip") },
                         { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-5-turbo", tip: t("presetGlmTip") },
                         { label: "MiniMax", baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-M2.7", tip: t("presetMinimaxTip") },

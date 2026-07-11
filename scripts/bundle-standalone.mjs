@@ -81,7 +81,33 @@ async function rebuildBetterSqlite3ForElectron() {
 
   const node = join(bsDir, "build", "Release", "better_sqlite3.node");
   if (!existsSync(node)) throw new Error("解包后未见 better_sqlite3.node，Electron ABI 重建失败");
-  console.log("✓ standalone better-sqlite3 已切到 Electron ABI（打包 App 的 DB 路由可用）");
+
+  // 关键：Next 构建会把 serverExternalPackages 的原生包再拷一份到 standalone/.next/node_modules/<包名>-<hash>/，
+  // 运行时（至少 Windows 上）加载的是这一份而不是顶层 node_modules 那份——只换顶层会导致打包 App 里
+  // 所有 DB 路由 NODE_MODULE_VERSION 不匹配（ERR_DLOPEN_FAILED）→ 500（issue #12）。
+  // mac 此前能跑是因为两份拷贝共享同一 inode、覆盖顶层时"顺带"改了这份，纯属侥幸。
+  // 所以：扫描 standalone 下所有 better_sqlite3.node，逐一覆写为 Electron ABI 二进制，不依赖任何链接行为。
+  const electronNode = readFileSync(node);
+  const replaced = [];
+  for (const target of findFiles(standalone, "better_sqlite3.node")) {
+    if (target === node) continue;
+    writeFileSync(target, electronNode);
+    replaced.push(target);
+  }
+  console.log(`✓ standalone better-sqlite3 已切到 Electron ABI（另覆写 ${replaced.length} 份副本），打包 App 的 DB 路由可用`);
+  for (const p of replaced) console.log(`  ↳ 已覆写副本: ${p}`);
+}
+
+/** 递归查找 dir 下所有名为 fileName 的文件（跳过符号链接，避免环） */
+function findFiles(dir, fileName) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isSymbolicLink()) continue;
+    if (entry.isDirectory()) out.push(...findFiles(full, fileName));
+    else if (entry.name === fileName) out.push(full);
+  }
+  return out;
 }
 
 console.log("standalone 资源补齐完成");
