@@ -12,6 +12,10 @@ export interface PublishPack {
   caption: string;
   /** UTM-tagged storefront link (only present when a shopUrl was provided) — creators paste it where the platform allows (bio / cart / description) */
   shopLink?: string;
+  /** platform AI-disclosure kit: why to declare + a paste-ready caption line (2026: Douyin auto-flags
+   * undeclared AI content and throttles it; TikTok C2PA-detects and suppresses 50-70% — self-declaring
+   * barely affects reach on either) */
+  aiDeclaration: { notice: string; line: string };
 }
 
 export interface PublishPackInput {
@@ -188,5 +192,23 @@ export function buildPublishPack(input: PublishPackInput): PublishPack {
   // UTM-tagged storefront link (only when a shopUrl was supplied) so the creator can attribute traffic per platform
   const shopLink = buildShopLink(input.shopUrl, { platform, affiliateCode: input.affiliateCode });
 
-  return { titles, hashtags, caption, ...(shopLink && { shopLink }) };
+  return { titles, hashtags, caption, aiDeclaration: buildAiDeclaration(input.locale), ...(shopLink && { shopLink }) };
+}
+
+/**
+ * Platform AI-disclosure kit — platforms now auto-detect undeclared AI content (Douyin appends a
+ * "疑似AI生成" badge + throttles; TikTok C2PA-flags and suppresses reach 50-70%), while self-declared
+ * content distributes normally. Standalone so both the key-free pack and the LLM publish path use it.
+ */
+export function buildAiDeclaration(locale?: "zh" | "en"): { notice: string; line: string } {
+  return locale === "en"
+    ? {
+        notice:
+          'Turn on the platform\'s "AI-generated content" toggle when posting — undeclared AI content gets auto-flagged and suppressed (TikTok C2PA detection); self-declared content distributes normally.',
+        line: "Contains AI-generated content",
+      }
+    : {
+        notice: "发布时记得勾选平台的「内容由 AI 生成」声明——未主动声明会被自动打「疑似AI生成」标并限流，主动声明基本不影响分发。",
+        line: "本视频含 AI 生成内容",
+      };
 }

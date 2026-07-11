@@ -43,6 +43,7 @@ export const exportPage: NamespaceMessages = {
     publishCopyAll: "复制全部",
     publishCaptionLabel: "种草文案",
     publishShopLinkLabel: "带追踪的商品链接（点击复制）",
+    publishAiDeclLabel: "AI 内容声明（点击复制声明句）",
     // 更多产出（变现/出海）
     moreTitle: "更多产出",
     moreDesc: "一键生成封面、图文卡片、扫码购买二维码、片尾扫码成片、多语言译制版——全部复用成片，免额外操作。",
@@ -164,6 +165,7 @@ export const exportPage: NamespaceMessages = {
     publishCopyAll: "Copy all",
     publishCaptionLabel: "Caption",
     publishShopLinkLabel: "Trackable shop link (click to copy)",
+    publishAiDeclLabel: "AI content disclosure (click to copy the line)",
     // more outputs (monetization / localization)
     moreTitle: "More outputs",
     moreDesc: "One click to generate a cover, image cards, a scan-to-buy QR, a QR end-card video, and dubbed versions — all reuse the finished video, no extra setup.",

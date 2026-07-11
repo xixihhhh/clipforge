@@ -176,3 +176,18 @@ describe("buildPublishPack 商品专属话题标签（2026 商品词搜索发现
     expect(p.hashtags).toContain("#美妆");
   });
 });
+
+describe("buildAiDeclaration / pack aiDeclaration", () => {
+  it("双语声明齐全且随 locale 切换", async () => {
+    const { buildAiDeclaration, buildPublishPack } = await import("@/lib/publish-pack");
+    const zh = buildAiDeclaration("zh");
+    expect(zh.notice).toContain("AI 生成");
+    expect(zh.line).toBe("本视频含 AI 生成内容");
+    const en = buildAiDeclaration("en");
+    expect(en.line).toBe("Contains AI-generated content");
+    expect(en.notice).toMatch(/C2PA/);
+    // pack 内嵌同一声明
+    expect(buildPublishPack({ productName: "榨汁杯" }).aiDeclaration.line).toBe(zh.line);
+    expect(buildPublishPack({ productName: "juicer", locale: "en" }).aiDeclaration.line).toBe(en.line);
+  });
+});

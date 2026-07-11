@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { buildPublishPack } from "@/lib/publish-pack";
+import { buildPublishPack, buildAiDeclaration } from "@/lib/publish-pack";
 import { buildShopLink } from "@/lib/shop-link";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -240,6 +240,9 @@ export default function ExportPage() {
       setTool("dub", { loading: false, note: t("moreDubDone", { voice: d.recommendedVoice || "" }) });
     } catch (e) { setTool("dub", { loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
+
+  // platform AI-disclosure kit (static, path-independent: shown with both the template pack and LLM copy)
+  const aiDecl = buildAiDeclaration(locale === "en" ? "en" : "zh");
 
   const generatePublish = async () => {
     // UTM-tagged shop link (only when the project has a shopUrl) — surfaced alongside the copy so the
@@ -596,6 +599,14 @@ export default function ExportPage() {
                     </button>
                   </div>
                 )}
+                {/* platform AI-disclosure kit: toggle reminder + paste-ready caption line (undeclared AI content gets auto-flagged and throttled) */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">{t("publishAiDeclLabel")}</p>
+                  <p className="text-[11px] text-amber-500/90 mb-1.5">{aiDecl.notice}</p>
+                  <button onClick={() => copyText(aiDecl.line)} className="text-left text-xs px-3 py-2 rounded-lg border border-border/50 bg-muted/10 hover:border-primary/50 transition-colors">
+                    {aiDecl.line}
+                  </button>
+                </div>
               </div>
             )}
           </CardContent>

@@ -237,8 +237,15 @@ export default function ScriptPage() {
   );
   // pre-publish readiness check: inspect banned words / hook / duration / subtitles / CTA / three-act structure item by item (AIGC label is handled by the compose page, not checked here)
   const readiness = useMemo(
-    () => (currentScript ? checkPublishReadiness(currentScript.shots as Shot[], currentScript.totalDuration, { locale }) : null),
-    [currentScript, locale]
+    () =>
+      currentScript
+        ? checkPublishReadiness(currentScript.shots as Shot[], currentScript.totalDuration, {
+            locale,
+            // commerce hard rule "product visible in the first 3s" — only for product videos (topic videos have no productName)
+            productName: projectMeta?.productName || undefined,
+          })
+        : null,
+    [currentScript, locale, projectMeta?.productName]
   );
 
   // template-related state

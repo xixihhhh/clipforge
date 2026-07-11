@@ -93,3 +93,62 @@ describe("checkPublishReadiness", () => {
     expect(r.overall).toBe("needsWork");
   });
 });
+
+describe("前3秒露商品硬规则 (productEarly)", () => {
+  const name = "氨基酸洁面";
+  // story-first template: 3 shots of scene-setting, product only appears at ~11s
+  const storyFirst: Shot[] = [
+    mk({ shotId: 1, type: "hook", duration: 3, voiceover: "你还在为出油发愁吗" }),
+    mk({ shotId: 2, type: "pain_point", duration: 4, voiceover: "每天洗完脸紧绷刺痛" }),
+    mk({ shotId: 3, type: "social_proof", duration: 4, voiceover: "换季更是雪上加霜" }),
+    mk({ shotId: 4, type: "product_reveal", duration: 8, voiceover: `${name}温和不刺激` }),
+    mk({ shotId: 5, type: "cta", duration: 5, voiceover: "点下方小黄车" }),
+  ];
+  const item = (r: ReturnType<typeof checkPublishReadiness>, key: string) => r.items.find((i) => i.key === key);
+
+  it("未传 productName（主题视频）→ 不出该项", () => {
+    expect(item(checkPublishReadiness(storyFirst, 24, {}), "productEarly")).toBeUndefined();
+  });
+
+  it("首镜含商品（product_image 素材或提及商品名）→ pass", () => {
+    const early = [mk({ shotId: 1, type: "hook", duration: 3, visualSource: "product_image", voiceover: "还在乱选洁面吗" }), ...storyFirst.slice(3)];
+    expect(item(checkPublishReadiness(early, 16, { productName: name }), "productEarly")?.status).toBe("pass");
+    const mention = [mk({ shotId: 1, type: "hook", duration: 3, voiceover: `${name}凭什么卖爆` }), ...storyFirst.slice(3)];
+    expect(item(checkPublishReadiness(mention, 16, { productName: name }), "productEarly")?.status).toBe("pass");
+  });
+
+  it("商品 3-7 秒才出现 → warn；晚于 7 秒 → fail 且给出限流理由", () => {
+    // 3s hook + 2s scene → product first appears at 5s (the 3s boundary itself passes: a 3s hook then the product is the standard healthy shape)
+    const mid = [
+      storyFirst[0],
+      mk({ shotId: 2, type: "social_proof", duration: 2, voiceover: "换季更难受" }),
+      mk({ shotId: 3, type: "product_reveal", duration: 8, voiceover: `${name}好用` }),
+      storyFirst[4],
+    ];
+    expect(item(checkPublishReadiness(mid, 18, { productName: name }), "productEarly")?.status).toBe("warn");
+    const late = checkPublishReadiness(storyFirst, 24, { productName: name });
+    expect(item(late, "productEarly")?.status).toBe("fail");
+    expect(item(late, "productEarly")?.message).toContain("骗完播");
+    expect(late.overall).toBe("needsWork");
+  });
+
+  it("全程无商品 → fail（never appears 分支），英文文案生效", () => {
+    const none: Shot[] = [
+      mk({ shotId: 1, type: "hook", duration: 3, voiceover: "还在发愁吗" }),
+      mk({ shotId: 2, type: "social_proof", duration: 10, voiceover: "生活就是这样" }),
+    ];
+    const zh = item(checkPublishReadiness(none, 13, { productName: name }), "productEarly");
+    expect(zh?.status).toBe("fail");
+    expect(zh?.message).toContain("全程没有明确出现");
+    const en = item(checkPublishReadiness(none, 13, { productName: name, locale: "en" }), "productEarly");
+    expect(en?.message).toMatch(/never clearly appears/);
+  });
+
+  it("textOverlay 提及商品名也算露出", () => {
+    const overlay = [
+      mk({ shotId: 1, type: "hook", duration: 3, voiceover: "还在乱选吗", textOverlay: { text: `${name}实测`, style: "title" } as Shot["textOverlay"] }),
+      ...storyFirst.slice(3),
+    ];
+    expect(item(checkPublishReadiness(overlay, 16, { productName: name }), "productEarly")?.status).toBe("pass");
+  });
+});

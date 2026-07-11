@@ -11,7 +11,7 @@ import { checkScriptCompliance } from "./ad-compliance";
 import type { Shot } from "./db/schema";
 
 export type CheckStatus = "pass" | "warn" | "fail";
-export type CheckKey = "compliance" | "hook" | "duration" | "caption" | "cta" | "structure" | "aigc";
+export type CheckKey = "compliance" | "hook" | "duration" | "caption" | "cta" | "structure" | "aigc" | "productEarly";
 
 export interface ReadinessItem {
   key: CheckKey;
@@ -31,6 +31,8 @@ export interface ReadinessReport {
 export interface ReadinessOptions {
   /** Whether the AIGC compliance label will be burned in; undefined means skip this check */
   aigcLabel?: boolean;
+  /** Product name (commerce videos only) — enables the "product visible in the first 3s" hard rule; omit for topic videos */
+  productName?: string;
   locale?: "zh" | "en";
 }
 
@@ -42,6 +44,14 @@ const DUR_MAX = 60;
 const HOOK_MAX_SEC = 4;
 // Maximum subtitle reading speed (CJK chars/second); exceeding this makes subtitles unreadable
 const READ_CPS = 9;
+
+// "Product visible within the first N seconds" hard rule (2026 Douyin: cart-linked videos that
+// tease a story and only reveal the product at the end are treated as completion-baiting and
+// suppressed; the product must appear inside the opening 3 seconds)
+const PRODUCT_EARLY_SEC = 3;
+const PRODUCT_LATE_SEC = 7;
+// shot types that inherently show the product
+const PRODUCT_SHOT_TYPES = new Set(["product_reveal", "product_intro", "demo"]);
 
 // Hook signals: question / number / pain-point / contrast — any one qualifies as "has a hook"
 const HOOK_SIGNAL = /[?？!！]|\d|别再|还在|总是|为什么|怎么|居然|竟然|没想到|原来|你知道|千万别|后悔|踩雷|谁懂|绝了/;
@@ -140,7 +150,46 @@ export function checkPublishReadiness(
     );
   }
 
-  // 7) AIGC compliance label (only checked when the caller provides the toggle state)
+  // 7) Product visible in the first 3s (commerce hard rule; only when the caller passes productName)
+  if (opts.productName?.trim()) {
+    const name = opts.productName.trim();
+    const showsProduct = (s: Shot) =>
+      s.visualSource === "product_image" ||
+      PRODUCT_SHOT_TYPES.has(s.type ?? "") ||
+      (s.voiceover ?? "").includes(name) ||
+      (s.description ?? "").includes(name) ||
+      (s.textOverlay?.text ?? "").includes(name);
+    let elapsed = 0;
+    let firstAt: number | null = null;
+    for (const s of shots) {
+      if (showsProduct(s)) {
+        firstAt = elapsed;
+        break;
+      }
+      elapsed += s.duration || 0;
+    }
+    if (firstAt !== null && firstAt <= PRODUCT_EARLY_SEC) {
+      push("productEarly", "pass", en ? "Product appears within the first 3s" : "商品在前 3 秒内出现");
+    } else if (firstAt !== null && firstAt <= PRODUCT_LATE_SEC) {
+      push(
+        "productEarly",
+        "warn",
+        en
+          ? `Product first appears at ~${Math.round(firstAt)}s — cart-linked videos should show it inside 3s`
+          : `商品约 ${Math.round(firstAt)}s 才出现——挂车视频应在前 3 秒露出商品`
+      );
+    } else {
+      push(
+        "productEarly",
+        "fail",
+        en
+          ? `Product ${firstAt === null ? "never clearly appears" : `first appears at ~${Math.round(firstAt)}s`} — platforms treat "story first, product last" cart videos as completion-baiting and suppress them; put the product in the opening shot`
+          : `商品${firstAt === null ? "全程没有明确出现" : `约 ${Math.round(firstAt)}s 才出现`}——平台把「先讲故事最后亮产品」的挂车视频判为骗完播限流，请把商品放进开场镜头`
+      );
+    }
+  }
+
+  // 8) AIGC compliance label (only checked when the caller provides the toggle state)
   if (opts.aigcLabel === true) {
     push("aigc", "pass", en ? "AIGC compliance label is on" : "已开 AIGC 合规标签");
   } else if (opts.aigcLabel === false) {
