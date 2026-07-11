@@ -2,7 +2,9 @@
 # 步骤：下载 v0.8.41 安装包 → 解包 → 用 Electron-as-Node 直接拉起 standalone 服务 → 请求 DB 路由，抓真实报错
 name: Debug Win DB Repro
 
-on: workflow_dispatch
+on:
+  push:
+    branches: ["debug/win-db-repro"]
 
 jobs:
   repro:
