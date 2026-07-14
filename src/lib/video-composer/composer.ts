@@ -1,13 +1,13 @@
 import { join, dirname } from "path";
 import { getDataDir } from "@/lib/paths";
 import { ffmpegBin } from "@/lib/ffmpeg-path";
-import { mkdir } from "fs/promises";
+import { mkdir, writeFile, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
 import { MOTIONS, DEFAULT_MOTION } from "./motions";
 import { safeEncodeParams } from "@/lib/compose-presets";
 import { createLimiter } from "@/lib/concurrency";
-import { buildAigcMetadataArgs } from "@/lib/compliance-metadata";
+import { buildAigcMetadataArgs, buildAigcMetadataArgv } from "@/lib/compliance-metadata";
 import { CAPTION_SAFE_BOTTOM_RATIO, CAPTION_SAFE_BOTTOM_RATIO_NOCARD } from "./safe-zone";
 
 /**
@@ -277,8 +277,43 @@ const SEGMENT_NORM = "format=yuv420p,setsar=1,fps=30,settb=AVTB";
 /** cross-fade duration in seconds for ffmpeg_fade transitions. video xfade / audio acrossfade / subtitle timeline must all use this same value; otherwise audio, video, and subtitles drift out of sync */
 export const FADE_DURATION = 0.5;
 
-// build the FFmpeg composition command
-export function buildComposeCommand(config: ComposeConfig): string {
+/** One ffmpeg `-i` input. loop/t reproduce the `-loop 1 [-t N]` flags used for still images / the product-card image. */
+interface InputSpec {
+  loop?: boolean;
+  t?: number;
+  path: string;
+}
+
+/** ffmpeg argv tokens for one input — raw path, no shell quoting (shell-free execFile path). */
+function inputToArgv(spec: InputSpec): string[] {
+  const a: string[] = [];
+  if (spec.loop) {
+    a.push("-loop", "1");
+    if (spec.t != null) a.push("-t", String(spec.t));
+  }
+  a.push("-i", spec.path);
+  return a;
+}
+
+/** Shell fragment for one input — path shell-escaped + double-quoted (legacy command-string form). */
+function inputToShell(spec: InputSpec): string {
+  const flags = spec.loop ? (spec.t != null ? `-loop 1 -t ${spec.t} ` : `-loop 1 `) : "";
+  return `${flags}-i "${escapeShellPath(spec.path)}"`;
+}
+
+interface ComposeGraph {
+  inputs: InputSpec[];
+  filterComplex: string; // pre-shell-escaped filtergraph, joined with ";\n"
+  videoStream: string;
+  audioStream: string; // "" when no clip carries audio
+  accumulated: number; // real output duration after xfade overlaps
+  outputPath: string;
+}
+
+// Assemble the ffmpeg composition graph (inputs / filtergraph / stream labels / duration) once;
+// buildComposeCommand renders it as a shell string (tests/debug) and buildComposeInvocation renders it
+// as shell-free argv + a -filter_complex_script payload (actual execution).
+function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
   // empty clips would cause the subsequent -map "[v0]" to reference a stream that was never created, producing a cryptic ffmpeg error; fail early with a readable message instead
   if (!config.clips || config.clips.length === 0) {
     throw new Error("没有可合成的片段（clips 为空）——请先为分镜配好画面素材再合成");
@@ -287,7 +322,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
   const outputDir = join(getDataDir(), "output", config.projectId);
   const outputPath = join(outputDir, `final_${Date.now()}.mp4`);
 
-  const inputs: string[] = [];
+  const inputs: InputSpec[] = [];
   const filterParts: string[] = [];
 
   // check whether any clip carries audio (native audio or TTS voice-over)
@@ -301,7 +336,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
       // product image + motion effect. falls back to default motion when the motion key is invalid; never skips the clip
       // (otherwise the inputs/filter count would mismatch the [v${i}] references in the concat below, crashing ffmpeg)
       const motion = (clip.motion && MOTIONS[clip.motion]) || MOTIONS[DEFAULT_MOTION];
-      inputs.push(`-loop 1 -t ${clip.duration} -i "${escapeShellPath(clip.filePath)}"`);
+      inputs.push({ loop: true, t: clip.duration, path: clip.filePath });
       // key: zoompan outputs d frames per input frame. -loop produces many input frames which causes frame count explosion
       // and stretches the video tens of times longer than intended; use trim to grab only the first frame, then let
       // zoompan's d=duration*fps control total output frame count.
@@ -316,7 +351,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
       // video clip: scale to fill + align to shot duration. real stock library videos (Wikimedia etc.) vary in length;
       // clips shorter than the shot duration would leave a black tail and cause audio/subtitle desync if only trimmed —
       // use tpad to clone the last frame up to the target duration, then trim, so each video clip is always exactly clip.duration.
-      inputs.push(`-i "${escapeShellPath(clip.filePath)}"`);
+      inputs.push({ path: clip.filePath });
       filterParts.push(`[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30,tpad=stop_mode=clone:stop_duration=${clip.duration},trim=duration=${clip.duration},setpts=PTS-STARTPTS,${SEGMENT_NORM}[v${i}]`);
     }
   });
@@ -328,7 +363,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
       if (clip.audioPath) {
         // TTS voice-over: added as an extra input, padded with silence / trimmed to clip duration
         const ai = inputs.length;
-        inputs.push(`-i "${escapeShellPath(clip.audioPath)}"`);
+        inputs.push({ path: clip.audioPath });
         audioParts.push(
           `[${ai}:a]aresample=44100,apad,atrim=duration=${clip.duration},asetpts=PTS-STARTPTS[a${i}]`
         );
@@ -394,7 +429,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
   // BGM mixing: layered on top of clip audio
   if (config.output.bgmPath) {
     const bgmIndex = inputs.length; // resolved dynamically (TTS audio may have consumed several inputs already)
-    inputs.push(`-i "${escapeShellPath(config.output.bgmPath)}"`);
+    inputs.push({ path: config.output.bgmPath });
     const vol = config.output.bgmVolume ?? 0.3;
     // skip intro silence (opt-in, default 0): atrim drops the first N seconds then loops
     const introSkip = config.output.bgmIntroSkipSec ?? 0;
@@ -521,7 +556,7 @@ export function buildComposeCommand(config: ComposeConfig): string {
   // product card overlay (opt-in): bottom-left card = product thumbnail + name + purchase CTA, shown for ~5s at the start to simulate a "shopping cart link"
   if (config.productCard?.imagePath) {
     const cardIdx = inputs.length;
-    inputs.push(`-loop 1 -i "${escapeShellPath(config.productCard.imagePath)}"`);
+    inputs.push({ loop: true, path: config.productCard.imagePath });
     const thumb = Math.round(width * 0.16);
     const mx = Math.round(width * 0.045); // left margin
     const pad = Math.round(width * 0.022); // card inner padding
@@ -564,15 +599,43 @@ export function buildComposeCommand(config: ComposeConfig): string {
     currentAudioStream = "audio_norm";
   }
 
-  // assemble the full command
-  const inputStr = inputs.join(" ");
-  const filterStr = filterParts.join(";\n");
+  return {
+    inputs,
+    filterComplex: filterParts.join(";\n"),
+    videoStream: currentVideoStream,
+    audioStream: currentAudioStream,
+    accumulated,
+    outputPath,
+  };
+}
 
-  let cmd = `"${ffmpegBin()}" -y ${inputStr} -filter_complex "${filterStr}" -map "[${currentVideoStream}]"`;
+/**
+ * Convert the pre-shell-escaped filtergraph (built for an inline, double-quoted -filter_complex argument)
+ * into the form ffmpeg reads directly from a -filter_complex_script file. The only shell transform our
+ * filtergraph relies on is POSIX double-quote backslash-halving (\\ -> \): escapeDrawText deliberately
+ * doubles backslashes expecting the shell to halve them. Reading from a file (or passing via execFile)
+ * skips the shell, so we apply that halving ourselves. escapeSubtitlesPath emits single backslashes
+ * (\: \'), which contain no \\ pair and are left untouched — exactly as the shell leaves them.
+ */
+function unshellFilter(filter: string): string {
+  return filter.replace(/\\\\/g, "\\");
+}
+
+/**
+ * Legacy shell-command string form — kept for tests / debugging and as the human-readable record of the
+ * exact ffmpeg invocation. NOT used to execute anymore: composeVideo runs ffmpeg shell-free via execFile
+ * (see buildComposeInvocation), which is what fixes the Windows failure. Paths are shell-quoted and the
+ * filtergraph stays in pre-shell form here (a real shell would halve its backslashes).
+ */
+export function buildComposeCommand(config: ComposeConfig): string {
+  const g = assembleComposeGraph(config);
+  const inputStr = g.inputs.map(inputToShell).join(" ");
+
+  let cmd = `"${ffmpegBin()}" -y ${inputStr} -filter_complex "${g.filterComplex}" -map "[${g.videoStream}]"`;
 
   // map audio output
-  if (currentAudioStream) {
-    cmd += ` -map "[${currentAudioStream}]"`;
+  if (g.audioStream) {
+    cmd += ` -map "[${g.audioStream}]"`;
   }
 
   // encoding parameters
@@ -584,9 +647,44 @@ export function buildComposeCommand(config: ComposeConfig): string {
   // content ID is derived from projectId (deterministic, assertable via ffprobe).
   const aigcArgs = buildAigcMetadataArgs({ contentId: config.projectId });
   // explicitly cap output duration to the real video timeline (accumulated): after xfade overlaps the video is shorter than the naive sum; prevents trailing audio playing over a frozen last frame
-  cmd += ` -c:a aac -b:a 256k -movflags +faststart ${aigcArgs} -t ${accumulated.toFixed(3)} "${escapeShellPath(outputPath)}"`;
+  cmd += ` -c:a aac -b:a 256k -movflags +faststart ${aigcArgs} -t ${g.accumulated.toFixed(3)} "${escapeShellPath(g.outputPath)}"`;
 
   return cmd;
+}
+
+/** Shell-free ffmpeg invocation: raw argv + a filtergraph in ffmpeg-direct form (fed via -filter_complex_script). */
+export interface ComposeInvocation {
+  /** ["-y", ...inputs] — raw paths, no shell quoting */
+  inputArgs: string[];
+  /** filtergraph in ffmpeg-direct form (shell backslash-halving already applied); write to a file for -filter_complex_script */
+  filterComplex: string;
+  /** maps + encode + metadata + -t + output path (the filter flag is spliced in by the caller) */
+  outputArgs: string[];
+  outputPath: string;
+}
+
+/**
+ * Build a shell-free ffmpeg invocation. The giant, newline-laden filtergraph is returned separately so the
+ * caller can write it to a file and pass it via -filter_complex_script; together with execFile (no shell)
+ * this sidesteps cmd.exe's 8191-char command-line cap, its embedded-newline breakage, and its backslash
+ * mangling of Windows paths — all of which made every compose fail on Windows (issue #13) while working on
+ * macOS/Linux.
+ */
+export function buildComposeInvocation(config: ComposeConfig): ComposeInvocation {
+  const g = assembleComposeGraph(config);
+  const enc = safeEncodeParams(config.output.videoPreset, config.output.crf);
+  const inputArgs = ["-y", ...g.inputs.flatMap(inputToArgv)];
+  const outputArgs = [
+    "-map", `[${g.videoStream}]`,
+    ...(g.audioStream ? ["-map", `[${g.audioStream}]`] : []),
+    "-c:v", "libx264", "-preset", enc.videoPreset, "-crf", String(enc.crf),
+    "-profile:v", "high", "-level:v", "4.2", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart",
+    ...buildAigcMetadataArgv({ contentId: config.projectId }),
+    "-t", g.accumulated.toFixed(3),
+    g.outputPath,
+  ];
+  return { inputArgs, filterComplex: unshellFilter(g.filterComplex), outputArgs, outputPath: g.outputPath };
 }
 
 /** maximum composition duration in milliseconds; the process is killed if exceeded to prevent a stuck render monopolising the machine indefinitely */
@@ -617,24 +715,37 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
   const outputDir = join(getDataDir(), "output", config.projectId);
   await mkdir(outputDir, { recursive: true });
 
-  const cmd = buildComposeCommand(config);
+  const inv = buildComposeInvocation(config);
 
-  const { exec } = await import("child_process");
+  // Write the (large, newline-laden) filtergraph to a script file and pass it via -filter_complex_script.
+  // Combined with execFile (no shell) this is the crux of the Windows fix (issue #13): a real 6-shot compose
+  // command is ~12k chars with ~23 embedded newlines, and running it through cmd.exe (as child_process.exec
+  // does on Windows) blew past its 8191-char command-line cap and choked on the newlines, so every final
+  // compose failed on Windows while working on macOS/Linux. execFile bypasses the shell entirely (no length
+  // cap, no quoting/backslash issues) and the script file keeps the argv small regardless of project size.
+  const filterFile = join(outputDir, `filter_${Date.now()}.txt`);
+  await writeFile(filterFile, inv.filterComplex, "utf8");
+  const args = [...inv.inputArgs, "-filter_complex_script", filterFile, ...inv.outputArgs];
+
+  const { execFile } = await import("child_process");
   const { promisify } = await import("util");
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   try {
-    // Only the expensive ffmpeg exec goes through the gate (cheap setup above runs unguarded);
-    // exec's timeout starts inside the limited fn, so time spent queueing never counts against it.
+    // Only the expensive ffmpeg run goes through the gate (cheap setup above runs unguarded);
+    // execFile's timeout starts inside the limited fn, so time spent queueing never counts against it.
     // apply timeout (sends SIGTERM if exceeded); disk-full / timeout errors are mapped to readable messages
-    await composeLimiter(() => execAsync(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS }));
+    await composeLimiter(() =>
+      execFileAsync(ffmpegBin(), args, { maxBuffer: 50 * 1024 * 1024, timeout: COMPOSE_TIMEOUT_MS })
+    );
   } catch (e) {
     const friendly = composeErrorMessage(e as { killed?: boolean; signal?: string; stderr?: string; message?: string });
     if (friendly) throw new Error(friendly);
     throw e;
+  } finally {
+    // Best-effort cleanup of the transient filtergraph script (kept out of the finished-video listing).
+    await rm(filterFile, { force: true }).catch(() => {});
   }
 
-  // extract output path from the command string
-  const outputMatch = cmd.match(/"([^"]*final_[^"]*\.mp4)"/);
-  return outputMatch ? outputMatch[1] : "";
+  return inv.outputPath;
 }

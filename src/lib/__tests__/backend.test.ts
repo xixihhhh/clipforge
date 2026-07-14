@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildUserPrompt, buildBatchPrompt } from "@/lib/script-engine/prompts";
 import type { ScriptGenerationInput } from "@/lib/script-engine/prompts";
 import { extractJSON, parseScriptResponse, reasoningParams, batchCountFor } from "@/lib/script-engine/generator";
-import { buildComposeCommand, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildComposeCommand, buildComposeInvocation, resolveChineseFontFamily, wrapCaption, composeErrorMessage, buildDrawtext, type ComposeConfig } from "@/lib/video-composer/composer";
 
 // ==================== Prompt build tests ====================
 
@@ -471,6 +471,51 @@ describe("buildComposeCommand", () => {
     });
     expect(cmd).toContain("-preset medium -crf 20");
     expect(cmd).not.toContain("rm -rf");
+  });
+});
+
+// buildComposeInvocation is the shell-free form composeVideo actually runs (execFile + -filter_complex_script).
+// It exists specifically to fix the Windows compose failure (issue #13): a real command is ~12k chars with
+// embedded newlines, which overruns cmd.exe's 8191-char limit and breaks on newlines when run via a shell.
+describe("buildComposeInvocation（shell-free 执行形态：修 Windows 合成必挂 issue #13）", () => {
+  const cfg: ComposeConfig = {
+    projectId: "p1",
+    clips: [
+      // Windows-style absolute path with a space + backslashes — must be passed RAW (no shell escaping/quoting)
+      { type: "image", filePath: "C:\\clip forge\\data\\s0.png", duration: 3, transition: "direct_concat", motion: "static" },
+    ],
+    output: { resolution: "1080p", aspectRatio: "9:16" },
+    // ASCII colon in subtitle text stresses the filtergraph escaping across the two forms
+    subtitle: { texts: [{ text: "a:b", startTime: 0, endTime: 3 }], position: "bottom" },
+  };
+
+  it("输入路径作为独立 argv token 原样传入（不加引号、不做反斜杠转义）", () => {
+    const inv = buildComposeInvocation(cfg);
+    expect(inv.inputArgs[0]).toBe("-y");
+    // raw path present verbatim as one token — not `"C:\\..."` shell-quoted, not backslash-doubled
+    expect(inv.inputArgs).toContain("C:\\clip forge\\data\\s0.png");
+    expect(inv.inputArgs).toContain("-i");
+    // no argv token carries the giant filtergraph or an embedded newline (that lives in the script file)
+    expect(inv.inputArgs.every((a) => !a.includes("\n"))).toBe(true);
+    expect(inv.outputArgs.every((a) => !a.includes("\n"))).toBe(true);
+  });
+
+  it("视频流用原始 [vN] 映射、输出路径为最后一个 token（无 shell 引号）", () => {
+    const inv = buildComposeInvocation(cfg);
+    expect(inv.outputArgs).toContain("-map");
+    expect(inv.outputArgs.some((a) => /^\[[^\]]+\]$/.test(a))).toBe(true); // e.g. "[sub_out]" — raw, unquoted
+    expect(inv.outputArgs[inv.outputArgs.length - 1]).toBe(inv.outputPath);
+    expect(inv.outputPath).toMatch(/final_\d+\.mp4$/);
+  });
+
+  it("filtergraph 用直连转义（冒号 \\: 单反斜杠），而命令串形态保留 shell 预留的 \\\\:", () => {
+    const inv = buildComposeInvocation(cfg);
+    const cmd = buildComposeCommand(cfg);
+    // shell string form keeps the doubled backslash a real shell would halve
+    expect(cmd).toContain("a\\\\:b");
+    // script/execFile form is the post-shell direct form: single backslash before the colon
+    expect(inv.filterComplex).toContain("a\\:b");
+    expect(inv.filterComplex).not.toContain("a\\\\:b");
   });
 });
 

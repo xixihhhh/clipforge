@@ -228,6 +228,7 @@ node bin/clipforge.mjs --help          # 全部命令与参数
 - **Ken Burns 运动**: 缓慢推进 / 左右横移 / 景深漂移，用运镜让静态商品图"活起来"且不篡改商品
 - **配音双通道**: 付费 OpenAI 兼容 TTS（音质更可控）；或 **免费 Edge keyless TTS**（无需 Key，5 款中文音色可试听）做零配置兜底，逐镜生成口播并按配音时长卡点对齐字幕
 - **混源素材归一**: 不同来源素材像素格式/SAR/帧率统一归一，避免 xfade/concat 因格式不一致而合成失败
+- **无 shell 执行**: 合成用 `execFile` + `-filter_complex_script` 直跑 FFmpeg、不经系统 shell——规避 Windows `cmd.exe` 8191 字符命令行上限与内嵌换行/转义问题，多分镜+字幕的长滤镜也能稳定合成（issue #13）
 - **音频智能处理**: 支持音频的模型直接出带配音视频，BGM 自动混音压低
 
 ### 六、电商效率工具
