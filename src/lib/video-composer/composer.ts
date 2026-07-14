@@ -616,8 +616,12 @@ function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
  * doubles backslashes expecting the shell to halve them. Reading from a file (or passing via execFile)
  * skips the shell, so we apply that halving ourselves. escapeSubtitlesPath emits single backslashes
  * (\: \'), which contain no \\ pair and are left untouched — exactly as the shell leaves them.
+ *
+ * Exported because the sibling one-off overlay composers (cover / carousel / end-card) also run ffmpeg
+ * shell-free via execFile with the filtergraph as a raw argv element, so they need the same halving to
+ * turn buildDrawtext's pre-shell escaping into the ffmpeg-direct form.
  */
-function unshellFilter(filter: string): string {
+export function unshellFilter(filter: string): string {
   return filter.replace(/\\\\/g, "\\");
 }
 

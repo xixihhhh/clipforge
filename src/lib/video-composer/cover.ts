@@ -7,7 +7,7 @@
 import { dirname } from "path";
 import { mkdir } from "fs/promises";
 import { ffmpegBin, ffprobeBin } from "@/lib/ffmpeg-path";
-import { buildDrawtext, wrapCaption, resolveChineseFontFile } from "./composer";
+import { buildDrawtext, wrapCaption, resolveChineseFontFile, unshellFilter } from "./composer";
 
 export interface CoverVfOpts {
   title: string;
@@ -24,6 +24,12 @@ export interface CoverVfOpts {
  * per-line horizontally-centered boxed drawtexts, stacked as a positioned block — a single
  * drawtext would overflow the frame edges and get clipped at this large cover font size.
  * Pure; reuses wrapCaption + buildDrawtext escaping.
+ *
+ * generateCover runs ffmpeg shell-free (execFile, with this filter as a raw -vf argv element), so no shell
+ * halves buildDrawtext's pre-shell double-backslash escaping (colon → \\:, etc.). unshellFilter applies that
+ * halving here to yield the ffmpeg-direct form (\:), otherwise an ASCII colon/bracket/backslash in the title
+ * (e.g. "A:B") breaks the filtergraph parse or renders a stray backslash. Chinese titles lack these chars,
+ * which is why this went unnoticed.
  */
 export function buildCoverVf(o: CoverVfOpts): string {
   const fontSize = Math.round(o.width * 0.09);
@@ -37,20 +43,22 @@ export function buildCoverVf(o: CoverVfOpts): string {
       : o.position === "upper"
         ? `h*0.2-${Math.round(blockH / 2)}`
         : `(h-${blockH})/2`;
-  return lines
-    .map((line, i) =>
-      buildDrawtext({
-        fontFile: o.fontFile,
-        text: line || " ",
-        fontSize,
-        fontColor: "white",
-        borderW: Math.max(2, Math.round(o.width * 0.006)),
-        box: { color: "black@0.5", borderW: Math.round(o.width * 0.015) },
-        x: "(w-text_w)/2",
-        y: `${base}+${i * lineH}`,
-      }),
-    )
-    .join(",");
+  return unshellFilter(
+    lines
+      .map((line, i) =>
+        buildDrawtext({
+          fontFile: o.fontFile,
+          text: line || " ",
+          fontSize,
+          fontColor: "white",
+          borderW: Math.max(2, Math.round(o.width * 0.006)),
+          box: { color: "black@0.5", borderW: Math.round(o.width * 0.015) },
+          x: "(w-text_w)/2",
+          y: `${base}+${i * lineH}`,
+        }),
+      )
+      .join(","),
+  );
 }
 
 /** Probe the video's pixel width via ffprobe (falls back to 1080 on failure). */

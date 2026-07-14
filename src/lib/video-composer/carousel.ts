@@ -8,7 +8,7 @@
 import { join, dirname } from "path";
 import { mkdir } from "fs/promises";
 import { ffmpegBin } from "@/lib/ffmpeg-path";
-import { buildDrawtext, wrapCaption, resolveChineseFontFile } from "./composer";
+import { buildDrawtext, wrapCaption, resolveChineseFontFile, unshellFilter } from "./composer";
 
 export interface CardVfOpts {
   text: string;
@@ -23,25 +23,32 @@ export interface CardVfOpts {
  * its own horizontally-centered drawtext, stacking the lines as a vertically-centered block.
  * (A single multi-line drawtext is left-aligned; per-line drawtexts give true centering for a polished card.)
  * Pure; reuses wrapCaption + buildDrawtext escaping.
+ *
+ * generateCard runs ffmpeg shell-free (execFile, with this filter as a raw -vf argv element), so no shell
+ * halves buildDrawtext's pre-shell double-backslash escaping. unshellFilter applies that halving here to
+ * yield the ffmpeg-direct form, otherwise an ASCII colon/bracket/backslash in the card text breaks the
+ * filtergraph parse or renders a stray backslash (Chinese card text lacks these chars, hiding the bug).
  */
 export function buildCardVf(o: CardVfOpts): string {
   const fontSize = o.fontSize ?? Math.round(o.width * 0.055);
   const lines = wrapCaption(o.text, fontSize, o.width).split("\n");
   const lineH = Math.round(fontSize * 1.5);
   const blockH = lines.length * lineH;
-  return lines
-    .map((line, i) =>
-      buildDrawtext({
-        fontFile: o.fontFile,
-        text: line || " ",
-        fontSize,
-        fontColor: o.fontColor ?? "white",
-        borderW: Math.max(2, Math.round(o.width * 0.004)),
-        x: "(w-text_w)/2",
-        y: `(h-${blockH})/2+${i * lineH}`,
-      }),
-    )
-    .join(",");
+  return unshellFilter(
+    lines
+      .map((line, i) =>
+        buildDrawtext({
+          fontFile: o.fontFile,
+          text: line || " ",
+          fontSize,
+          fontColor: o.fontColor ?? "white",
+          borderW: Math.max(2, Math.round(o.width * 0.004)),
+          x: "(w-text_w)/2",
+          y: `(h-${blockH})/2+${i * lineH}`,
+        }),
+      )
+      .join(","),
+  );
 }
 
 /** Card color themes (gradient background + text color) so a feed of cards isn't monotone. */

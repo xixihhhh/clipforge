@@ -9,7 +9,7 @@
 import { dirname } from "path";
 import { mkdir } from "fs/promises";
 import { ffmpegBin, ffprobeBin } from "@/lib/ffmpeg-path";
-import { buildDrawtext } from "./composer";
+import { buildDrawtext, unshellFilter } from "./composer";
 
 export interface EndCardVfOpts {
   /** video pixel width (from ffprobe) */
@@ -30,6 +30,12 @@ export interface EndCardVfOpts {
  * Build the -filter_complex that overlays the QR (input [1:v]) + optional CTA onto the last N seconds
  * of the video ([0:v]). Always ends with a labeled [vout] so the caller can -map it and keep the audio.
  * Pure function.
+ *
+ * generateEndCard runs ffmpeg shell-free (execFile, with this filter as a raw -filter_complex argv element),
+ * so no shell halves buildDrawtext's pre-shell double-backslash escaping. The CTA branch below applies
+ * unshellFilter to yield the ffmpeg-direct form, otherwise an ASCII colon/bracket/backslash in ctaText
+ * would break the filtergraph parse or render a stray backslash. (The overlay/QR fragment carries no
+ * backslashes, so the CTA-free branch needs no halving.)
  */
 export function buildEndCardFilter(o: EndCardVfOpts): string {
   const qrW = Math.round(o.width * (o.qrRatio ?? 0.34));
@@ -52,7 +58,7 @@ export function buildEndCardFilter(o: EndCardVfOpts): string {
     y: `(h-${qrW})/2-${Math.round(fontSize * 2)}`,
     enable,
   });
-  return `${overlay}[ov];[ov]${cta}[vout]`;
+  return unshellFilter(`${overlay}[ov];[ov]${cta}[vout]`);
 }
 
 /** ffprobe the video's width + duration (falls back to 1080 / 0 on failure). */
