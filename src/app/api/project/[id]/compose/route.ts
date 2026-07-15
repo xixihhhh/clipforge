@@ -283,12 +283,10 @@ export async function POST(
       }
     });
 
-    // 可选叠加：AI 生成合规标识（TikTok/抖音 2025 末起要求）+ 片尾购买 CTA（带货转化），按 body 开关
+    // 可选叠加：片尾购买 CTA（带货转化），按 body 开关
     overlays.push(
       ...buildComplianceOverlays(
         {
-          aiDisclosure: body.aiDisclosure === true,
-          disclosureText: typeof body.disclosureText === "string" ? body.disclosureText : undefined,
           ctaText: typeof body.ctaText === "string" ? body.ctaText : undefined,
         },
         acc

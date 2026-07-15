@@ -45,8 +45,6 @@ interface ComposeConfig {
   resolution: "720p" | "1080p";
   /** 渲染质量预设：快速/标准/高清（决定分辨率 + 编码速度/质量） */
   renderPreset: RenderPreset;
-  /** 合规：烧 AI 生成标识（TikTok/抖音要求） */
-  aiDisclosure: boolean;
   /** 带货：片尾购买 CTA 贴片 */
   ctaEnabled: boolean;
   ctaText: string;
@@ -133,7 +131,6 @@ export default function VideoPage() {
     aspectRatio: "9:16",
     resolution: "1080p",
     renderPreset: DEFAULT_RENDER_PRESET,
-    aiDisclosure: false,
     ctaEnabled: false,
     ctaText: "", // 默认空，开启时按当前语言用 ctaPlaceholder 预填（避免英文用户拿到中文默认 CTA）
     productCard: false,
@@ -284,7 +281,6 @@ export default function VideoPage() {
           resolution: config.resolution,
           renderPreset: config.renderPreset,
           aspectRatio: config.aspectRatio,
-          ...(config.aiDisclosure && { aiDisclosure: true }),
           ...(config.ctaEnabled && config.ctaText.trim() && { ctaText: config.ctaText.trim() }),
           ...(config.productCard && { productCard: true }),
           ...(config.karaoke && { karaoke: true }),
@@ -605,19 +601,10 @@ export default function VideoPage() {
               </CardContent>
             </Card>
 
-            {/* 合规与转化：AI 生成标识 + 购买 CTA 片尾 */}
+            {/* 带货转化：购买 CTA 片尾 */}
             <Card className="glass-card">
               <CardContent className="p-4 space-y-3">
                 <Label className="text-sm font-medium">{t("complianceLabel")}</Label>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{t("aiDisclosureLabel")}</span>
-                  <button
-                    onClick={() => setConfig((c) => ({ ...c, aiDisclosure: !c.aiDisclosure }))}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${config.aiDisclosure ? "bg-primary" : "bg-muted"}`}
-                  >
-                    <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${config.aiDisclosure ? "translate-x-5" : "translate-x-0.5"}`} />
-                  </button>
-                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{t("ctaLabel")}</span>
                   <button
