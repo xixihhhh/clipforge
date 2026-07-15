@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
-// fetch project list
+// fetch project list, most recently edited first (the /start "continue" cards rely on this order)
 export async function GET() {
   try {
     const db = getDb();
-    const result = await db.select().from(projects).orderBy(desc(projects.createdAt));
+    const result = await db.select().from(projects).orderBy(desc(projects.updatedAt));
     return NextResponse.json(result);
   } catch (error) {
     console.error("获取项目列表失败:", error);

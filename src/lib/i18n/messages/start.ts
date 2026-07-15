@@ -43,6 +43,7 @@ export const start: NamespaceMessages = {
     atlasUseOther: "想用别的平台（OpenAI / DeepSeek…）？前往完整设置",
     atlasKeyInvalid: "Key 无效或无权限，请检查后重试",
     atlasConnectFailed: "连接失败，请检查网络后重试",
+    atlasDismiss: "稍后再说",
     // 主按钮 + 安心文案
     ctaStart: "开始生成",
     busyDefault: "生成中…",
@@ -65,6 +66,11 @@ export const start: NamespaceMessages = {
     // 最近项目
     recentLabel: "继续未完成的项目",
     untitledProject: "未命名项目",
+    // 最近项目卡片的阶段标签（区别于上方 stage* 生成进行时文案）
+    pjStageScript: "脚本",
+    pjStageAssets: "素材",
+    pjStageVideo: "合成",
+    pjStageDone: "已完成",
     // 高级入口
     advLink: "高级设置 · 多平台 / 自定义模型 / 生成参数 ›",
     // 新建项目默认名（{name} 为商品名）
@@ -111,6 +117,7 @@ export const start: NamespaceMessages = {
     atlasUseOther: "Prefer another platform (OpenAI / DeepSeek…)? Open full settings",
     atlasKeyInvalid: "Key invalid or unauthorized — check and retry",
     atlasConnectFailed: "Connection failed — check your network and retry",
+    atlasDismiss: "Maybe later",
     // 主按钮 + 安心文案
     ctaStart: "Start generating",
     busyDefault: "Generating…",
@@ -133,6 +140,11 @@ export const start: NamespaceMessages = {
     // 最近项目
     recentLabel: "Continue an unfinished project",
     untitledProject: "Untitled project",
+    // 最近项目卡片的阶段标签（区别于上方 stage* 生成进行时文案）
+    pjStageScript: "Script",
+    pjStageAssets: "Assets",
+    pjStageVideo: "Compose",
+    pjStageDone: "Done",
     // 高级入口
     advLink: "Advanced · multi-platform / custom models / generation params ›",
     // 新建项目默认名（{name} 为商品名）

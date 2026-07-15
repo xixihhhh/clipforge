@@ -14,6 +14,8 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { getExampleProducts, type ExampleProduct } from "@/lib/examples";
 import { useT, useLocale, useSetLocale } from "@/lib/i18n";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n/config";
+import { ATLAS_KEYS_URL } from "@/lib/atlas-onekey";
+import { formatRelativeTime } from "@/lib/relative-time";
 
 type Mode = "upload" | "topic" | "link";
 interface PickedImage {
@@ -58,6 +60,7 @@ export default function StartPage() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const keyformRef = useRef<HTMLDivElement>(null);
 
   // fetch recent projects to give returning users a "continue" entry point (replaces the old homepage project list so they are not left stranded)
   useEffect(() => {
@@ -66,7 +69,14 @@ export default function StartPage() {
       try {
         const res = await fetch("/api/project");
         const data = res.ok ? await res.json() : [];
-        if (!cancelled) setRecent(Array.isArray(data) ? data.slice(0, 4) : []);
+        const list: RecentProject[] = Array.isArray(data) ? data : [];
+        // sort by updatedAt desc so "recent" truly reflects last-edited order (null/invalid timestamps sink to the end)
+        const ts = (p: RecentProject) => {
+          if (!p.updatedAt) return 0;
+          const time = new Date(p.updatedAt).getTime();
+          return Number.isFinite(time) ? time : 0;
+        };
+        if (!cancelled) setRecent([...list].sort((a, b) => ts(b) - ts(a)).slice(0, 4));
       } catch {
         /* ignore */
       }
@@ -77,6 +87,10 @@ export default function StartPage() {
   // navigate to the appropriate step based on project status
   const stepFor = (status: string) =>
     status === "done" || status === "composing" || status === "video" ? "video" : status === "assets" ? "assets" : "script";
+
+  // map project status to the short stage-label i18n key shown on recent-project cards
+  const stageKeyFor = (status: string) =>
+    status === "done" ? "pjStageDone" : status === "video" || status === "composing" ? "pjStageVideo" : status === "assets" ? "pjStageAssets" : "pjStageScript";
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -244,6 +258,12 @@ export default function StartPage() {
     // no LLM configured: expand the Atlas one-click setup panel inline (no navigation, no loss of filled content)
     if (!llmReady) {
       setNeedKey(true);
+      // the panel may be mounting this very tick — defer the scroll until React has committed it to the DOM
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          keyformRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+        });
+      });
       return;
     }
     runGeneration();
@@ -326,6 +346,8 @@ export default function StartPage() {
         .cf-keyform{margin-top:12px;border:1px solid rgba(94,234,212,.32);background:rgba(94,234,212,.06);border-radius:14px;padding:14px}
         .cf-keyhead{font-size:14.5px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:9px;margin-bottom:5px}
         .cf-keyhead .badge{font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink);background:var(--teal);border-radius:6px;padding:2px 8px}
+        .cf-keyclose{margin-left:auto;width:26px;height:26px;flex:none;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:.18s}
+        .cf-keyclose:hover{color:var(--text);border-color:var(--bd2);background:var(--surface2)}
         .cf-keydesc{font-size:12.5px;color:var(--dim);line-height:1.55;margin-bottom:11px}
         .cf-keydesc a{color:var(--teal);text-decoration:none;white-space:nowrap}
         .cf-keydesc a:hover{text-decoration:underline;text-underline-offset:2px}
@@ -341,7 +363,7 @@ export default function StartPage() {
         .cf-keyerr{margin-top:9px;color:#FCA5A5;font-size:12.5px}
         .cf-err{margin-top:12px;color:#FCA5A5;font-size:13px}
         .cf-examples{margin-top:24px;font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
-        .cf-chip{padding:6px 12px;border:1px solid var(--bd);border-radius:999px;background:var(--surface);color:var(--dim);cursor:pointer;transition:.18s}
+        .cf-chip{padding:6px 12px;border:1px solid var(--bd);border-radius:999px;background:var(--surface);color:var(--dim);font:inherit;cursor:pointer;transition:.18s}
         .cf-chip:hover{border-color:rgba(94,234,212,.4);color:var(--text)}
         .cf-adv{display:flex;justify-content:center;padding:30px 0 50px}
         .cf-adv a{font-size:12.5px;color:var(--muted);text-decoration:none;padding:8px 14px;border:1px solid transparent;border-radius:999px;transition:.18s}
@@ -355,7 +377,9 @@ export default function StartPage() {
         .cf-pj{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--bd);border-radius:12px;background:var(--surface);text-decoration:none;transition:.18s}
         .cf-pj:hover{border-color:var(--bd2);background:var(--surface2)}
         .cf-pj .dot{width:7px;height:7px;border-radius:999px;background:var(--teal);flex:none;box-shadow:0 0 8px var(--teal)}
+        .cf-pj .col{min-width:0;display:flex;flex-direction:column;gap:2px}
         .cf-pj .nm{font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cf-pj-meta{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         @media (prefers-reduced-motion:reduce){.cf-drop{animation:none}}
       `}</style>
 
@@ -449,15 +473,18 @@ export default function StartPage() {
               </div>
             )}
 
-            {needKey && !llmReady ? (
-              <div className="cf-keyform">
+            {needKey && !llmReady && (
+              <div className="cf-keyform" ref={keyformRef}>
                 <div className="cf-keyhead">
                   <span className="badge">{t("atlasBadge")}</span>
                   {t("atlasTitle")}
+                  <button type="button" className="cf-keyclose" aria-label={t("atlasDismiss")} title={t("atlasDismiss")} onClick={() => setNeedKey(false)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
                 </div>
                 <div className="cf-keydesc">
                   {t("atlasDesc")}{" "}
-                  <a href="https://www.atlascloud.ai" target="_blank" rel="noreferrer">{t("atlasGetKey")} ↗</a>
+                  <a href={ATLAS_KEYS_URL} target="_blank" rel="noreferrer">{t("atlasGetKey")} ↗</a>
                 </div>
                 <div className="cf-keyrow">
                   <input
@@ -479,22 +506,21 @@ export default function StartPage() {
                   <Link href="/settings">{t("atlasUseOther")}</Link>
                 </div>
               </div>
-            ) : (
-              <div className="cf-cta-row">
-                <button className="cf-cta" onClick={onStart} disabled={!canStart || busy}>
-                  {busy ? (stage || t("busyDefault")) : t("ctaStart")}
-                  {!busy && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
-                </button>
-                <div className="cf-reassure">{t("reassureLead")}<b>Atlas Cloud</b>{t("reassureTail")}</div>
-              </div>
             )}
+            <div className="cf-cta-row">
+              <button className="cf-cta" onClick={onStart} disabled={!canStart || busy}>
+                {busy ? (stage || t("busyDefault")) : t("ctaStart")}
+                {!busy && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
+              </button>
+              <div className="cf-reassure">{t("reassureLead")}<b>Atlas Cloud</b>{t("reassureTail")}</div>
+            </div>
             {error && <div className="cf-err">{error}</div>}
           </div>
 
           <div className="cf-examples">
             {t("examplesLabel")}
             {examples.slice(0, 3).map((ex) => (
-              <span key={ex.id} className="cf-chip" onClick={() => fillExample(ex)}>{ex.name} ¥{ex.price}</span>
+              <button key={ex.id} type="button" className="cf-chip" onClick={() => fillExample(ex)}>{ex.name} ¥{ex.price}</button>
             ))}
           </div>
 
@@ -502,12 +528,18 @@ export default function StartPage() {
             <div className="cf-recent">
               <div className="lbl">{t("recentLabel")}</div>
               <div className="row">
-                {recent.map((p) => (
-                  <Link key={p.id} href={`/project/${p.id}/${stepFor(p.status)}`} className="cf-pj">
-                    <span className="dot" />
-                    <span className="nm">{p.name || p.productName || t("untitledProject")}</span>
-                  </Link>
-                ))}
+                {recent.map((p) => {
+                  const rel = formatRelativeTime(p.updatedAt, locale);
+                  return (
+                    <Link key={p.id} href={`/project/${p.id}/${stepFor(p.status)}`} className="cf-pj">
+                      <span className="dot" />
+                      <span className="col">
+                        <span className="nm">{p.name || p.productName || t("untitledProject")}</span>
+                        <span className="cf-pj-meta">{t(stageKeyFor(p.status))}{rel ? ` · ${rel}` : ""}</span>
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

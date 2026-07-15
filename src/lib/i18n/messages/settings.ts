@@ -111,6 +111,9 @@ export const settings: NamespaceMessages = {
     enableProviderFirst: "请先启用 AI 平台",
     modelsLoading: "加载中...",
 
+    // 顶部配置状态横幅
+    configBannerTitle: "配置未完成，部分功能暂不可用",
+
     // 底部保存
     llmConfigured: "✓ LLM 已配置",
     llmNotConfigured: "⚠ LLM 未配置（脚本生成需要）",
@@ -278,6 +281,9 @@ export const settings: NamespaceMessages = {
     selectVideoModel: "Select a video model",
     enableProviderFirst: "Enable an AI platform first",
     modelsLoading: "Loading...",
+
+    // Top configuration status banner
+    configBannerTitle: "Setup incomplete — some features are unavailable",
 
     // Save footer
     llmConfigured: "✓ LLM configured",

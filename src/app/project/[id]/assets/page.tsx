@@ -13,6 +13,7 @@ import type { Shot } from "@/lib/db/schema";
 import { buildAssetRows, shouldOfferStockFill, needsImageModelWarning, type AssetItem } from "@/lib/assets-view";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ProjectStepper } from "@/components/project-stepper";
 
 // shot type labels (label changed to i18n key in the assets namespace, resolved per locale)
 const shotTypeLabels: Record<Shot["type"], { key: string; color: string }> = {
@@ -486,29 +487,10 @@ export default function AssetsPage() {
             <span className="text-sm text-muted-foreground truncate max-w-[20vw] sm:max-w-xs">{projectName || t("untitledProject")}</span>
           </div>
 
-          {/* step progress */}
+          {/* step progress: clickable pills (mobile shows a compact badge inside the component) */}
           <div className="flex items-center gap-1">
             <LanguageToggle className="mr-1" />
-            {/* mobile: full step pills don't fit, show a compact "current step / total" badge instead */}
-            <div className="sm:hidden flex h-7 items-center gap-1.5 rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/20 text-[10px]">2</span>
-              {t("stepAssets")}
-              <span className="text-primary-foreground/60">2/4</span>
-            </div>
-            {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
-            <div className="hidden sm:flex items-center gap-1">
-            {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
-              <div key={step} className="flex items-center">
-                <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 1 ? "bg-primary text-primary-foreground" : i < 1 ? "text-primary" : "text-muted-foreground"}`}>
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 1 ? "bg-white/20" : i < 1 ? "bg-primary/20" : "bg-muted"}`}>
-                    {i < 1 ? "✓" : i + 1}
-                  </span>
-                  {step}
-                </div>
-                {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
-              </div>
-            ))}
-            </div>
+            <ProjectStepper />
           </div>
         </div>
       </header>

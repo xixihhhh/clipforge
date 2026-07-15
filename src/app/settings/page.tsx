@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette, LuZap, LuCheck } from "react-icons/lu";
+import { LuPlus, LuTrash2, LuUser, LuStar, LuUpload, LuPalette, LuZap, LuCheck, LuTriangleAlert } from "react-icons/lu";
+import { ATLAS_KEYS_URL } from "@/lib/atlas-onekey";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useSettingsStore } from "@/lib/stores/settings-store";
@@ -467,6 +468,20 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* configuration status banner: surfaces missing setup right at the top (the footer summary is easy to miss) */}
+        {(!llm.apiKey || !hasAnyProvider) && (
+          <div className="mb-6 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <LuTriangleAlert className="w-4 h-4 shrink-0 text-amber-500" />
+              <h2 className="font-semibold text-sm text-amber-600 dark:text-amber-400">{t("configBannerTitle")}</h2>
+            </div>
+            <ul className="space-y-1 text-xs text-amber-600 dark:text-amber-400/90">
+              {!llm.apiKey && <li>{t("llmNotConfigured")}</li>}
+              {!hasAnyProvider && <li>{t("noProvider")}</li>}
+            </ul>
+          </div>
+        )}
+
         {/* beginner one-click setup: a single Atlas Key auto-configures LLM/image-gen/video-gen/TTS, skipping manual item-by-item setup */}
         <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-5">
           <div className="flex items-center gap-2 mb-1">
@@ -494,7 +509,7 @@ export default function SettingsPage() {
               </Button>
             </div>
           )}
-          <a href="https://www.atlascloud.ai" target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-primary hover:underline">
+          <a href={ATLAS_KEYS_URL} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-primary hover:underline">
             {t("oneKeyGetKey")}
           </a>
         </div>

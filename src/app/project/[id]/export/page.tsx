@@ -12,6 +12,7 @@ import { buildPublishPack, buildAiDeclaration } from "@/lib/publish-pack";
 import { buildShopLink } from "@/lib/shop-link";
 import { useT, useLocale } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ProjectStepper } from "@/components/project-stepper";
 import { PerformanceFeedback } from "@/components/performance-feedback";
 
 // platform export config (planned feature, for display). name uses an i18n key (nameKey) resolved to the translated text at render time
@@ -404,20 +405,8 @@ export default function ExportPage() {
         </div>
         <div className="flex items-center gap-3">
           <LanguageToggle />
-          {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
-          <div className="hidden sm:flex items-center gap-1">
-            {["stepScript", "stepAssets", "stepVideo", "stepExport"].map((stepKey, i) => (
-              <div key={stepKey} className="flex items-center">
-                <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 3 ? "bg-primary text-primary-foreground" : "text-primary"}`}>
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 3 ? "bg-white/20" : "bg-primary/20"}`}>
-                    {i < 3 ? "✓" : i + 1}
-                  </span>
-                  {t(stepKey)}
-                </div>
-                {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
-              </div>
-            ))}
-          </div>
+          {/* step progress: clickable pills (mobile shows a compact badge inside the component) */}
+          <ProjectStepper />
         </div>
       </div>
     </header>
@@ -526,7 +515,7 @@ export default function ExportPage() {
         {/* action buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-8">
           <a href={`${composition.url}?download=1`} download={composition.fileName}>
-            <Button className="brand-gradient text-white h-11 px-8 text-sm font-semibold w-full">
+            <Button className="brand-gradient text-white h-12 px-8 text-base font-semibold w-full">
               <LuDownload className="w-[18px] h-[18px] mr-2" />
               {t("downloadVideo")}
             </Button>
@@ -671,42 +660,161 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        {/* performance feedback: backfill data after publishing → learn which style sells better */}
-        <div className="mb-6">
-          <PerformanceFeedback projectId={id} />
-        </div>
-
-        {/* A/B variants: re-render one video per subtitle style + BGM combo to compare conversion rates in ads */}
-        <Card className="glass-card mb-6">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <LuShuffle className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold">{t("abTitle")}</h3>
-              </div>
-              <Button size="sm" variant="outline" className="text-xs" disabled={abRunning || !composition?.url} onClick={generateAbVariants}>
-                {abRunning ? t("abRunning") : t("abGenerate")}
-              </Button>
+        {/* advanced tools (collapsed by default): feedback / A/B testing / QC & compliance — keeps the primary download action prominent for casual users */}
+        <details className="group rounded-xl border border-border/50 bg-card/30 mb-6">
+          <summary className="flex items-center justify-between cursor-pointer list-none select-none px-5 py-3.5 text-muted-foreground hover:text-foreground">
+            <div className="min-w-0">
+              <span className="block text-sm font-medium text-foreground">{t("advancedTitle")}</span>
+              <span className="block text-xs text-muted-foreground mt-0.5">{t("advancedHint")}</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-3">{t("abDesc")}</p>
-            {abVariants.length > 0 && (
-              <div className="space-y-2">
-                {abVariants.map((v) => (
-                  <div key={v.key} className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-3 py-2">
-                    <span className="text-xs">{t(v.labelKey)}</span>
-                    {v.status === "running" && <LuLoaderCircle className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-                    {v.status === "done" && v.url && (
-                      <a href={`${v.url}?download=1`} download>
-                        <Button size="sm" variant="outline" className="text-xs h-7">{t("abDownload")}</Button>
-                      </a>
-                    )}
-                    {v.status === "error" && <span className="text-xs text-destructive">{t("abFailed")}</span>}
+            <svg className="size-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+          </summary>
+          <div className="px-4 pb-4 space-y-3">
+            {/* performance feedback: backfill data after publishing → learn which style sells better */}
+            <PerformanceFeedback projectId={id} />
+
+            {/* A/B variants: re-render one video per subtitle style + BGM combo to compare conversion rates in ads */}
+            <Card className="glass-card">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <LuShuffle className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold">{t("abTitle")}</h3>
                   </div>
-                ))}
+                  <Button size="sm" variant="outline" className="text-xs" disabled={abRunning || !composition?.url} onClick={generateAbVariants}>
+                    {abRunning ? t("abRunning") : t("abGenerate")}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">{t("abDesc")}</p>
+                {abVariants.length > 0 && (
+                  <div className="space-y-2">
+                    {abVariants.map((v) => (
+                      <div key={v.key} className="flex items-center justify-between rounded-md border border-border/40 bg-muted/10 px-3 py-2">
+                        <span className="text-xs">{t(v.labelKey)}</span>
+                        {v.status === "running" && <LuLoaderCircle className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                        {v.status === "done" && v.url && (
+                          <a href={`${v.url}?download=1`} download>
+                            <Button size="sm" variant="outline" className="text-xs h-7">{t("abDownload")}</Button>
+                          </a>
+                        )}
+                        {v.status === "error" && <span className="text-xs text-destructive">{t("abFailed")}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* composed-video quality check */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuShieldCheck className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("qcTitle")}</span></div>
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={qc.loading || !composition?.url} onClick={runQualityCheck}>
+                  {qc.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("qcRun")}
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <p className="text-[11px] text-muted-foreground">{t("qcHint")}</p>
+              {qc.error && <p className="text-[11px] text-destructive mt-1">{qc.error}</p>}
+              {qc.status && (
+                <p className={`text-[11px] mt-2 font-medium ${qc.status === "ok" ? "text-emerald-500" : qc.status === "warn" ? "text-amber-500" : "text-destructive"}`}>
+                  {qc.status === "ok" ? t("qcPass") : qc.status === "warn" ? t("qcWarn") : t("qcFail")}
+                </p>
+              )}
+              {qc.checks && qc.checks.length > 0 && (
+                <ul className="mt-1.5 space-y-1">
+                  {qc.checks.map((c) => (
+                    <li key={c.id} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                      {c.level === "ok" ? <LuCircleCheck className="w-3 h-3 mt-0.5 shrink-0 text-emerald-500" /> : c.level === "warn" ? <LuTriangleAlert className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" /> : <LuCircleX className="w-3 h-3 mt-0.5 shrink-0 text-destructive" />}
+                      <span>{locale === "en" ? c.message.en : c.message.zh}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* asset license manifest */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuFileText className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("creditsTitle")}</span></div>
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={credits.loading} onClick={runCredits}>
+                  {credits.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("creditsRun")}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("creditsHint")}</p>
+              {credits.error && <p className="text-[11px] text-destructive mt-1">{credits.error}</p>}
+              {credits.summary && (
+                <>
+                  <p className={`text-[11px] mt-2 font-medium ${credits.summary.commercialSafe ? "text-emerald-500" : "text-amber-500"}`}>
+                    {credits.summary.commercialSafe ? t("creditsSafe") : t("creditsUnsafe", { n: credits.summary.needsReview })}
+                    {" · "}
+                    <span className="text-muted-foreground font-normal">{t("creditsSummary", { total: credits.summary.total, attr: credits.summary.needsAttribution })}</span>
+                  </p>
+                  {credits.attributions && credits.attributions.length > 0 && (
+                    <div className="mt-1.5">
+                      <p className="text-[11px] text-muted-foreground mb-1">{t("creditsAttrLabel")}</p>
+                      <ul className="space-y-1">
+                        {credits.attributions.map((line, i) => (
+                          <li key={i}>
+                            <button
+                              className="text-left text-[11px] text-foreground/80 hover:text-primary break-all"
+                              onClick={() => copyAttribution(line, i)}
+                            >
+                              {line}{credits.copiedIdx === i && <span className="ml-1.5 text-emerald-500">{t("creditsCopied")}</span>}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <a href={`/api/project/${id}/credits?format=md&lang=${locale === "en" ? "en" : "zh"}`} download>
+                    <Button size="sm" variant="outline" className="text-xs h-7 mt-2"><LuDownload className="w-3 h-3 mr-1" />{t("creditsDownloadMd")}</Button>
+                  </a>
+                </>
+              )}
+            </div>
+            {/* native feel (hand-shot look) */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuFilm className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("feelTitle")}</span></div>
+                <div className="flex items-center gap-2">
+                  <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={feelStrength} onChange={(e) => setFeelStrength(e.target.value === "medium" ? "medium" : "subtle")}>
+                    <option value="subtle">{t("feelStrengthSubtle")}</option>
+                    <option value="medium">{t("feelStrengthMedium")}</option>
+                  </select>
+                  <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.feel?.loading || !composition?.url} onClick={genNativeFeel}>
+                    {more.feel?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("feelHint")}</p>
+              {more.feel?.error && <p className="text-[11px] text-destructive mt-1">{more.feel.error}</p>}
+              {more.feel?.video && (
+                <a href={`${more.feel.video}?download=1`} download>
+                  <Button size="sm" variant="outline" className="text-xs h-7 mt-1"><LuDownload className="w-3 h-3 mr-1" />{t("feelDownload")}</Button>
+                </a>
+              )}
+            </div>
+            {/* multi-language dub */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuLanguages className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("moreDub")}</span></div>
+                <div className="flex items-center gap-2">
+                  <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={dubLang} onChange={(e) => setDubLang(e.target.value)}>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="ko">한국어</option>
+                    <option value="es">Español</option>
+                  </select>
+                  <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.dub?.loading} onClick={genDub}>
+                    {more.dub?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("moreDubHint")}</p>
+              {more.dub?.error && <p className="text-[11px] text-destructive mt-1">{more.dub.error}</p>}
+              {more.dub?.note && <p className="text-[11px] text-emerald-500 mt-1">{more.dub.note}</p>}
+            </div>
+          </div>
+        </details>
 
         {/* more outputs: monetization + localization tools (cover / carousel / shop QR / end-card / dub) */}
         <Card className="glass-card mb-6">
@@ -791,114 +899,6 @@ export default function ExportPage() {
                     <Button size="sm" variant="outline" className="text-xs h-7 mt-1"><LuDownload className="w-3 h-3 mr-1" />{t("moreEndCardDownload")}</Button>
                   </a>
                 )}
-              </div>
-              {/* composed-video quality check */}
-              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2"><LuShieldCheck className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("qcTitle")}</span></div>
-                  <Button size="sm" variant="outline" className="text-xs h-7" disabled={qc.loading || !composition?.url} onClick={runQualityCheck}>
-                    {qc.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("qcRun")}
-                  </Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t("qcHint")}</p>
-                {qc.error && <p className="text-[11px] text-destructive mt-1">{qc.error}</p>}
-                {qc.status && (
-                  <p className={`text-[11px] mt-2 font-medium ${qc.status === "ok" ? "text-emerald-500" : qc.status === "warn" ? "text-amber-500" : "text-destructive"}`}>
-                    {qc.status === "ok" ? t("qcPass") : qc.status === "warn" ? t("qcWarn") : t("qcFail")}
-                  </p>
-                )}
-                {qc.checks && qc.checks.length > 0 && (
-                  <ul className="mt-1.5 space-y-1">
-                    {qc.checks.map((c) => (
-                      <li key={c.id} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-                        {c.level === "ok" ? <LuCircleCheck className="w-3 h-3 mt-0.5 shrink-0 text-emerald-500" /> : c.level === "warn" ? <LuTriangleAlert className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" /> : <LuCircleX className="w-3 h-3 mt-0.5 shrink-0 text-destructive" />}
-                        <span>{locale === "en" ? c.message.en : c.message.zh}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {/* asset license manifest */}
-              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2"><LuFileText className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("creditsTitle")}</span></div>
-                  <Button size="sm" variant="outline" className="text-xs h-7" disabled={credits.loading} onClick={runCredits}>
-                    {credits.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("creditsRun")}
-                  </Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t("creditsHint")}</p>
-                {credits.error && <p className="text-[11px] text-destructive mt-1">{credits.error}</p>}
-                {credits.summary && (
-                  <>
-                    <p className={`text-[11px] mt-2 font-medium ${credits.summary.commercialSafe ? "text-emerald-500" : "text-amber-500"}`}>
-                      {credits.summary.commercialSafe ? t("creditsSafe") : t("creditsUnsafe", { n: credits.summary.needsReview })}
-                      {" · "}
-                      <span className="text-muted-foreground font-normal">{t("creditsSummary", { total: credits.summary.total, attr: credits.summary.needsAttribution })}</span>
-                    </p>
-                    {credits.attributions && credits.attributions.length > 0 && (
-                      <div className="mt-1.5">
-                        <p className="text-[11px] text-muted-foreground mb-1">{t("creditsAttrLabel")}</p>
-                        <ul className="space-y-1">
-                          {credits.attributions.map((line, i) => (
-                            <li key={i}>
-                              <button
-                                className="text-left text-[11px] text-foreground/80 hover:text-primary break-all"
-                                onClick={() => copyAttribution(line, i)}
-                              >
-                                {line}{credits.copiedIdx === i && <span className="ml-1.5 text-emerald-500">{t("creditsCopied")}</span>}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <a href={`/api/project/${id}/credits?format=md&lang=${locale === "en" ? "en" : "zh"}`} download>
-                      <Button size="sm" variant="outline" className="text-xs h-7 mt-2"><LuDownload className="w-3 h-3 mr-1" />{t("creditsDownloadMd")}</Button>
-                    </a>
-                  </>
-                )}
-              </div>
-              {/* native feel (hand-shot look) */}
-              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2"><LuFilm className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("feelTitle")}</span></div>
-                  <div className="flex items-center gap-2">
-                    <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={feelStrength} onChange={(e) => setFeelStrength(e.target.value === "medium" ? "medium" : "subtle")}>
-                      <option value="subtle">{t("feelStrengthSubtle")}</option>
-                      <option value="medium">{t("feelStrengthMedium")}</option>
-                    </select>
-                    <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.feel?.loading || !composition?.url} onClick={genNativeFeel}>
-                      {more.feel?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t("feelHint")}</p>
-                {more.feel?.error && <p className="text-[11px] text-destructive mt-1">{more.feel.error}</p>}
-                {more.feel?.video && (
-                  <a href={`${more.feel.video}?download=1`} download>
-                    <Button size="sm" variant="outline" className="text-xs h-7 mt-1"><LuDownload className="w-3 h-3 mr-1" />{t("feelDownload")}</Button>
-                  </a>
-                )}
-              </div>
-              {/* multi-language dub */}
-              <div className="rounded-lg border border-border/50 bg-muted/10 p-3 md:col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2"><LuLanguages className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("moreDub")}</span></div>
-                  <div className="flex items-center gap-2">
-                    <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={dubLang} onChange={(e) => setDubLang(e.target.value)}>
-                      <option value="en">English</option>
-                      <option value="ja">日本語</option>
-                      <option value="ko">한국어</option>
-                      <option value="es">Español</option>
-                    </select>
-                    <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.dub?.loading} onClick={genDub}>
-                      {more.dub?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t("moreDubHint")}</p>
-                {more.dub?.error && <p className="text-[11px] text-destructive mt-1">{more.dub.error}</p>}
-                {more.dub?.note && <p className="text-[11px] text-emerald-500 mt-1">{more.dub.note}</p>}
               </div>
             </div>
           </CardContent>

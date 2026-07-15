@@ -16,6 +16,11 @@ export const common: NamespaceMessages = {
     retry: "重试",
     loading: "加载中...",
     generating: "生成中...",
+    // 项目四步流程（ProjectStepper 组件使用）
+    stepScript: "脚本",
+    stepAssets: "素材",
+    stepVideo: "视频",
+    stepExport: "导出",
     // 项目状态
     statusDraft: "草稿",
     statusScripting: "脚本中",
@@ -38,6 +43,11 @@ export const common: NamespaceMessages = {
     retry: "Retry",
     loading: "Loading...",
     generating: "Generating...",
+    // Project four-step pipeline (used by the ProjectStepper component)
+    stepScript: "Script",
+    stepAssets: "Assets",
+    stepVideo: "Video",
+    stepExport: "Export",
     statusDraft: "Draft",
     statusScripting: "Scripting",
     statusAssets: "Assets",

@@ -22,6 +22,7 @@ export const script: NamespaceMessages = {
     errorNoLlm: "尚未配置 LLM，请先到「设置」填写 API Key",
     errorGenFailedCheckLlm: "脚本生成失败，请检查 LLM 设置",
     errorGenFailed: "脚本生成失败",
+    goToSettings: "前往设置 →",
     // 加载/空态
     loadingScripts: "正在加载脚本...",
     emptyTitle: "还没有生成脚本",
@@ -104,6 +105,7 @@ export const script: NamespaceMessages = {
     errorNoLlm: "No LLM configured — add your API key in Settings first",
     errorGenFailedCheckLlm: "Script generation failed — check your LLM settings",
     errorGenFailed: "Script generation failed",
+    goToSettings: "Go to Settings →",
     // 加载/空态
     loadingScripts: "Loading scripts...",
     emptyTitle: "No script yet",

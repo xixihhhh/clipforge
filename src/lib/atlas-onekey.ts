@@ -9,6 +9,14 @@
 
 export const ATLAS_BASE_URL = "https://api.atlascloud.ai/api/v1";
 
+/**
+ * Deep link to the Atlas Cloud API-key console (verified 2026-07: page titled "API Keys - Atlas Cloud";
+ * unauthenticated visitors are routed through login/signup and land back on this page).
+ * Used by every "get a free key" CTA — deep-linking here instead of the homepage saves beginners
+ * from hunting for the key console on their own.
+ */
+export const ATLAS_KEYS_URL = "https://www.atlascloud.ai/console/api-keys";
+
 export const ATLAS_ONEKEY_MODELS = {
   /** Script (LLM): DeepSeek V3.2 — high cost-efficiency, strong Chinese e-commerce copy */
   llm: "deepseek-ai/deepseek-v3.2",

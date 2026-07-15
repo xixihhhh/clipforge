@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useT, useLocale } from "@/lib/i18n";
 import { friendlyError } from "@/lib/friendly-error";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ProjectStepper } from "@/components/project-stepper";
 
 // shot type labels (label changed to i18n key, resolved per locale at render time)
 const shotTypeLabels: Record<Shot["type"], { labelKey: string; color: string }> = {
@@ -393,7 +394,7 @@ export default function ScriptPage() {
     }
   };
 
-  // top navigation bar (shared by empty state and normal state)
+  // top navigation bar (shared by loading, empty and normal states)
   const headerBar = (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
@@ -410,7 +411,11 @@ export default function ScriptPage() {
           <span className="text-muted-foreground">/</span>
           <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("defaultProjectName")}</span>
         </div>
-        <LanguageToggle />
+        {/* step progress: clickable pills (mobile shows a compact badge inside the component) */}
+        <div className="flex items-center gap-1">
+          <ProjectStepper />
+          <LanguageToggle />
+        </div>
       </div>
     </header>
   );
@@ -456,7 +461,13 @@ export default function ScriptPage() {
             {t("emptyDesc", { name: projectName || t("emptyDescThisProject") })}
           </p>
           {genError && (
-            <p className="text-sm text-destructive mb-4">{genError}</p>
+            <div className="mb-4 flex flex-col items-center gap-2">
+              <p className="text-sm text-destructive">{genError}</p>
+              {/* most generation errors are LLM-config related — offer a direct jump to Settings */}
+              <Link href="/settings" className="text-xs text-primary underline underline-offset-2 hover:text-primary/80">
+                {t("goToSettings")}
+              </Link>
+            </div>
           )}
           <div className="flex items-center gap-3">
             <Button onClick={handleGenerate} disabled={isGenerating} className="brand-gradient text-white">
@@ -483,43 +494,7 @@ export default function ScriptPage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      {/* top navigation */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg brand-gradient">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                </svg>
-              </div>
-              <span className="text-lg font-bold tracking-tight">ClipForge</span>
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-muted-foreground truncate max-w-[40vw] sm:max-w-xs">{projectName || t("defaultProjectName")}</span>
-          </div>
-
-          {/* step progress */}
-          <div className="flex items-center gap-1">
-            {/* step pills don't fit on narrow screens, hidden on mobile (progress display only, not navigation) */}
-            <div className="hidden sm:flex items-center gap-1">
-            {[t("stepScript"), t("stepAssets"), t("stepVideo"), t("stepExport")].map((step, i) => (
-              <div key={step} className="flex items-center">
-                <div className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium ${i === 0 ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${i === 0 ? "bg-white/20" : "bg-muted"}`}>
-                    {i + 1}
-                  </span>
-                  {step}
-                </div>
-                {i < 3 && <div className="mx-1 h-px w-4 bg-border" />}
-              </div>
-            ))}
-            </div>
-            <LanguageToggle />
-          </div>
-        </div>
-      </header>
+      {headerBar}
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -626,6 +601,16 @@ export default function ScriptPage() {
               {autoFinishError && (
                 <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-xs text-red-400">
                   {autoFinishError}
+                </div>
+              )}
+              {/* regenerate errors (e.g. missing LLM key) used to fail silently in this view —
+                  render them here with a direct jump to Settings */}
+              {genError && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-xs text-red-400">
+                  <span>{genError}</span>
+                  <Link href="/settings" className="shrink-0 text-primary underline underline-offset-2 hover:text-primary/80">
+                    {t("goToSettings")}
+                  </Link>
                 </div>
               )}
               <TabsContent value="timeline" className="mt-0">

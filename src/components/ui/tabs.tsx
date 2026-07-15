@@ -73,7 +73,13 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      // CSS guard for a @base-ui/react 1.3.0 bug: with keepMounted=false, panel
+      // unmount waits on useOpenChangeComplete/useAnimationsFinished callbacks
+      // that never fire here (Next 16 / React 19), so deactivated panels stay in
+      // the DOM without the `hidden` attribute and pile up visibly. Base UI
+      // always sets `inert` on inactive panels (and never on the active one),
+      // so hiding inert panels is a reliable no-op once upstream is fixed.
+      className={cn("flex-1 text-sm outline-none [&[inert]]:hidden", className)}
       {...props}
     />
   )

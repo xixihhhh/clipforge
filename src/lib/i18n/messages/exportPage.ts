@@ -46,7 +46,7 @@ export const exportPage: NamespaceMessages = {
     publishAiDeclLabel: "AI 内容声明（点击复制声明句）",
     // 更多产出（变现/出海）
     moreTitle: "更多产出",
-    moreDesc: "一键生成封面、图文卡片、扫码购买二维码、片尾扫码成片、多语言译制版——全部复用成片，免额外操作。",
+    moreDesc: "一键生成封面、图文卡片、扫码购买二维码、片尾扫码成片——全部复用成片，免额外操作。",
     moreGenerate: "生成",
     moreFailed: "生成失败，请重试",
     moreCover: "封面图（提升点击率）",
@@ -95,6 +95,9 @@ export const exportPage: NamespaceMessages = {
     exporting: "导出中...",
     retryExport: "重试导出",
     exportFailed: "导出失败",
+    // advanced tools collapsible section
+    advancedTitle: "进阶工具",
+    advancedHint: "效果回流 · A/B 测试 · 质检与合规",
     // A/B 测试
     abTitle: "A/B 变体",
     abBadge: "开发中",
@@ -168,7 +171,7 @@ export const exportPage: NamespaceMessages = {
     publishAiDeclLabel: "AI content disclosure (click to copy the line)",
     // more outputs (monetization / localization)
     moreTitle: "More outputs",
-    moreDesc: "One click to generate a cover, image cards, a scan-to-buy QR, a QR end-card video, and dubbed versions — all reuse the finished video, no extra setup.",
+    moreDesc: "One click to generate a cover, image cards, a scan-to-buy QR, and a QR end-card video — all reuse the finished video, no extra setup.",
     moreGenerate: "Generate",
     moreFailed: "Generation failed, please retry",
     moreCover: "Cover (boosts CTR)",
@@ -216,6 +219,9 @@ export const exportPage: NamespaceMessages = {
     exporting: "Exporting...",
     retryExport: "Retry export",
     exportFailed: "Export failed",
+    // advanced tools collapsible section
+    advancedTitle: "Advanced tools",
+    advancedHint: "Feedback · A/B testing · QC & compliance",
     abTitle: "A/B variants",
     abBadge: "In progress",
     abDesc: "Re-render one clip per caption-style + music combo to A/B which converts better (key-free; each takes ~1 min to recompose)",
