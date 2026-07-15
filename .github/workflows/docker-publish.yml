@@ -51,6 +51,10 @@ jobs:
           echo "final /start = $final"
           [ "$final" = "200" ] || { echo "::error::冒烟测试失败：/start 未返回 200"; exit 1; }
           docker exec smoke ffmpeg -version | head -1
+          # drawtext 滤镜必须存在（烧字幕/价格贴/封面/图文卡全依赖它）：ffmpeg-static 7.x 的
+          # linux 静态构建缺 harfbuzz 没有 drawtext，曾让坏镜像带病通过只查 -version 的冒烟
+          docker exec smoke sh -c "ffmpeg -hide_banner -filters | grep -q ' drawtext '" \
+            || { echo "::error::冒烟测试失败：ffmpeg 缺 drawtext 滤镜（字幕/文字合成会挂）"; exit 1; }
           docker rm -f smoke
 
       # 3) 测试通过 → 登录 + 打标签 + 推送（构建缓存复用，秒级）
