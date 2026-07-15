@@ -24,21 +24,33 @@ const run = promisify(execFile);
 /** Inverse of unshellFilter: re-double every backslash to reconstruct the old pre-shell (unhalved) form. */
 const reshell = (filter: string): string => filter.replace(/\\/g, "\\\\");
 
-/** Resolve a usable ffmpeg binary: prefer the bundled ffmpeg-static, fall back to a system ffmpeg. */
+/**
+ * Probe whether a candidate ffmpeg binary actually has the drawtext filter compiled in.
+ * Binary existence is NOT enough: johnvansickle's Linux static builds of FFmpeg 7.x (shipped by
+ * ffmpeg-static on linux-x64) are built without harfbuzz, and FFmpeg >= 7.0 drops drawtext entirely
+ * when harfbuzz is absent — so on CI the bundled binary exists but "No such filter: 'drawtext'".
+ * The macOS static build does include drawtext, which is why this only bites on Linux.
+ */
+async function hasDrawtext(bin: string): Promise<boolean> {
+  try {
+    const { stdout } = await run(bin, ["-hide_banner", "-filters"], { maxBuffer: 1e7 });
+    return String(stdout).includes(" drawtext ");
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve an ffmpeg binary that supports drawtext: prefer the bundled ffmpeg-static, fall back to a system ffmpeg. */
 async function resolveFfmpeg(): Promise<string | null> {
   try {
     const mod: unknown = await import("ffmpeg-static");
     const p = (mod as { default?: string }).default ?? (mod as unknown as string);
-    if (typeof p === "string" && existsSync(p)) return p;
+    if (typeof p === "string" && existsSync(p) && (await hasDrawtext(p))) return p;
   } catch {
     /* fall through to system ffmpeg */
   }
-  try {
-    await run("ffmpeg", ["-version"]);
-    return "ffmpeg";
-  } catch {
-    return null;
-  }
+  if (await hasDrawtext("ffmpeg")) return "ffmpeg";
+  return null;
 }
 
 let FF: string | null = null;

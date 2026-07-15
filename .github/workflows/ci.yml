@@ -34,6 +34,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # ffmpeg-static 的 linux-x64 静态包（johnvansickle 构建）自 FFmpeg 7.x 起缺 harfbuzz、
+      # 没有 drawtext 滤镜；装发行版 ffmpeg 作为回退，让 drawtext 真渲染回归测试在 CI 上真实执行
+      - name: 安装系统 ffmpeg（供 drawtext 真渲染测试回退使用）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: 安装依赖（锁定版本，开箱即用）
         run: pnpm install --frozen-lockfile
 
