@@ -10,6 +10,7 @@ import { VolcEngineProvider } from './volcengine'
 import { ReplicateProvider } from './replicate'
 import { AlibabaProvider } from './alibaba'
 import { SiliconFlowProvider } from './siliconflow'
+import { OpenAIProvider } from './openai'
 
 // ==================== Provider 注册表 ====================
 
@@ -65,6 +66,13 @@ registerProvider({
   displayName: 'Replicate',
   description: 'Replicate 模型聚合平台，支持 FLUX、Imagen、Kling、Seedance、Veo 等海量模型',
   factory: (config) => new ReplicateProvider(config),
+})
+
+registerProvider({
+  name: 'openai',
+  displayName: 'OpenAI',
+  description: 'OpenAI 官方平台，支持 gpt-image-2 / gpt-image-1.5 图片生成与图生图编辑',
+  factory: (config) => new OpenAIProvider(config),
 })
 
 // ==================== 工厂函数 ====================
@@ -150,3 +158,4 @@ export { FalAIProvider } from './fal-ai'
 export { VolcEngineProvider } from './volcengine'
 export { AlibabaProvider } from './alibaba'
 export { SiliconFlowProvider } from './siliconflow'
+export { OpenAIProvider } from './openai'

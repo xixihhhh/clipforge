@@ -16,9 +16,10 @@ const DEFAULT_BASE: Record<string, string> = {
   volcengine: "https://ark.cn-beijing.volces.com/api/v3",
   alibaba: "https://dashscope.aliyuncs.com/api/v1",
   siliconflow: "https://api.siliconflow.cn/v1",
+  openai: "https://api.openai.com/v1",
 };
 
-type Probe = { url: string; headers: Record<string, string>; authFirst?: boolean };
+type Probe = { url: string; headers: Record<string, string>; authFirst?: boolean; method?: "GET" | "POST"; body?: string };
 
 function buildProbe(name: string, apiKey: string, baseUrl?: string): Probe {
   const base = (baseUrl || DEFAULT_BASE[name] || "").replace(/\/$/, "");
@@ -37,7 +38,22 @@ function buildProbe(name: string, apiKey: string, baseUrl?: string): Probe {
     // dashscope 原生无 /models，用 OpenAI 兼容模式的 /models 验 Key
     return { url: `https://dashscope.aliyuncs.com/compatible-mode/v1/models`, headers: { Authorization: `Bearer ${apiKey}` } };
   }
-  // siliconflow / volcengine / atlas-cloud / 自定义 OpenAI 兼容：GET /models
+  if (name === "atlas-cloud") {
+    // Atlas 的 GET /models 是公开模型目录，无效 Key 也返回 2xx（会误判为有效）。
+    // Atlas 没有 /account、/me、/usage 这类只读鉴权端点，只能用 OpenAI 兼容的 chat/completions 做鉴权探针：
+    // 选最便宜的聊天模型 + max_tokens:1，仅靠 401/403 判无效，2xx 即鉴权通过；成本/时延可忽略。
+    return {
+      url: `${base}/chat/completions`,
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      method: "POST",
+      body: JSON.stringify({
+        model: "deepseek-ai/deepseek-v3.2",
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 1,
+      }),
+    };
+  }
+  // siliconflow / volcengine / 自定义 OpenAI 兼容：GET /models
   return { url: `${base}/models`, headers: { Authorization: `Bearer ${apiKey}` } };
 }
 
@@ -57,7 +73,7 @@ export async function POST(req: NextRequest) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const r = await fetch(probe.url, { method: "GET", headers: probe.headers, signal: controller.signal });
+    const r = await fetch(probe.url, { method: probe.method ?? "GET", headers: probe.headers, body: probe.body, signal: controller.signal });
     if (r.status === 401 || r.status === 403) {
       return NextResponse.json({ status: "invalid", message: "Key 无效或无权限" });
     }

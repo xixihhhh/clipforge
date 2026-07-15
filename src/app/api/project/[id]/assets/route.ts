@@ -30,6 +30,24 @@ async function persistSource(projectId: string, sourceUrl: string, shotId: numbe
   // 已是本项目本地文件，直接复用
   if (sourceUrl.startsWith("/api/files/")) return sourceUrl;
 
+  // base64 data URI（如 OpenAI gpt-image-1 只返回 base64）：直接解码落盘
+  if (sourceUrl.startsWith("data:")) {
+    const comma = sourceUrl.indexOf(",");
+    if (comma === -1) throw new Error("无法解析 data URI 素材");
+    const meta = sourceUrl.slice(5, comma); // 如 "image/png;base64"
+    const payload = sourceUrl.slice(comma + 1);
+    const mime = meta.split(";")[0] || "image/png";
+    const buf = /;base64/i.test(meta)
+      ? Buffer.from(payload, "base64")
+      : Buffer.from(decodeURIComponent(payload), "utf-8");
+    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("mp4") ? "mp4" : "jpg";
+    const dir = join(getDataDir(), "uploads", projectId);
+    await mkdir(dir, { recursive: true });
+    const fileName = `asset-${shotId}-${Date.now()}.${ext}`;
+    await writeFile(join(dir, fileName), buf);
+    return `/api/files/${projectId}/${fileName}`;
+  }
+
   // 远程 URL：下载到本地，避免合成时依赖外链（且 AI 素材外链常有有效期）
   if (/^https?:\/\//.test(sourceUrl)) {
     const resp = await fetch(sourceUrl);

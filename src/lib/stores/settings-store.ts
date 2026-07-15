@@ -96,6 +96,7 @@ export const useSettingsStore = create<SettingsState>()(
         volcengine: { enabled: false, apiKey: "" },
         alibaba: { enabled: false, apiKey: "" },
         siliconflow: { enabled: false, apiKey: "" },
+        openai: { enabled: false, apiKey: "" },
       },
       llm: {
         provider: "",
