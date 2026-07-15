@@ -41,7 +41,7 @@ There's no shortage of AI short-video tools, but most can't really sell: **they 
 
 Chinese platforms (Douyin / Kuaishou / Xiaohongshu) **silently throttle unlabeled AI content** and **suppress ad-law banned terms**. ClipForge makes compliance **on by default, zero config** — it ships compliant, you don't patch it afterward:
 
-- **Dual AIGC labeling (aligned with China's GB 45438-2025)**: every render auto-writes **implicit file metadata** (generation/synthesis tags, service provider, content ID) and can burn an explicit **"AI-generated" overlay** on-frame — dodging the throttle platforms apply to unlabeled AI content.
+- **AIGC labeling (aligned with China's GB 45438-2025)**: every render auto-writes **implicit file metadata** (generation/synthesis tags, service provider, content ID), and the export page provides a copy-ready "AI-generated" declaration line — dodging the throttle platforms apply to unlabeled AI content.
 - **Pre-publish self-check**: ad-law risk terms / opening hook / duration sweet-spot / subtitle readability / call-to-action / e-commerce 3-act structure, each flagged ✓⚠✗ with a **concrete fix** (no fake score) — spot throttling risk before you render.
 - **Ad-law banned-term scan**: absolute-superlative wording (Ad Law art. 9) / medical or false-efficacy claims / claims needing certification are highlighted instantly with compliant rewrite hints — **never overstate**.
 - **Product-fidelity**: image-to-image locks the product itself — you can swap background / lighting without altering the product, which is both the conversion linchpin and a guard against "not-as-advertised" compliance/returns risk.
@@ -52,7 +52,7 @@ Chinese platforms (Douyin / Kuaishou / Xiaohongshu) **silently throttle unlabele
 
 - **🛍️ Product commerce video (main use case)**: **upload a product photo, or just paste a product URL** (it auto-extracts title/price/images) → AI extracts selling points and writes several sales scripts → your original product appears with fidelity + free stock B-roll → free voiceover + subtitles + BGM → one-click export in TikTok Shop / Reels / Shorts / Douyin / Kuaishou / Xiaohongshu specs.
 - **🗣️ One-sentence topic video**: works even when you're not selling — type a one-line topic, AI writes the narration → free stock auto-fills the visuals (incl. key-free real footage) → free voiceover → renders a vertical short.
-- **✅ Compliance + conversion switches**: dual AIGC labeling + pre-publish self-check + ad-law banned-term scan, all on by default (see [Compliance-first by default](#-compliance-first-by-default-ship-to-china-without-getting-throttled) above), plus an end-card "tap the cart below" CTA — so you ship without violations and viewers buy on finish.
+- **✅ Compliance + conversion switches**: AIGC metadata labeling + pre-publish self-check + ad-law banned-term scan, all on by default (see [Compliance-first by default](#-compliance-first-by-default-ship-to-china-without-getting-throttled) above), plus an end-card "tap the cart below" CTA — so you ship without violations and viewers buy on finish.
 - **🛒 Product-card overlay (cart feel)**: optionally overlay a product card in the lower-left — thumbnail + name + a yellow "tap below to buy →" prompt, shown for the first few seconds to reinforce conversion.
 - **📋 Copy-and-post pack**: the export page generates catchy titles + #hashtags + caption copy in one click; even without an AI key, a **key-free template version** outputs per category/platform — just copy and post.
 
