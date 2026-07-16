@@ -21,7 +21,9 @@ ClipForge produces a finished vertical short video end to end. You drive it thro
 
 ## Three ways to create
 
-- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_product_script`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_carousel`, `clipforge_shop_qr`, `clipforge_end_card`, `clipforge_qc`, `clipforge_credits`, `clipforge_native_feel`, `clipforge_preview_gif`, `clipforge_export_subtitle`.
+- **MCP tools** (in Claude Desktop / Cursor / Claude Code): `clipforge_create_video`, `clipforge_ingest_product`, `clipforge_product_script`, `clipforge_generate_script`, `clipforge_compose`, `clipforge_search_stock`, `clipforge_list_voices`, `clipforge_list_projects`, `clipforge_get_video`, `clipforge_trends`, `clipforge_import_script`, `clipforge_dub`, `clipforge_cover`, `clipforge_carousel`, `clipforge_shop_qr`, `clipforge_end_card`, `clipforge_qc`, `clipforge_credits`, `clipforge_native_feel`, `clipforge_preview_gif`, `clipforge_contact_sheet`, `clipforge_export_subtitle`.
+
+**Self-check before delivering**: after `clipforge_create_video` / `clipforge_compose` finishes, call `clipforge_contact_sheet` and *look* at the returned PNG (filmstrip + waveform) — black frames, caption collisions, audio spikes and dead-air endings are visible at a glance; run `clipforge_qc` for the automated metrics. Only tell the user the video is ready once both look clean.
 - **CLI**: `node bin/clipforge.mjs <create|product|import|compose|dub|cover|qr|endcard|qc|credits|native|carousel|list|voices|get|trends> [flags]` (`--help` for all).
 - **HTTP**: `POST /api/topic/script` → `POST /api/project/[id]/stock-fill` → `POST /api/project/[id]/compose` → poll `GET /api/project/[id]/compose`.
 

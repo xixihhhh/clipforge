@@ -185,6 +185,18 @@ export default function ExportPage() {
     } catch (e) { setQc({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
 
+  // contact sheet: one-image eyeball overview of the composed video (filmstrip + audio waveform)
+  const [sheet, setSheet] = useState<{ loading?: boolean; error?: string; url?: string }>({});
+  const runContactSheet = async () => {
+    setSheet({ loading: true });
+    try {
+      const r = await fetch(`/api/project/${id}/contact-sheet`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || t("moreFailed"));
+      setSheet({ loading: false, url: d.sheet });
+    } catch (e) { setSheet({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
+  };
+
   // asset license manifest: per-shot provenance + commercial-risk flags + attribution lines
   type CreditsUi = {
     loading?: boolean;
@@ -729,6 +741,23 @@ export default function ExportPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </div>
+            {/* contact sheet: eyeball overview (filmstrip + waveform) */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuFilm className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("sheetTitle")}</span></div>
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={sheet.loading || !composition?.url} onClick={runContactSheet}>
+                  {sheet.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("sheetRun")}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("sheetHint")}</p>
+              {sheet.error && <p className="text-[11px] text-destructive mt-1">{sheet.error}</p>}
+              {sheet.url && (
+                <a href={sheet.url} target="_blank" rel="noreferrer" className="block mt-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sheet.url} alt={t("sheetTitle")} className="w-full rounded-md border border-border/50" />
+                </a>
               )}
             </div>
             {/* asset license manifest */}

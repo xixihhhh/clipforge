@@ -468,6 +468,20 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_contact_sheet",
+    description:
+      "把某项目最新成片渲成一张速览图（均匀抽帧胶片条 + 音频波形 PNG）。合成后建议调用并查看这张图，一眼确认黑屏/字幕遮挡/爆音/静音尾巴，再告知用户成片可用。需先合成过视频。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+        frames: { type: "number", description: "胶片条帧数（4-12），默认 8" },
+        thumbWidth: { type: "number", description: "单帧宽度 px（120-320），默认 180" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "clipforge_export_subtitle",
     description:
       "导出某项目脚本字幕为 SRT 或 WebVTT（二次剪辑 / 平台原生字幕 / 无障碍）。不需要 LLM。",
@@ -856,6 +870,18 @@ async function handlePreviewGif(args) {
   return ok({ ok: true, projectId, gif: res.gif ? `${BASE_URL}${res.gif}` : null });
 }
 
+// Contact sheet: one-image overview (filmstrip + waveform) of the latest composed video — the
+// agent-side eyeball check: fetch the PNG and *look* at it before telling the user the video is good
+async function handleContactSheet(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const body = {};
+  if (Number.isFinite(args.frames)) body.frames = args.frames;
+  if (Number.isFinite(args.thumbWidth)) body.thumbWidth = args.thumbWidth;
+  const res = await api(`/api/project/${projectId}/contact-sheet`, { method: "POST", body });
+  return ok({ ok: true, projectId, sheet: res.sheet ? `${BASE_URL}${res.sheet}` : null, layout: res.layout ?? null });
+}
+
 // Export the project's subtitles as SRT/WebVTT (the route returns text, wrapped as { raw } by api())
 async function handleExportSubtitle(args) {
   const projectId = String(args.projectId || "").trim();
@@ -899,6 +925,7 @@ const HANDLERS = {
   clipforge_credits: handleCredits,
   clipforge_native_feel: handleNativeFeel,
   clipforge_preview_gif: handlePreviewGif,
+  clipforge_contact_sheet: handleContactSheet,
   clipforge_export_subtitle: handleExportSubtitle,
   clipforge_carousel: handleCarousel,
 };

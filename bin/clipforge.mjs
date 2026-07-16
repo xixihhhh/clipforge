@@ -439,6 +439,18 @@ async function cmdPreview(flags) {
   return { ok: true, projectId, gif: res.gif };
 }
 
+// Contact sheet: one PNG overview of the latest composed video (filmstrip + audio waveform) for eyeball QC
+async function cmdSheet(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const body = {};
+  if (flags.frames && Number.isFinite(Number(flags.frames))) body.frames = Number(flags.frames);
+  if (flags["thumb-width"] && Number.isFinite(Number(flags["thumb-width"]))) body.thumbWidth = Number(flags["thumb-width"]);
+  const res = await api(`/api/project/${projectId}/contact-sheet`, { method: "POST", body });
+  step(`成片速览已生成：${res.sheet}（${res.layout.frames} 帧胶片条${res.layout.waveHeight ? " + 波形" : ""}）`);
+  return { ok: true, projectId, ...res };
+}
+
 // Carousel: render image cards (title + key lines) from the script for image-first platforms (Xiaohongshu)
 async function cmdCarousel(flags) {
   const projectId = String(flags.project || "").trim();
@@ -521,6 +533,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge credits --project <id> [--format md --lang zh|en]   素材授权清单(商用风险+署名行,投流审核用)
   clipforge native --project <id> [--strength subtle|medium --seed 3 --no-grain --vignette]   原生感处理(手持感+颗粒,反AI精致感)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
+  clipforge sheet --project <id> [--frames 8 --thumb-width 180]   成片速览一张图(抽帧胶片条+音频波形,发布前人眼把关)
   clipforge carousel --project <id> [--theme night|warm|mint|mono|rose]   生成小红书图文卡片(标题+逐条要点)
   clipforge get --project <id>  查最新成片地址
   clipforge --help | --version
@@ -532,7 +545,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, export: cmdExport, qc: cmdQc, credits: cmdCredits, native: cmdNative, preview: cmdPreview, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, export: cmdExport, qc: cmdQc, credits: cmdCredits, native: cmdNative, preview: cmdPreview, sheet: cmdSheet, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));
