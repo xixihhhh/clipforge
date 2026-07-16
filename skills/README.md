@@ -6,7 +6,11 @@ It complements ClipForge's [MCP server](../mcp/README.md): the MCP exposes calla
 
 ## Install
 
-Copy the skill folder into your assistant's skills directory:
+**Fastest: paste this Setup prompt to your agent** (Claude Code / Codex / Cursor — the agent installs everything itself):
+
+> Set up ClipForge (https://github.com/xixihhhh/clipforge) for me. Clone the repo, install deps with pnpm and start it (`pnpm install && pnpm dev`), register `skills/clipforge` in my assistant's skills directory, and verify with `node bin/clipforge.mjs --help`. Script generation needs an OpenAI-compatible LLM — ask me for a key, or wire up a free option (Ollama / Pollinations). Footage and voiceover are keyless out of the box.
+
+Or copy the skill folder into your assistant's skills directory manually:
 
 ```bash
 # Claude Code (user-level, or your project's .claude/skills/)

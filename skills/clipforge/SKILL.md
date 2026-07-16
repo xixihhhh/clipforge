@@ -64,6 +64,13 @@ For documentary or science content, search the keyless public-domain sources exp
 | `aiDisclosure` | boolean | burn an "AI-generated" compliance label |
 | `ctaText` | string | end-screen purchase CTA |
 
+## Combining with footage-editing skills
+
+ClipForge *generates* finished short videos; it pairs naturally with the raw-footage-editing skills of the 2026 agent ecosystem (trim / jump-cut / filler-word removal over the user's own recordings):
+
+- **Edited footage → ClipForge**: after another skill cuts the user's raw clips, upload the results as project materials (`POST /api/project/[id]/materials`, multipart) — auto-fill prefers uploaded footage and tops up with free stock, then ClipForge adds script-aligned voiceover, styled captions, BGM, product overlays and platform exports.
+- **ClipForge → post-processing**: the composed mp4 (from `clipforge_get_video`) is a normal H.264 file any editing skill can refine further; re-run `clipforge_qc` afterwards to re-check loudness/black-frame/silence health.
+
 ## Notes
 - Subtitles can be exported as SRT/WebVTT: `GET /api/project/[id]/subtitle?format=srt|vtt`.
 - `compose` is async — poll until `status: "done"`, then the response carries the downloadable mp4 URL.

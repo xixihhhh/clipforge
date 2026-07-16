@@ -35,7 +35,7 @@
 - **真·免费、零 Key**：免费素材（Openverse 图 + **Wikimedia 实拍视频**）+ 免费微软 Edge TTS 配音（中 / 英 / 日 / 韩 / 西多语言，出海直接配外文原生发音）+ 免费背景音乐 + 本地 FFmpeg 合成——**没有任何 AI Key 也能出整片**。
 - **无水印 · 本地隐私**：自部署、开源（AGPL-3.0），商品图 / 项目 / Key 全在你自己机器，不上传任何云。
 - **想要更高画质再加 Key**：一个接口聚合 **7 大**生图/生视频平台、30+ 模型（GPT Image 2 / Seedance 2.0 / Kling 3.0 …）。
-- **能被 AI Agent 调用 / 命令行出片**：内置 **MCP Server**（Claude / Cursor 里一句话出片，`clipforge_product_script` **贴链接直接出带货脚本**）+ **命令行 CLI**（`clipforge product --url "…" --compose` 一条命令从链接到成片）+ **agent Skill**（[skills/clipforge](skills/clipforge/SKILL.md)，把整条出片流水线教给编程助手，一句话「用这个商品链接做条 9:16」即可）；中英双语界面。
+- **能被 AI Agent 调用 / 命令行出片**：内置 **MCP Server**（Claude / Cursor 里一句话出片，`clipforge_product_script` **贴链接直接出带货脚本**）+ **命令行 CLI**（`clipforge product --url "…" --compose` 一条命令从链接到成片）+ **agent Skill**（[skills/clipforge](skills/clipforge/SKILL.md)，把整条出片流水线教给编程助手，一句话「用这个商品链接做条 9:16」即可；**装 skill 只需把 [skills/README](skills/README.md) 里的 Setup prompt 原句贴给你的 agent**，安装过程本身就由 agent 完成）；中英双语界面。
 
 ## ✅ 合规默认开：国内发布不踩坑
 
