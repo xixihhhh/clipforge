@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight, LuLoaderCircle } from "react-icons/lu";
 import { useSettingsStore } from "@/lib/stores/settings-store";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/i18n";
 import { RENDER_PRESETS, DEFAULT_RENDER_PRESET, type RenderPreset } from "@/lib/compose-presets";
+import { BUILTIN_STYLE_PACKS, parseStylePack, serializeStylePack, type StylePack } from "@/lib/style-packs";
 import { LanguageToggle } from "@/components/language-toggle";
 import {
   Select,
@@ -259,6 +260,56 @@ export default function VideoPage() {
     );
   };
 
+  // style packs: declarative JSON recipes (caption preset / BGM / quality / CTA / product card).
+  // Novice-safe "external skill": pure data validated against a whitelist — nothing executable.
+  const packFileRef = useRef<HTMLInputElement>(null);
+  const [packNotice, setPackNotice] = useState<string | null>(null);
+
+  const applyStylePack = (pack: StylePack) => {
+    const p = pack.compose;
+    setConfig((c) => ({
+      ...c,
+      ...(p.captionPreset && { captionPreset: p.captionPreset }),
+      ...(p.bgm && { bgm: p.bgm }),
+      ...(p.bgmDuck !== undefined && { bgmDuck: p.bgmDuck }),
+      ...(p.quality && { renderPreset: p.quality, resolution: RENDER_PRESETS[p.quality].resolution }),
+      ...(p.aspectRatio && { aspectRatio: p.aspectRatio }),
+      ...(p.ctaText ? { ctaEnabled: true, ctaText: p.ctaText } : {}),
+      ...(p.productCard !== undefined && { productCard: p.productCard }),
+    }));
+    setPackNotice(t("stylePackApplied").replace("{name}", pack.name));
+  };
+
+  const importStylePack = async (file: File) => {
+    const pack = parseStylePack(await file.text());
+    if (!pack) {
+      setPackNotice(t("stylePackInvalid"));
+      return;
+    }
+    applyStylePack(pack);
+  };
+
+  const exportStylePack = () => {
+    const json = serializeStylePack({
+      name: projectName || "my-style",
+      compose: {
+        captionPreset: config.captionPreset,
+        bgm: config.bgm as StylePack["compose"]["bgm"],
+        bgmDuck: config.bgmDuck,
+        quality: config.renderPreset,
+        aspectRatio: config.aspectRatio,
+        ...(config.ctaEnabled && config.ctaText.trim() ? { ctaText: config.ctaText.trim() } : {}),
+        productCard: config.productCard,
+      },
+    });
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clipforge-style-pack.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // 真实合成：调用 compose API 跑 FFmpeg，配乐观进度动画，完成后拿到真实 mp4
   const startCompose = async () => {
     setIsComposing(true);
@@ -478,6 +529,52 @@ export default function VideoPage() {
           {/* 右侧：合成配置 */}
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-base font-semibold">{t("composeSettings")}</h2>
+
+            {/* style packs: apply a whole look at once; import shared packs / export the current settings */}
+            <Card className="glass-card">
+              <CardContent className="p-4 space-y-3">
+                <Label className="text-sm font-medium">{t("stylePackLabel")}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {BUILTIN_STYLE_PACKS.map((p) => (
+                    <button
+                      key={p.name}
+                      onClick={() => applyStylePack(p)}
+                      title={p.description}
+                      className="h-9 rounded-md text-xs border border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-primary transition-all px-1 truncate"
+                    >
+                      {p.name.split(" / ")[0]}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => packFileRef.current?.click()}
+                    className="h-8 rounded-md text-xs border border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40 transition-all"
+                  >
+                    {t("stylePackImport")}
+                  </button>
+                  <button
+                    onClick={exportStylePack}
+                    className="h-8 rounded-md text-xs border border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40 transition-all"
+                  >
+                    {t("stylePackExport")}
+                  </button>
+                </div>
+                <input
+                  ref={packFileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void importStylePack(f);
+                    e.target.value = ""; // allow re-importing the same file
+                  }}
+                />
+                {packNotice && <p className="text-[11px] text-primary">{packNotice}</p>}
+                <p className="text-[11px] text-muted-foreground">{t("stylePackHint")}</p>
+              </CardContent>
+            </Card>
 
             {/* 配音设置 */}
             <Card className="glass-card">
