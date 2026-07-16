@@ -7,6 +7,7 @@ import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
 import { generateSpeechFree, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
 import { resolveRenderProfile, isRenderPreset } from "@/lib/compose-presets";
+import { isCaptionPreset, captionPresetOverrides, CAPTION_PRESETS } from "@/lib/caption-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -197,6 +198,9 @@ export async function POST(
     // 渲染质量预设（快速/标准/高清）→ 分辨率 + 编码参数；只有「合法」预设才顶替 body.resolution，
     // 否则非法预设字符串会静默把用户显式选的 720p 顶成 1080p。
     const validPreset = isRenderPreset(body.renderPreset) ? body.renderPreset : undefined;
+    // caption style preset (standard/bold/minimal/karaoke); invalid values fall back to the default look
+    const captionPresetRaw: unknown = body.captionPreset;
+    const captionPreset = isCaptionPreset(captionPresetRaw) ? captionPresetRaw : undefined;
     const profile = resolveRenderProfile(validPreset);
     const resolution: "720p" | "1080p" = validPreset
       ? profile.resolution
@@ -316,12 +320,17 @@ export async function POST(
         ...outputCfg,
         ...(bgmLocal && { bgmPath: bgmLocal, bgmVolume: 0.18, bgmDuck: body.bgmDuck === true }),
       },
-      subtitle: subtitleTexts.length > 0 ? { texts: subtitleTexts, position: "bottom" } : undefined,
+      subtitle:
+        subtitleTexts.length > 0
+          ? { texts: subtitleTexts, position: "bottom", ...captionPresetOverrides(captionPreset) }
+          : undefined,
       overlays: overlays.length > 0 ? overlays : undefined,
     };
 
-    // 卡拉OK逐字字幕（opt-in）：把每镜整句旁白写成 ASS \k 卡拉OK，libass 烧录，替代 rapid 短句卡
-    if (body.karaoke === true && karaokeLines.length > 0) {
+    // karaoke per-character subtitles (opt-in via the karaoke flag or captionPreset=karaoke):
+    // whole-sentence ASS \k burn-in via libass, replacing the rapid short caption cards
+    const wantKaraoke = body.karaoke === true || (captionPreset && CAPTION_PRESETS[captionPreset].karaoke === true);
+    if (wantKaraoke && karaokeLines.length > 0) {
       const ass = buildKaraokeAss(karaokeLines, { fontName: resolveChineseFontFamily() });
       const assDir = join(getDataDir(), "output", id);
       await mkdir(assDir, { recursive: true });

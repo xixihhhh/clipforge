@@ -50,8 +50,8 @@ interface ComposeConfig {
   ctaText: string;
   /** 带货：左下角商品卡贴片（商品图缩略+名+购买引导，需商品图） */
   productCard: boolean;
-  /** 卡拉OK逐字高亮字幕（整句留屏，逐字随旁白变色） */
-  karaoke: boolean;
+  /** caption style preset: standard boxed / bold punch / minimal / word-by-word karaoke */
+  captionPreset: "standard" | "bold" | "minimal" | "karaoke";
   /** 旁白闪避：旁白一响自动压低 BGM、停顿回升，旁白更清晰 */
   bgmDuck: boolean;
 }
@@ -134,7 +134,7 @@ export default function VideoPage() {
     ctaEnabled: false,
     ctaText: "", // 默认空，开启时按当前语言用 ctaPlaceholder 预填（避免英文用户拿到中文默认 CTA）
     productCard: false,
-    karaoke: false,
+    captionPreset: "standard",
     bgmDuck: false,
   });
 
@@ -283,7 +283,7 @@ export default function VideoPage() {
           aspectRatio: config.aspectRatio,
           ...(config.ctaEnabled && config.ctaText.trim() && { ctaText: config.ctaText.trim() }),
           ...(config.productCard && { productCard: true }),
-          ...(config.karaoke && { karaoke: true }),
+          ...(config.captionPreset !== "standard" && { captionPreset: config.captionPreset }),
           ...(config.bgmDuck && { bgmDuck: true }),
           ...(bgm?.path && { bgmPath: bgm.path }),
           // 没上传 BGM 且选了非 none 的配乐情绪 → 自动取一条该情绪的免费 CC 配乐（之前这里漏发，下拉形同虚设）
@@ -588,15 +588,25 @@ export default function VideoPage() {
                     </button>
                   ))}
                 </div>
-                {/* 卡拉OK逐字高亮字幕（整句留屏，逐字随旁白变色，爆款字幕样式） */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-muted-foreground">{t("karaokeLabel")}</span>
-                  <button
-                    onClick={() => setConfig((c) => ({ ...c, karaoke: !c.karaoke }))}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${config.karaoke ? "bg-primary" : "bg-muted"}`}
-                  >
-                    <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${config.karaoke ? "translate-x-5" : "translate-x-0.5"}`} />
-                  </button>
+                {/* caption style preset: standard boxed / bold punch / minimal / karaoke word-by-word */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-xs text-muted-foreground">{t("captionStyleLabel")}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["standard", "bold", "minimal", "karaoke"] as const).map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => setConfig((c) => ({ ...c, captionPreset: preset }))}
+                        className={`h-9 rounded-md text-xs border transition-all ${
+                          config.captionPreset === preset
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border/50 bg-muted/20 text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {t(`captionPreset_${preset}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{t(`captionPresetDesc_${config.captionPreset}`)}</p>
                 </div>
               </CardContent>
             </Card>

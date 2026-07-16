@@ -59,6 +59,7 @@ For documentary or science content, search the keyless public-domain sources exp
 | `voice` | Edge TTS voice id (see `clipforge_list_voices`) | free narration voice; auto-picked by topic language if omitted |
 | `bgm` + `bgmMood` | `upbeat`/`chill`/`energetic`/`emotional` | free CC background music, ducked under narration |
 | `karaoke` | boolean | word-by-word highlighted subtitles |
+| `captionPreset` | `standard` / `bold` / `minimal` / `karaoke` | caption look: translucent-boxed / big heavy-outline no-box punch / small thin-stroke minimal / per-word karaoke |
 | `productCard` | boolean | corner product card (e-commerce projects) |
 | `aiDisclosure` | boolean | burn an "AI-generated" compliance label |
 | `ctaText` | string | end-screen purchase CTA |

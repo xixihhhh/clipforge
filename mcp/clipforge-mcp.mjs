@@ -36,6 +36,7 @@ const NARRATION_STYLES = ["knowledge", "story", "lifestyle", "inspiration", "tra
 const FOOTAGE_KINDS = ["auto", "image", "video"];
 const ASPECT_RATIOS = ["9:16", "16:9", "1:1"]; // 9:16 portrait (Douyin/Kuaishou/Reels/Shorts) · 16:9 landscape · 1:1 square
 const QUALITY_PRESETS = ["fast", "standard", "hd"]; // maps to real FFmpeg encoding: resolution + x264 preset + crf
+const CAPTION_PRESETS = ["standard", "bold", "minimal", "karaoke"]; // caption style presets (mirrors src/lib/caption-presets.ts)
 
 /** footage resolution: default "auto" — delegates to stock-fill per shot ("video first, fall back to image" — fully key-free); image/video are explicit overrides */
 function resolveMediaType(footage) {
@@ -52,6 +53,7 @@ function composeBody(args) {
   if (["upbeat", "chill", "energetic", "emotional"].includes(args.bgmMood)) body.bgmMood = args.bgmMood; // BGM mood
   if (args.bgmDuck === true) body.bgmDuck = true; // voiceover ducking (makes narration clearer)
   if (args.karaoke === true) body.karaoke = true; // karaoke word-by-word captions
+  if (CAPTION_PRESETS.includes(args.captionPreset)) body.captionPreset = args.captionPreset; // caption style preset
   if (args.productCard === true) body.productCard = true; // product card overlay (only applies when product image exists)
   if (args.aiDisclosure === true) body.aiDisclosure = true; // AI compliance disclosure label
   if (typeof args.ctaText === "string" && args.ctaText.trim()) body.ctaText = args.ctaText.trim(); // end-card purchase CTA
@@ -85,6 +87,12 @@ const OUTPUT_OPTION_PROPS = {
   karaoke: {
     type: "boolean",
     description: "卡拉OK逐字高亮字幕（整句留屏、逐字随旁白变色，2026 爆款字幕样式）。默认 false（默认是 rapid 短句卡字幕）",
+  },
+  captionPreset: {
+    type: "string",
+    enum: CAPTION_PRESETS,
+    description:
+      "字幕样式预设：standard 白字半透明底板（默认）/ bold 大号粗描边无底板（高留存爆款风）/ minimal 小号细描边（纪实干净画面）/ karaoke 逐字高亮（等价 karaoke=true）",
   },
   productCard: {
     type: "boolean",

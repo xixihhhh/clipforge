@@ -228,9 +228,13 @@ export interface ComposeConfig {
     /** absolute path to a Chinese font file (if omitted, the system Chinese font is auto-detected) */
     fontFile?: string;
     fontSize?: number;
+    /** font size as a ratio of frame width (used when fontSize is absent; default 0.05) */
+    fontSizeRatio?: number;
     color?: string;
     strokeColor?: string;
     strokeWidth?: number;
+    /** background box behind each caption: false = none, or a boxcolor string (default black@0.45) */
+    box?: false | { color: string };
     position?: "bottom" | "center" | "top";
     /** karaoke per-character subtitles (opt-in): providing a pre-built ASS file path switches to libass burn-in instead of per-sentence drawtext */
     karaokeAssPath?: string;
@@ -471,9 +475,14 @@ function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
   } else if (config.subtitle?.texts.length) {
     const subtitleStream = `sub_out`;
     // font size adapts to frame width (~5%) so e-commerce subtitles are prominent; can be overridden via config
-    const fontSize = config.subtitle.fontSize || Math.round(width * 0.05);
+    const fontSize = config.subtitle.fontSize || Math.round(width * (config.subtitle.fontSizeRatio || 0.05));
     const fontColor = config.subtitle.color || "white";
     const borderW = config.subtitle.strokeWidth || 3;
+    // background box: opt-out via box:false (punch/minimal presets), custom colour via box.color
+    const boxOpt =
+      config.subtitle.box === false
+        ? undefined
+        : { color: config.subtitle.box?.color ?? "black@0.45", borderW: Math.round(fontSize * 0.35) };
     // multi-line-safe vertical anchor: bottom is pinned by the bottom edge of the text block (grows upward, never overflows);
     // center/top positions include text_h. bottom baseline is raised above the platform's bottom UI safe zone (avoids
     // the shopping-cart button / progress bar). with product card: pinned to 0.17 by the "card above, subtitle below" stack
@@ -498,7 +507,7 @@ function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
           fontColor,
           borderW,
           lineSpacing,
-          box: { color: "black@0.45", borderW: Math.round(fontSize * 0.35) },
+          box: boxOpt,
           x: "(w-text_w)/2",
           y: yPos,
           enable: `enable='between(t,${t.startTime},${t.endTime})'`,

@@ -8,7 +8,8 @@
  * Usage:
  *   node bin/clipforge.mjs create --topic "在家手冲咖啡" [--duration 25] [--style knowledge]
  *        [--footage auto|image|video] [--voice <id>] [--aspect 9:16|16:9|1:1]
- *        [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--cta "👇 点击下方下单"] [--json]
+ *        [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--caption standard|bold|minimal|karaoke]
+ *        [--cta "👇 点击下方下单"] [--json]
  *   node bin/clipforge.mjs compose --project <id> [same compose options]   compose an existing project with script + assets
  *   node bin/clipforge.mjs list                     list projects
  *   node bin/clipforge.mjs voices                   list free voices
@@ -39,6 +40,7 @@ const FOOTAGE_KINDS = ["auto", "image", "video"];
 const ASPECT_RATIOS = ["9:16", "16:9", "1:1"];
 const QUALITY_PRESETS = ["fast", "standard", "hd"];
 const BGM_MOODS = ["upbeat", "chill", "energetic", "emotional"];
+const CAPTION_PRESETS = ["standard", "bold", "minimal", "karaoke"]; // caption style presets (mirrors src/lib/caption-presets.ts)
 
 /** Read own package version (parent of bin/ is the repo root) */
 function readVersion() {
@@ -91,6 +93,7 @@ export function composeBodyFromFlags(flags) {
   if (BGM_MOODS.includes(flags["bgm-mood"])) body.bgmMood = flags["bgm-mood"];
   if (flags["bgm-duck"] === true) body.bgmDuck = true;
   if (flags.karaoke === true) body.karaoke = true;
+  if (CAPTION_PRESETS.includes(flags.caption)) body.captionPreset = flags.caption;
   if (flags["product-card"] === true) body.productCard = true;
   if (flags["ai-disclosure"] === true) body.aiDisclosure = true;
   if (typeof flags.cta === "string" && flags.cta.trim()) body.ctaText = flags.cta.trim();
@@ -501,6 +504,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge create --topic "在家手冲咖啡" [--duration 25] [--style knowledge]
                    [--footage auto|image|video] [--voice <id>] [--aspect 9:16|16:9|1:1]
                    [--quality fast|standard|hd] [--bgm] [--bgm-mood upbeat] [--karaoke] [--cta "..."] [--json]
+                   [--caption standard|bold|minimal|karaoke]   字幕样式预设(标准底板/重击大字/极简/逐字高亮)
   clipforge product --url "<商品链接>" [--style pain_point|scene|comparison|story|auto] [--duration 30]
                    [--category beauty|food|home|fashion|tech|other] [--compose 同款成片选项]   贴链接→带货脚本(加 --compose 直接出片)
   clipforge import --project <id> (--file <路径> | --text "你的脚本") [--title "..."]   自带脚本出片
