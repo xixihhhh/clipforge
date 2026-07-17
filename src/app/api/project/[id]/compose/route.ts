@@ -4,14 +4,15 @@ import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
-import { generateSpeech, type TTSConfig } from "@/lib/tts";
+import { generateSpeech, estimateSpeechSeconds, type TTSConfig } from "@/lib/tts";
 import { generateSpeechFree, DEFAULT_FREE_VOICE } from "@/lib/edge-tts";
 import { resolveRenderProfile, isRenderPreset } from "@/lib/compose-presets";
 import { isCaptionPreset, captionPresetOverrides, CAPTION_PRESETS } from "@/lib/caption-presets";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { composeVideo, FADE_DURATION, chunkCaption, resolveChineseFontFamily, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { composeVideo, resolveChineseFontFamily, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
+import { buildSubtitleTimeline, padDurationsForFade, type TimelineSegment } from "@/lib/video-composer/timeline";
 import { buildKaraokeAss } from "@/lib/video-composer/karaoke";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import { buildComplianceOverlays } from "@/lib/compliance-overlays";
@@ -224,8 +225,12 @@ export async function POST(
     // 后台异步合成（不阻塞请求，避免长视频超时）
     void (async () => {
      try {
+    // Breathing gap in seconds between the end of one narration and the start of the next;
+    // the extra tail needed by acrossfade transitions is added separately by padDurationsForFade
+    const VOICE_GAP = 0.45;
+
     // 构建渲染分镜：跳过无素材的；有 TTS 配音时按配音实际时长卡点（字幕/贴片/画面严格对齐）
-    const rendered: { shot: Shot; clip: ClipInput; duration: number }[] = [];
+    const rendered: { shot: Shot; clip: ClipInput; duration: number; voiceSec?: number }[] = [];
     const missing: number[] = [];
     for (const shot of shots) {
       // 素材优先级：该分镜已生成素材 → 商品原图兜底
@@ -242,11 +247,21 @@ export async function POST(
       const audioPath =
         shot.voiceover && !nativeAudio ? await buildVoiceover(shot.shotId, shot.voiceover) : undefined;
 
-      // 有效时长：有配音→按配音实际长度+0.4s 尾留白卡点（限 1.5~20s）；否则用脚本时长
+      // Effective duration (core fix for issue #14 "next segment starts before speech ends"):
+      // 1) TTS narration → actual audio length + breathing gap (clamped 1.5–20s); when the probe
+      //    fails, estimate from text instead of falling back to the script's guessed duration,
+      //    which used to hard-trim the narration mid-sentence;
+      // 2) video with native voice → play out the real media length so model speech isn't cut;
+      // 3) otherwise → script duration.
       let duration = shot.duration || 3;
+      let voiceSec: number | undefined;
       if (audioPath) {
-        const ttsDur = await probeDuration(audioPath);
-        if (ttsDur > 0) duration = Math.min(Math.max(ttsDur + 0.4, 1.5), 20);
+        const probed = await probeDuration(audioPath);
+        voiceSec = probed > 0 ? probed : estimateSpeechSeconds(shot.voiceover ?? "");
+        duration = Math.min(Math.max(voiceSec + VOICE_GAP, 1.5), 20);
+      } else if (nativeAudio) {
+        const mediaDur = await probeDuration(local);
+        if (mediaDur > 0) duration = Math.min(Math.max(mediaDur, 1.5), 20);
       }
 
       const clip: ClipInput = {
@@ -257,35 +272,52 @@ export async function POST(
         ...(isVideo ? { hasAudio: nativeAudio } : { motion: defaultMotion(shot) }),
         ...(audioPath && { audioPath }),
       };
-      rendered.push({ shot, clip, duration });
+      rendered.push({ shot, clip, duration, voiceSec });
     }
 
     if (rendered.length === 0) throw new Error("没有可用素材");
 
+    // acrossfade for ffmpeg_fade transitions consumes the previous clip's last FADE_DURATION:
+    // pad voiced clips followed by a fade so the cross-fade only ever eats tail silence,
+    // never the last words of narration (nor lets the next voice ride over them)
+    const paddedDurations = padDurationsForFade(
+      rendered.map((r) => ({
+        duration: r.duration,
+        transition: r.clip.transition,
+        hasVoice: Boolean(r.clip.audioPath || r.clip.hasAudio),
+      }))
+    );
+    rendered.forEach((r, i) => {
+      r.duration = paddedDurations[i];
+      r.clip.duration = paddedDurations[i];
+    });
+
     const clips = rendered.map((r) => r.clip);
 
-    // 字幕 + 文字贴片：按渲染分镜的有效时长累计，与画面时间轴严格对齐（修复缺素材导致的漂移 + 字幕卡配音）
-    let acc = 0;
-    const subtitleTexts: { text: string; startTime: number; endTime: number }[] = [];
-    const karaokeLines: { text: string; startTime: number; endTime: number }[] = [];
-    const overlays: { text: string; style: "title" | "highlight" | "price"; startTime: number; endTime: number }[] = [];
-    rendered.forEach((r, idx) => {
-      // 与 composer 的 xfade 时间轴严格一致：ffmpeg_fade 转入的片段与前段重叠 FADE_DURATION，整条时间轴前移，
-      // 否则字幕/贴片会比对应画面晚 0.5s/转场亮起（渐进漂移）。
-      if (idx > 0 && r.clip.transition === "ffmpeg_fade") acc -= FADE_DURATION;
-      const start = acc;
-      acc += r.duration;
-      const end = acc;
-      // 把整句旁白切成 rapid 短句卡（每段一闪），适配 muted 观看 / 带货留存
-      if (r.shot.voiceover) {
-        subtitleTexts.push(...chunkCaption(r.shot.voiceover, start, end));
-        karaokeLines.push({ text: r.shot.voiceover, startTime: start, endTime: end }); // 卡拉OK整句留屏逐字高亮
-      }
-      const ov = r.shot.textOverlay;
-      if (ov && ov.style !== "subtitle" && ov.text) {
-        overlays.push({ text: ov.text, style: ov.style as "title" | "highlight" | "price", startTime: start, endTime: end });
-      }
-    });
+    // Subtitle + overlay timeline (pure functions in timeline.ts): accumulates the rendered
+    // segments' effective durations in lockstep with the composer's xfade timeline; caption
+    // cards follow the actual speech window (not the padded tail) and cards spilling across
+    // fade transitions are clamped so two captions never over-print
+    const timeline = buildSubtitleTimeline(
+      rendered.map((r): TimelineSegment => {
+        const ov = r.shot.textOverlay;
+        return {
+          duration: r.duration,
+          transition: r.clip.transition,
+          voiceover: r.shot.voiceover || undefined,
+          voiceSec: r.voiceSec,
+          overlay:
+            ov && ov.style !== "subtitle" && ov.text
+              ? { text: ov.text, style: ov.style as "title" | "highlight" | "price" }
+              : undefined,
+        };
+      })
+    );
+    const subtitleTexts = timeline.cues;
+    const karaokeLines = timeline.karaokeLines;
+    const overlays: { text: string; style: "title" | "highlight" | "price"; startTime: number; endTime: number }[] = [
+      ...timeline.overlays,
+    ];
 
     // 可选叠加：片尾购买 CTA（带货转化），按 body 开关
     overlays.push(
@@ -293,7 +325,7 @@ export async function POST(
         {
           ctaText: typeof body.ctaText === "string" ? body.ctaText : undefined,
         },
-        acc
+        timeline.total
       )
     );
 

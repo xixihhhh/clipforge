@@ -159,12 +159,89 @@ export function wrapCaption(text: string, fontSize: number, frameWidth: number):
   return lines.join("\n");
 }
 
+/** Maximum number of rapid caption cards per narration segment */
+const MAX_CAPTION_CARDS = 8;
+/** Minimum readable on-screen time per caption card in seconds */
+const MIN_CARD_SECONDS = 0.6;
+
+/** Phrase-ending punctuation test: CJK + ASCII marks; ASCII "." only counts at a word boundary so decimals like "9.9" never split */
+function isPhrasePunct(ch: string, next: string | undefined): boolean {
+  if (/[。！？；，、：…!?;,]/.test(ch)) return true;
+  return ch === "." && (next === undefined || next === " ");
+}
+
+/** Split text into natural phrases at punctuation; each phrase keeps its trailing punctuation run (e.g. "！？" stays attached) */
+function splitPhrases(clean: string): string[] {
+  const chars = Array.from(clean);
+  const out: string[] = [];
+  let cur = "";
+  for (let i = 0; i < chars.length; i++) {
+    cur += chars[i];
+    const punct = isPhrasePunct(chars[i], chars[i + 1]);
+    const nextPunct = chars[i + 1] !== undefined && isPhrasePunct(chars[i + 1], chars[i + 2]);
+    // cut after the last punctuation of a consecutive run
+    if (punct && !nextPunct) {
+      const t = cur.trim();
+      if (t) out.push(t);
+      cur = "";
+    }
+  }
+  const tail = cur.trim();
+  if (tail) out.push(tail);
+  return out;
+}
+
+/** Display width of a card in "units": CJK char ≈ 1, Latin char ≈ 0.5 — used for merge thresholds */
+function cardWeight(s: string): number {
+  return Array.from(s).reduce((w, c) => w + (isCJK(c) ? 1 : 0.5), 0);
+}
+
 /**
- * Split a narration sentence into rapid "caption cards" distributed evenly within [startTime, endTime].
+ * Timing weight of a card: display width + punctuation pause bonus.
+ * TTS voices pause at punctuation, so cards containing commas/periods must own a larger
+ * share of the time window — otherwise captions run ahead of the actual speech.
+ */
+function timeWeight(s: string): number {
+  let w = 0;
+  for (const c of Array.from(s)) {
+    if (/[。！？…!?]/.test(c) || c === ".") w += 1.3; // sentence-final pause
+    else if (/[；，、：;,:]/.test(c)) w += 0.7; // mid-sentence pause
+    else w += isCJK(c) ? 1 : 0.5;
+  }
+  return Math.max(w, 1);
+}
+
+/** Distribute [startTime, endTime] across cards proportionally to their timing weight (last card lands exactly on endTime) */
+function allocateCardTimes(
+  cards: string[],
+  startTime: number,
+  endTime: number
+): { text: string; startTime: number; endTime: number }[] {
+  const total = Math.max(endTime - startTime, 0.1);
+  const weights = cards.map(timeWeight);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let acc = startTime;
+  return cards.map((c, i) => {
+    const s = acc;
+    acc = i === cards.length - 1 ? endTime : acc + (weights[i] / sum) * total;
+    return { text: c, startTime: Number(s.toFixed(3)), endTime: Number(acc.toFixed(3)) };
+  });
+}
+
+/**
+ * Split a narration sentence into rapid "caption cards" distributed within [startTime, endTime].
  * Rapid short captions are the 2026 standard for muted viewing / e-commerce retention,
  * replacing the pattern of displaying a full sentence statically for an entire shot.
- * Target: ~1.2s per card (max 8 cards); CJK splits per character, Latin splits per word;
- * time is allocated proportionally to card length.
+ *
+ * Splitting strategy (fixes GitHub issue #14 "captions cut mid-phrase"):
+ * 1. Cut at punctuation first — cards are natural phrases ("百事可乐，" / "冰爽加倍！"),
+ *    never mid-word fragments like "一口下去透心 / 凉";
+ * 2. Tiny fragments merge with a neighbour; if the card count exceeds what the time
+ *    window can show readably (≥0.6s per card, max 8), the shortest adjacent pair merges;
+ * 3. Text without any punctuation falls back to the legacy even split (CJK per character,
+ *    Latin per word, ~1.2s per card);
+ * 4. Time is allocated proportionally to card length + punctuation pause bonus, matching
+ *    the natural pacing of TTS narration.
  * Pure function for unit testing; the returned multi-segment subtitles are rendered by the
  * existing composer one segment at a time via drawtext (non-overlapping, one card shown at a time).
  */
@@ -176,7 +253,44 @@ export function chunkCaption(
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const total = Math.max(endTime - startTime, 0.1);
-  const n = Math.max(1, Math.min(Math.round(total / 1.2), 8));
+
+  const phrases = splitPhrases(clean);
+  if (phrases.length > 1) {
+    // budget: how many cards this time window can display readably
+    const maxCards = Math.max(1, Math.min(Math.floor(total / MIN_CARD_SECONDS), MAX_CAPTION_CARDS));
+    const cards = phrases.slice();
+    // merge tiny fragments (e.g. a lone "哇！") with the shorter neighbour
+    for (let i = 0; i < cards.length && cards.length > 1; ) {
+      if (cardWeight(cards[i]) >= 3) {
+        i++;
+        continue;
+      }
+      const mergeLeft = i > 0 && (i === cards.length - 1 || cardWeight(cards[i - 1]) <= cardWeight(cards[i + 1]));
+      if (mergeLeft) {
+        cards.splice(i - 1, 2, cards[i - 1] + cards[i]);
+        i = Math.max(i - 1, 0);
+      } else {
+        cards.splice(i, 2, cards[i] + cards[i + 1]);
+      }
+    }
+    // enforce the card-count budget by merging the lightest adjacent pair
+    while (cards.length > maxCards) {
+      let best = 0;
+      let bestW = Infinity;
+      for (let i = 0; i + 1 < cards.length; i++) {
+        const w = cardWeight(cards[i]) + cardWeight(cards[i + 1]);
+        if (w < bestW) {
+          bestW = w;
+          best = i;
+        }
+      }
+      cards.splice(best, 2, cards[best] + cards[best + 1]);
+    }
+    return allocateCardTimes(cards, startTime, endTime);
+  }
+
+  // legacy even split — text without punctuation (short hooks, single phrases)
+  const n = Math.max(1, Math.min(Math.round(total / 1.2), MAX_CAPTION_CARDS));
   if (n === 1) return [{ text: clean, startTime, endTime }];
   const cjk = /[぀-ヿ一-鿿가-힯]/.test(clean); // kana / CJK / hangul
   const units = cjk ? Array.from(clean) : clean.split(/\s+/);
@@ -184,14 +298,7 @@ export function chunkCaption(
   const per = Math.ceil(units.length / n);
   const chunks: string[] = [];
   for (let i = 0; i < units.length; i += per) chunks.push(units.slice(i, i + per).join(cjk ? "" : " "));
-  const lens = chunks.map((c) => Math.max(c.length, 1));
-  const sum = lens.reduce((a, b) => a + b, 0);
-  let acc = startTime;
-  return chunks.map((c, i) => {
-    const s = acc;
-    acc = i === chunks.length - 1 ? endTime : acc + (lens[i] / sum) * total;
-    return { text: c, startTime: Number(s.toFixed(3)), endTime: Number(acc.toFixed(3)) };
-  });
+  return allocateCardTimes(chunks, startTime, endTime);
 }
 
 /**

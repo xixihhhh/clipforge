@@ -81,6 +81,30 @@ export async function generateSpeech(text: string, config: TTSConfig): Promise<B
   }
 }
 
+/**
+ * Rough speech-duration estimate in seconds, used when ffprobe cannot report the length
+ * of a synthesized audio file (issue #14: a failed probe fell back to the script's guessed
+ * shot duration, hard-trimming the narration mid-sentence).
+ * Calibrated for zh narration voices at 1.0x speed (~4.2 CJK chars/sec, ~2.8 Latin
+ * words/sec, plus punctuation pauses) and deliberately errs long by 15%: extra tail
+ * silence is harmless, while an under-estimate cuts speech.
+ */
+export function estimateSpeechSeconds(text: string): number {
+  const clean = (text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return 0;
+  let cjkChars = 0;
+  let pauses = 0;
+  let latin = "";
+  for (const ch of Array.from(clean)) {
+    if (/[⺀-鿿豈-﫿぀-ヿ가-힣]/.test(ch)) cjkChars++;
+    else if (/[。！？；，、：…!?;,.]/.test(ch)) pauses++;
+    else latin += ch;
+  }
+  const latinWords = latin.split(/\s+/).filter(Boolean).length;
+  const sec = cjkChars / 4.2 + latinWords / 2.8 + pauses * 0.2;
+  return Math.max(1, sec * 1.15);
+}
+
 function dispatchTTS(clean: string, config: TTSConfig): Promise<Buffer> {
   switch (config.provider) {
     case "atlas":

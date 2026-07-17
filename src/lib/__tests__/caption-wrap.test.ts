@@ -81,4 +81,46 @@ describe("chunkCaption（rapid 短句卡切分）", () => {
     expect(chunkCaption(txt, 0, 2).length).toBeLessThan(chunkCaption(txt, 0, 10).length);
     expect(chunkCaption(txt, 0, 60).length).toBeLessThanOrEqual(8);
   });
+
+  // issue #14 regression: caption cards must cut at punctuation, never mid-phrase
+  it("带标点文案按标点断句：不从短语中间截断、不丢字、块首无标点（issue #14）", () => {
+    const txt =
+      "百事可乐，冰爽加倍！气足劲爽，一口下去透心凉；经典可乐味，配饭配串配火锅，越喝越过瘾；聚会囤一箱，追剧开黑小烧烤，随手一罐,快乐即刻开盖！";
+    const out = chunkCaption(txt, 0, 20);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out.length).toBeLessThanOrEqual(8);
+    // no characters lost or reordered
+    expect(out.map((c) => c.text).join("")).toBe(txt);
+    // every card boundary sits on punctuation: non-final cards end with a mark, no card starts with one
+    const punct = /[。！？；，、：…!?;,.]/;
+    for (let i = 0; i < out.length; i++) {
+      const chars = Array.from(out[i].text);
+      expect(punct.test(chars[0])).toBe(false);
+      if (i < out.length - 1) expect(punct.test(chars[chars.length - 1])).toBe(true);
+    }
+    // ordered, non-overlapping, exact endpoints
+    expect(out[0].startTime).toBe(0);
+    expect(out[out.length - 1].endTime).toBe(20);
+    for (let i = 1; i < out.length; i++) expect(out[i].startTime).toBeCloseTo(out[i - 1].endTime, 3);
+  });
+
+  it("小数点不拆（9.9 元不被切成 9/.9）", () => {
+    const out = chunkCaption("现价9.9元，限时秒杀！", 0, 4);
+    expect(out.map((c) => c.text).join("")).toBe("现价9.9元，限时秒杀！");
+    expect(out.some((c) => c.text.includes("9.9"))).toBe(true);
+  });
+
+  it("时长太短时合并到能读完为止（每卡 ≥0.6s）", () => {
+    const txt = "先囤一箱，追剧开黑，随手一罐，快乐开盖！";
+    const out = chunkCaption(txt, 0, 1.5);
+    // 1.5s window → at most 2 cards
+    expect(out.length).toBeLessThanOrEqual(2);
+    expect(out.map((c) => c.text).join("")).toBe(txt);
+  });
+
+  it("零碎短语（哇！等）并入邻卡，不单独闪一帧", () => {
+    const out = chunkCaption("哇！这也太好喝了吧，必须回购！", 0, 6);
+    for (const c of out) expect(Array.from(c.text).length).toBeGreaterThanOrEqual(3);
+    expect(out.map((c) => c.text).join("")).toBe("哇！这也太好喝了吧，必须回购！");
+  });
 });
