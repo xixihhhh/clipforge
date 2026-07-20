@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDataDir } from "@/lib/paths";
+import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -77,7 +77,8 @@ export async function POST(
     const outStats = await probeEncodeStats(outFile).catch(() => null);
     const report = outStats ? buildBitrateReport(outStats, target) : null;
 
-    const fileName = outFile.split("/").pop() ?? "";
+    // separator-agnostic: join() produces backslash paths on Windows (issue #15)
+    const fileName = fileNameOf(outFile);
     return NextResponse.json({
       success: true,
       platform,

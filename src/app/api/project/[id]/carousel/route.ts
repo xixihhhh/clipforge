@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 import { join } from "path";
 import { getDb } from "@/lib/db";
-import { getDataDir } from "@/lib/paths";
+import { getDataDir, fileNameOf } from "@/lib/paths";
 import { scripts as scriptsTable, type Shot } from "@/lib/db/schema";
 import { generateCarousel } from "@/lib/video-composer/carousel";
 import { apiError, errText } from "@/lib/api-error";
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       height,
       theme: typeof body.theme === "string" ? body.theme : undefined,
     });
-    const cards = files.map((f) => `/api/files/${id}/carousel/${f.split("/").pop()}`);
+    // separator-agnostic: join() produces backslash paths on Windows (issue #15)
+    const cards = files.map((f) => `/api/files/${id}/carousel/${fileNameOf(f)}`);
     return NextResponse.json({ count: cards.length, cards });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : errText(req, "卡片生成失败", "Card generation failed") }, { status: 500 });

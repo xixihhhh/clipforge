@@ -22,6 +22,16 @@ export function getMigrationsDir(): string {
   return process.env.APP_MIGRATIONS_DIR || join(process.cwd(), "drizzle");
 }
 
+/**
+ * Last path component regardless of separator style. DB rows written on Windows carry
+ * backslash absolute paths (e.g. `D:\clipforge\data\output\<id>\final.mp4`) while download
+ * URLs always need the bare file name — a plain split("/") returns the whole Windows path
+ * and produces broken `/api/output/...` URLs (issue #15). Pure function.
+ */
+export function fileNameOf(p: string | null | undefined): string {
+  return (p ?? "").split(/[\\/]/).pop() ?? "";
+}
+
 /** Upload assets root directory: data/uploads */
 export function getUploadsDir(): string {
   return join(getDataDir(), "uploads");

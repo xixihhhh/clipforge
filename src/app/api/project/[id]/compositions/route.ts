@@ -3,6 +3,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { compositions } from "@/lib/db/schema";
 import { apiError, errText } from "@/lib/api-error";
+import { fileNameOf } from "@/lib/paths";
 
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
 
@@ -28,7 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const list = rows
       .filter((c) => !!c.outputPath)
       .map((c) => {
-        const fileName = (c.outputPath ?? "").split("/").pop() ?? "";
+        // separator-agnostic: Windows rows store backslash absolute paths (issue #15)
+        const fileName = fileNameOf(c.outputPath);
         return { ...c, fileName, url: fileName ? `/api/output/${id}/${fileName}` : null };
       });
     return NextResponse.json({ compositions: list });

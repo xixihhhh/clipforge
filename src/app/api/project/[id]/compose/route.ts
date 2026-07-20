@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDataDir } from "@/lib/paths";
+import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -46,7 +46,8 @@ export async function GET(
       return NextResponse.json({ composition: null });
     }
     const c = rows[0];
-    const fileName = (c.outputPath ?? "").split("/").pop() ?? "";
+    // separator-agnostic: Windows rows store backslash absolute paths (issue #15)
+    const fileName = fileNameOf(c.outputPath);
     return NextResponse.json({
       composition: {
         ...c,
