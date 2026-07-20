@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuSmartphone, LuShuffle, LuLoaderCircle, LuSparkles, LuImage, LuLayoutGrid, LuQrCode, LuScanLine, LuLanguages, LuShieldCheck, LuTriangleAlert, LuCircleX } from "react-icons/lu";
+import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuSmartphone, LuShuffle, LuLoaderCircle, LuSparkles, LuImage, LuLayoutGrid, LuQrCode, LuScanLine, LuLanguages, LuShieldCheck, LuTriangleAlert, LuCircleX, LuClipboardCheck } from "react-icons/lu";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -183,6 +183,20 @@ export default function ExportPage() {
       if (!r.ok) throw new Error(d.error || t("moreFailed"));
       setQc({ loading: false, status: d.status, checks: Array.isArray(d.checks) ? d.checks : [] });
     } catch (e) { setQc({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
+  };
+
+  // release gate: one aggregated pre-publish verdict (script readiness + video QC + asset licenses)
+  type GateUiItem = { id: string; status: "pass" | "warn" | "fail"; message: { zh: string; en: string }; problems: { zh: string; en: string }[] };
+  type GateUi = { loading?: boolean; error?: string; status?: "pass" | "warn" | "fail"; verdict?: { zh: string; en: string }; items?: GateUiItem[] };
+  const [gate, setGate] = useState<GateUi>({});
+  const runGate = async () => {
+    setGate({ loading: true });
+    try {
+      const r = await fetch(`/api/project/${id}/gate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || t("moreFailed"));
+      setGate({ loading: false, status: d.report?.status, verdict: d.report?.verdict, items: Array.isArray(d.report?.items) ? d.report.items : [] });
+    } catch (e) { setGate({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
 
   // contact sheet: one-image eyeball overview of the composed video (filmstrip + audio waveform)
@@ -717,6 +731,41 @@ export default function ExportPage() {
               </CardContent>
             </Card>
 
+            {/* release gate: aggregated pre-publish verdict (script readiness + video QC + asset licenses) */}
+            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2"><LuClipboardCheck className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("gateTitle")}</span></div>
+                <Button size="sm" variant="outline" className="text-xs h-7" disabled={gate.loading} onClick={runGate}>
+                  {gate.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("gateRun")}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("gateHint")}</p>
+              {gate.error && <p className="text-[11px] text-destructive mt-1">{gate.error}</p>}
+              {gate.status && gate.verdict && (
+                <p className={`text-[11px] mt-2 font-medium ${gate.status === "pass" ? "text-emerald-500" : gate.status === "warn" ? "text-amber-500" : "text-destructive"}`}>
+                  {locale === "en" ? gate.verdict.en : gate.verdict.zh}
+                </p>
+              )}
+              {gate.items && gate.items.length > 0 && (
+                <ul className="mt-1.5 space-y-1">
+                  {gate.items.map((item) => (
+                    <li key={item.id} className="text-[11px] text-muted-foreground">
+                      <div className="flex items-start gap-1.5">
+                        {item.status === "pass" ? <LuCircleCheck className="w-3 h-3 mt-0.5 shrink-0 text-emerald-500" /> : item.status === "warn" ? <LuTriangleAlert className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" /> : <LuCircleX className="w-3 h-3 mt-0.5 shrink-0 text-destructive" />}
+                        <span>{locale === "en" ? item.message.en : item.message.zh}</span>
+                      </div>
+                      {item.problems.length > 0 && (
+                        <ul className="mt-0.5 ml-4 space-y-0.5">
+                          {item.problems.map((p, i) => (
+                            <li key={i} className="text-[10px] text-muted-foreground/80">· {locale === "en" ? p.en : p.zh}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {/* composed-video quality check */}
             <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
               <div className="flex items-center justify-between mb-2">

@@ -23,6 +23,9 @@ Drive ClipForge's text-to-video pipeline from any MCP client (Claude Desktop / C
 > 素材（Openverse）与配音（微软 Edge TTS）全程 **免 Key**；只有「生成脚本」需要一个 OpenAI 兼容的 LLM Key。
 > Stock footage (Openverse) and voiceover (Edge TTS) are **key-less**; only script generation needs an OpenAI-compatible LLM key.
 
+> **出片后工具**（同为 MCP 工具，交付前把关/变现增强）：发布门禁 `clipforge_gate`（脚本就绪+质检+授权一键体检，`fail` 别交付）、成片质检 `clipforge_qc`、成片速览 `clipforge_contact_sheet`（agent 看图自检）、素材授权 `clipforge_credits`、平台导出 `clipforge_export_platform`、原生感 `clipforge_native_feel`、封面/图文卡/二维码/片尾扫码/译制等——完整清单与交付检查单见 [`skills/clipforge/SKILL.md`](../skills/clipforge/SKILL.md)。
+> **Post-compose tools** (also MCP tools): release gate `clipforge_gate` (readiness + QC + licensing in one verdict — don't deliver on `fail`), `clipforge_qc`, `clipforge_contact_sheet` (visual self-check), `clipforge_credits`, `clipforge_export_platform`, `clipforge_native_feel`, plus cover/carousel/QR/end-card/dub — full list and the delivery checklist live in [`skills/clipforge/SKILL.md`](../skills/clipforge/SKILL.md).
+
 > **成片选项**：`create_video` / `compose` 支持 `voice`（多语言音色，见 `clipforge_list_voices`；`create_video` 不指定则按主题语言自动挑，英文主题→英文音色）、`aspectRatio`（`9:16` 竖屏默认 / `16:9` / `1:1`）、`quality`（`fast` / `standard` / `hd`）、`bgm`（`true` 自动加一段免费 CC 背景音乐，混在旁白下方自动压低；来源 Wikimedia Commons，CC 多需署名）。一个画面都没配到时 `create_video` 会直接返回可操作的提示而非空白片。
 > **Output options**: `create_video` / `compose` accept `voice` (multilingual — zh/en/ja/ko/es; `create_video` auto-picks one matching the topic's language when unset, e.g. an English topic gets an English voice), `aspectRatio` (`9:16` default / `16:9` / `1:1`), `quality` (`fast`/`standard`/`hd`) and `bgm` (`true` = add free CC background music, ducked under the voiceover).
 

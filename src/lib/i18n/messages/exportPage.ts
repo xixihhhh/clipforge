@@ -61,6 +61,10 @@ export const exportPage: NamespaceMessages = {
     moreDubHint: "把当前脚本翻成目标语种并存为新脚本版本，回到「视频」步骤用推荐音色重新合成即可出海外版（需配置 LLM Key）。",
     moreDubNeedLlm: "译制需要 LLM，请先在设置里配置 Key",
     moreDubDone: "已生成译制脚本，推荐音色：{voice}，去「视频」重新合成",
+    // 发布门禁
+    gateTitle: "发布门禁",
+    gateRun: "一键体检",
+    gateHint: "发布/投流前一键跑完三层检查：脚本发布就绪（风险词/钩子/前3秒亮品）+ 成片质检（黑屏/静音/响度）+ 素材授权（商用风险/署名）。有 fail 别直接发。",
     // 成片质检
     qcTitle: "成片质检",
     qcRun: "运行质检",
@@ -189,6 +193,10 @@ export const exportPage: NamespaceMessages = {
     moreDubHint: "Translate the current script into the target language and save it as a new version; go back to the “Video” step and recompose with the recommended voice for the overseas cut (needs an LLM key).",
     moreDubNeedLlm: "Dubbing needs an LLM — configure a key in Settings first",
     moreDubDone: "Dubbed script created; recommended voice: {voice}. Recompose it in the “Video” step.",
+    // release gate
+    gateTitle: "Release gate",
+    gateRun: "Run gate",
+    gateHint: "One click runs all three pre-publish layers: script readiness (risk words / hook / early product), video QC (black frames / silence / loudness) and asset licensing (commercial risk / attribution). Don't publish with a fail.",
     // composed-video quality check
     qcTitle: "Video quality check",
     qcRun: "Run QC",

@@ -425,6 +425,20 @@ const TOOLS = [
     },
   },
   {
+    name: "clipforge_gate",
+    description:
+      "发布门禁（交付/发布前必跑的一键聚合检查）：脚本发布就绪（广告法风险词/开场钩子/时长/CTA/前3秒亮品）+ 成片质检（黑屏/静音/响度/流完整性）+ 素材授权（商用风险/署名要求）三层一次跑完，返回单一 status: pass|warn|fail 与逐项双语说明（report.items[].problems 列具体问题）。语义：fail=有必须修复的问题，先修复再交付；warn=需人工确认的风险（许可复核/署名），交付时必须把这些风险明示给用户；pass=自动检查无拦截项。strict=true 时 warn 也使返回的 ok 为 false。不需要 LLM。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "项目 ID" },
+        compositionId: { type: "string", description: "指定要检查的合成 ID（不填则用最新一次成功合成）" },
+        strict: { type: "boolean", description: "严格模式：warn 也视为拦截（ok=false），投流前建议开" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "clipforge_credits",
     description:
       "导出某项目的素材授权清单：逐镜溯源（来源/作者/许可）+ 商用风险分级（NC/ND/未知许可标记「需人工复核」）+ CC BY 素材的可直接粘贴署名行 + BGM 授权。投流/广告审核要授权凭证时用，或发布前自查素材商用安全。返回结构化 JSON（summary.commercialSafe 表示是否无风险项）。不需要 LLM。",
@@ -837,6 +851,18 @@ async function handleExportPlatform(args) {
   return ok({ ok: true, projectId, platform, platformName: res.platformName, url: res.url, size: res.size, report: res.report ?? null });
 }
 
+// Release gate: aggregated pre-publish verdict (script readiness + video QC + asset licenses)
+async function handleGate(args) {
+  const projectId = String(args.projectId || "").trim();
+  if (!projectId) throw new Error("projectId 不能为空");
+  const body = {};
+  if (typeof args.compositionId === "string" && args.compositionId.trim()) body.compositionId = args.compositionId.trim();
+  const res = await api(`/api/project/${projectId}/gate`, { method: "POST", body });
+  const status = res.report?.status ?? "fail";
+  const blocked = status === "fail" || (args.strict === true && status !== "pass");
+  return ok({ ok: !blocked, projectId, compositionId: res.compositionId ?? null, status, report: res.report ?? null });
+}
+
 // Asset license manifest (per-shot provenance + commercial-risk flags + attribution lines)
 async function handleCredits(args) {
   const projectId = String(args.projectId || "").trim();
@@ -922,6 +948,7 @@ const HANDLERS = {
   clipforge_end_card: handleEndCard,
   clipforge_export_platform: handleExportPlatform,
   clipforge_qc: handleQc,
+  clipforge_gate: handleGate,
   clipforge_credits: handleCredits,
   clipforge_native_feel: handleNativeFeel,
   clipforge_preview_gif: handlePreviewGif,

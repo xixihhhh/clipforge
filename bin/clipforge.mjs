@@ -400,6 +400,26 @@ async function cmdCredits(flags) {
   return { ok: true, projectId, summary: m.summary, items: m.items, bgm: m.bgm };
 }
 
+// Release gate: one aggregated pre-publish verdict (script readiness + video QC + asset licenses).
+// Exit code 2 when the gate blocks (fail, or warn under --strict) so shell scripts and agents can gate on it.
+async function cmdGate(flags) {
+  const projectId = String(flags.project || "").trim();
+  if (!projectId) throw new Error("--project 不能为空");
+  const body = {};
+  if (typeof flags.composition === "string" && flags.composition.trim()) body.compositionId = flags.composition.trim();
+  const res = await api(`/api/project/${projectId}/gate`, { method: "POST", body });
+  const icon = { pass: "✓", warn: "⚠", fail: "✗" };
+  for (const item of res.report?.items || []) {
+    step(`${icon[item.status] || "·"} ${item.message?.zh || item.id}`);
+    for (const p of item.problems || []) step(`    · ${p.zh || p.en || ""}`);
+  }
+  const status = res.report?.status;
+  step(res.report?.verdict?.zh || (status === "pass" ? "发布门禁通过" : "发布门禁未通过"));
+  const blocked = status === "fail" || (flags.strict === true && status !== "pass");
+  if (blocked && flags.strict === true && status === "warn") step("（--strict 模式：警告项也视为拦截）");
+  return { ok: !blocked, projectId, status, report: res.report, exitCode: blocked ? 2 : 0 };
+}
+
 // Platform export: re-encode the latest composed video to a platform's specs with the
 // anti-recompression bitrate cap, and print the measured-vs-line report
 async function cmdExport(flags) {
@@ -530,6 +550,8 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge endcard --project <id> [--platform douyin --seconds 3 --cta "扫码购买"]   把扫码购买二维码烧进成片片尾(需先合成)
   clipforge export --project <id> --platform douyin|kuaishou|xiaohongshu|shipinhao|tiktok|reels|shorts   按平台导出(码率卡线免二压+实测报告)
   clipforge qc --project <id> [--composition <id>]   成片质检(黑屏/静音/响度/流完整性,批量出片前把关)
+  clipforge gate --project <id> [--strict] [--composition <id>]   发布门禁:一条命令聚合 脚本就绪+成片质检+素材授权 三层检查
+                                fail(或 --strict 下 warn)退出码为 2,可直接接进脚本/CI 拦截发布
   clipforge credits --project <id> [--format md --lang zh|en]   素材授权清单(商用风险+署名行,投流审核用)
   clipforge native --project <id> [--strength subtle|medium --seed 3 --no-grain --vignette]   原生感处理(手持感+颗粒,反AI精致感)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
@@ -545,7 +567,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
 
 进度打印到 stderr，最终结果（含 videoUrl）打印到 stdout，便于管道取值。`;
 
-const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, export: cmdExport, qc: cmdQc, credits: cmdCredits, native: cmdNative, preview: cmdPreview, sheet: cmdSheet, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
+const COMMANDS = { create: cmdCreate, product: cmdProduct, import: cmdImport, dub: cmdDub, compose: cmdCompose, cover: cmdCover, qr: cmdQr, endcard: cmdEndcard, export: cmdExport, qc: cmdQc, gate: cmdGate, credits: cmdCredits, native: cmdNative, preview: cmdPreview, sheet: cmdSheet, carousel: cmdCarousel, list: cmdList, voices: cmdVoices, get: cmdGet, trends: cmdTrends };
 
 async function main() {
   const { _, flags } = parseArgs(process.argv.slice(2));
@@ -574,7 +596,8 @@ async function main() {
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
     }
   }
-  return 0;
+  // commands with gate semantics (e.g. `gate`) surface their own exit code; everything else exits 0
+  return typeof result?.exitCode === "number" ? result.exitCode : 0;
 }
 
 // Only run when executed as an entry point (not when imported by unit tests)
