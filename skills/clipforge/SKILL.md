@@ -1,7 +1,7 @@
 ---
 name: clipforge-video
 description: Create short vertical videos (TikTok / Reels / Shorts / 抖音 / 快手 / 小红书) from a topic, a product link/image, or a script you already wrote. ClipForge runs the full pipeline — script → footage → voiceover → subtitles → BGM → compose — with a free, no-API-key path (free stock + Edge TTS + local FFmpeg). Use when the user wants to turn an idea, product, or written narration into a finished short video. Pipeline-correctness rules are hard; everything creative is your call.
-version: 0.8.52
+version: 0.8.53
 license: AGPL-3.0-only
 homepage: https://github.com/xixihhhh/clipforge
 keywords: [ai-video, faceless-video, text-to-video, tiktok, reels, shorts, 抖音, 快手, 小红书, product-video, tiktok-shop, ugc, ffmpeg, edge-tts]
@@ -19,7 +19,7 @@ These are pipeline-correctness facts — violating them produces broken output o
 
 1. **Compose is async.** Poll `GET /api/project/[id]/compose` (or the MCP/CLI equivalents) until `status: "done"` or `"failed"`. Never re-trigger compose while one is still `composing` — you get duplicate renders fighting over the same project.
 2. **Gate before you deliver.** Run `clipforge_gate` (CLI: `clipforge gate --project <id>`, add `--strict` when the video is bound for paid traffic) after composing. `fail` → fix the cause and re-run; never hand the video over. `warn` → the flagged risks (license review, attribution lines) are *human* decisions: surface each one to the user verbatim, don't silently accept or drop them.
-3. **Look before you claim.** Fetch `clipforge_contact_sheet` and actually look at the PNG (filmstrip + waveform) before telling the user the video is ready — automated checks can't see caption collisions or an ugly frame; the image can.
+3. **Look before you claim.** Fetch `clipforge_contact_sheet` and actually look at the PNG before telling the user the video is ready — automated checks can't see caption collisions or an ugly frame; the image can. The sheet samples frames at real splice points (red-outlined thumbs, red ticks on the waveform timeline): check those frames first — they are where broken transitions and mismatched clips live. Pass `proxy: true` when the user wants to review the cut themselves: it returns a 720p clip with burned-in timecode for frame-accurate feedback.
 4. **Self-check loop is bounded.** Found a problem → fix → re-compose → re-check, at most 3 rounds. Still failing after 3? Tell the user exactly what's wrong and stop; a video that can't pass its own gate must not be presented as done.
 5. **Voices come from the list.** Pick `voice` only from `clipforge_list_voices` output, or omit it — ClipForge auto-picks by script language. Guessed voice ids fail the compose or read the wrong language.
 6. **Report reality.** If footage fell back from video to images, a provider failed over, or any check warned — say so. The API reports degradations honestly; so must you.

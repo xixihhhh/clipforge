@@ -199,15 +199,17 @@ export default function ExportPage() {
     } catch (e) { setGate({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
 
-  // contact sheet: one-image eyeball overview of the composed video (filmstrip + audio waveform)
-  const [sheet, setSheet] = useState<{ loading?: boolean; error?: string; url?: string }>({});
+  // contact sheet: one-image eyeball overview of the composed video. Smart mode samples real
+  // scene cuts (red-outlined thumbs + waveform ticks); optional review proxy burns a timecode.
+  const [sheet, setSheet] = useState<{ loading?: boolean; error?: string; url?: string; cuts?: number; proxy?: string }>({});
+  const [wantProxy, setWantProxy] = useState(false);
   const runContactSheet = async () => {
     setSheet({ loading: true });
     try {
-      const r = await fetch(`/api/project/${id}/contact-sheet`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const r = await fetch(`/api/project/${id}/contact-sheet`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(wantProxy ? { proxy: true } : {}) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || t("moreFailed"));
-      setSheet({ loading: false, url: d.sheet });
+      setSheet({ loading: false, url: d.sheet, cuts: Array.isArray(d.cuts) ? d.cuts.length : 0, proxy: d.proxy });
     } catch (e) { setSheet({ loading: false, error: e instanceof Error ? e.message : t("moreFailed") }); }
   };
 
@@ -801,11 +803,23 @@ export default function ExportPage() {
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground">{t("sheetHint")}</p>
+              <label className="flex items-center gap-1.5 mt-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" className="w-3 h-3 accent-primary" checked={wantProxy} onChange={(e) => setWantProxy(e.target.checked)} />
+                {t("sheetProxyOpt")}
+              </label>
               {sheet.error && <p className="text-[11px] text-destructive mt-1">{sheet.error}</p>}
               {sheet.url && (
                 <a href={sheet.url} target="_blank" rel="noreferrer" className="block mt-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={sheet.url} alt={t("sheetTitle")} className="w-full rounded-md border border-border/50" />
+                </a>
+              )}
+              {sheet.url && typeof sheet.cuts === "number" && (
+                <p className="text-[11px] text-muted-foreground mt-1">{t("sheetCuts").replace("{n}", String(sheet.cuts))}</p>
+              )}
+              {sheet.proxy && (
+                <a href={sheet.proxy} target="_blank" rel="noreferrer" className="inline-block mt-1 text-[11px] text-primary underline underline-offset-2">
+                  {t("sheetProxyLink")}
                 </a>
               )}
             </div>

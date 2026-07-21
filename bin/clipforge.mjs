@@ -459,15 +459,21 @@ async function cmdPreview(flags) {
   return { ok: true, projectId, gif: res.gif };
 }
 
-// Contact sheet: one PNG overview of the latest composed video (filmstrip + audio waveform) for eyeball QC
+// Contact sheet: one PNG overview of the latest composed video for eyeball QC.
+// Smart mode (default) samples real scene cuts and marks splice points; --proxy adds a
+// short-side-720 review clip with burned-in timecode for frame-accurate human feedback.
 async function cmdSheet(flags) {
   const projectId = String(flags.project || "").trim();
   if (!projectId) throw new Error("--project 不能为空");
   const body = {};
   if (flags.frames && Number.isFinite(Number(flags.frames))) body.frames = Number(flags.frames);
   if (flags["thumb-width"] && Number.isFinite(Number(flags["thumb-width"]))) body.thumbWidth = Number(flags["thumb-width"]);
+  if (flags.mode === "even" || flags.mode === "smart") body.mode = flags.mode;
+  if (flags.proxy === true) body.proxy = true;
   const res = await api(`/api/project/${projectId}/contact-sheet`, { method: "POST", body });
-  step(`成片速览已生成：${res.sheet}（${res.layout.frames} 帧胶片条${res.layout.waveHeight ? " + 波形" : ""}）`);
+  const cutNote = res.mode === "smart" ? `，检测到 ${(res.cuts || []).length} 个拼接点` : "";
+  step(`成片速览已生成：${res.sheet}（${res.layout.frames} 帧胶片条${res.layout.waveHeight ? " + 波形" : ""}${cutNote}）`);
+  if (res.proxy) step(`审片小样（720p+时间码）：${res.proxy}`);
   return { ok: true, projectId, ...res };
 }
 
@@ -555,7 +561,7 @@ const HELP = `ClipForge CLI · 命令行一句话出片
   clipforge credits --project <id> [--format md --lang zh|en]   素材授权清单(商用风险+署名行,投流审核用)
   clipforge native --project <id> [--strength subtle|medium --seed 3 --no-grain --vignette]   原生感处理(手持感+颗粒,反AI精致感)
   clipforge preview --project <id> [--start 0 --duration 4 --width 360]   生成预览 GIF
-  clipforge sheet --project <id> [--frames 8 --thumb-width 180]   成片速览一张图(抽帧胶片条+音频波形,发布前人眼把关)
+  clipforge sheet --project <id> [--frames 8 --proxy --mode smart|even]   成片速览一张图(scene感知抽帧+拼接点标注+波形;--proxy 出720p时间码审片小样)
   clipforge carousel --project <id> [--theme night|warm|mint|mono|rose]   生成小红书图文卡片(标题+逐条要点)
   clipforge get --project <id>  查最新成片地址
   clipforge --help | --version

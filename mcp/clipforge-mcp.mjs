@@ -484,13 +484,15 @@ const TOOLS = [
   {
     name: "clipforge_contact_sheet",
     description:
-      "把某项目最新成片渲成一张速览图（均匀抽帧胶片条 + 音频波形 PNG）。合成后建议调用并查看这张图，一眼确认黑屏/字幕遮挡/爆音/静音尾巴，再告知用户成片可用。需先合成过视频。不需要 LLM。",
+      "把某项目最新成片渲成一张速览图 PNG：默认 smart 模式按真实场景切换抽帧——拼接点缩略图带红框、波形时间轴上红线标出所有检测到的切点，一眼看出黑屏/字幕遮挡/拼接突兀/爆音/静音尾巴。合成后建议调用并查看这张图再告知用户成片可用。proxy=true 额外生成短边≤720、烧录时间码的审片小样 mp4，便于人工按精确时刻反馈。需先合成过视频。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
         projectId: { type: "string", description: "项目 ID" },
         frames: { type: "number", description: "胶片条帧数（4-12），默认 8" },
         thumbWidth: { type: "number", description: "单帧宽度 px（120-320），默认 180" },
+        mode: { type: "string", enum: ["smart", "even"], description: "抽帧模式：smart=场景切点优先（默认）；even=均匀抽帧" },
+        proxy: { type: "boolean", description: "true 时同时生成 720p 时间码审片小样" },
       },
       required: ["projectId"],
     },
@@ -904,8 +906,19 @@ async function handleContactSheet(args) {
   const body = {};
   if (Number.isFinite(args.frames)) body.frames = args.frames;
   if (Number.isFinite(args.thumbWidth)) body.thumbWidth = args.thumbWidth;
+  if (args.mode === "even" || args.mode === "smart") body.mode = args.mode;
+  if (args.proxy === true) body.proxy = true;
   const res = await api(`/api/project/${projectId}/contact-sheet`, { method: "POST", body });
-  return ok({ ok: true, projectId, sheet: res.sheet ? `${BASE_URL}${res.sheet}` : null, layout: res.layout ?? null });
+  return ok({
+    ok: true,
+    projectId,
+    sheet: res.sheet ? `${BASE_URL}${res.sheet}` : null,
+    layout: res.layout ?? null,
+    mode: res.mode ?? null,
+    cuts: res.cuts ?? [],
+    frameTimes: res.frameTimes ?? [],
+    proxy: res.proxy ? `${BASE_URL}${res.proxy}` : null,
+  });
 }
 
 // Export the project's subtitles as SRT/WebVTT (the route returns text, wrapped as { raw } by api())

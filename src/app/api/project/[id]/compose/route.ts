@@ -12,7 +12,7 @@ import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, assets as assetsTable, projects, compositions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { composeVideo, resolveChineseFontFamily, type ClipInput, type ComposeConfig } from "@/lib/video-composer/composer";
-import { buildSubtitleTimeline, padDurationsForFade, type TimelineSegment } from "@/lib/video-composer/timeline";
+import { buildSubtitleTimeline, padDurationsForFade, segmentBoundaries, type TimelineSegment } from "@/lib/video-composer/timeline";
 import { buildKaraokeAss } from "@/lib/video-composer/karaoke";
 import { isAudibleFromVolumedetect } from "@/lib/video-composer/audio-probe";
 import { buildComplianceOverlays } from "@/lib/compliance-overlays";
@@ -386,6 +386,18 @@ export async function POST(
 
         // 执行合成（FFmpeg）
         const outputPath = await composeVideo(config);
+        // Splice-point sidecar (same pattern as the BGM credit sidecar): the composer's actual
+        // fade-aware segment boundaries. The smart contact sheet reads this as the authoritative
+        // cut list — per-frame scene detection cannot see gradual cross-fades. Best-effort only.
+        await writeFile(
+          `${outputPath}.timeline.json`,
+          JSON.stringify({
+            version: 1,
+            boundaries: segmentBoundaries(rendered.map((r) => ({ duration: r.duration, transition: r.clip.transition }))),
+            total: timeline.total,
+          }),
+          "utf8"
+        ).catch(() => {});
         // 完成：更新合成记录与项目状态
         await db.update(compositions).set({ outputPath, status: "done" }).where(eq(compositions.id, comp.id));
         await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));

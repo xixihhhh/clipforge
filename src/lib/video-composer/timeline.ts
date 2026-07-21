@@ -101,6 +101,25 @@ export function buildSubtitleTimeline(segments: TimelineSegment[]): {
 }
 
 /**
+ * Splice times of the composed video: the start of every segment after the first, matching
+ * the composer's xfade timeline exactly (an ffmpeg_fade segment overlaps its predecessor by
+ * FADE_DURATION, shifting everything after it forward). Written next to the output as a
+ * timeline sidecar so the contact sheet can mark splice points authoritatively — per-frame
+ * scene detection cannot see gradual cross-fades at all (each fade frame only changes a few
+ * percent), so for our own renders the composer's knowledge is the only reliable source.
+ */
+export function segmentBoundaries(segments: { duration: number; transition: string }[]): number[] {
+  const bounds: number[] = [];
+  let acc = 0;
+  segments.forEach((seg, idx) => {
+    if (idx > 0 && seg.transition === "ffmpeg_fade") acc -= FADE_DURATION;
+    if (idx > 0) bounds.push(Number(acc.toFixed(3)));
+    acc += seg.duration;
+  });
+  return bounds;
+}
+
+/**
  * Return per-clip durations padded for audio cross-fades: a voiced clip whose successor
  * enters via ffmpeg_fade gains FADE_DURATION of tail so acrossfade only ever consumes
  * silence. Without this, the last ~0.5s of narration was faded out mid-word while the
