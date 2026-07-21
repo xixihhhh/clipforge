@@ -1,7 +1,7 @@
 ---
 name: clipforge-video
 description: Create short vertical videos (TikTok / Reels / Shorts / 抖音 / 快手 / 小红书) from a topic, a product link/image, or a script you already wrote. ClipForge runs the full pipeline — script → footage → voiceover → subtitles → BGM → compose — with a free, no-API-key path (free stock + Edge TTS + local FFmpeg). Use when the user wants to turn an idea, product, or written narration into a finished short video. Pipeline-correctness rules are hard; everything creative is your call.
-version: 0.8.53
+version: 0.8.54
 license: AGPL-3.0-only
 homepage: https://github.com/xixihhhh/clipforge
 keywords: [ai-video, faceless-video, text-to-video, tiktok, reels, shorts, 抖音, 快手, 小红书, product-video, tiktok-shop, ugc, ffmpeg, edge-tts]
@@ -112,6 +112,7 @@ What this skill does not do:
 Review the CLI/MCP scripts before first use — they are plain, dependency-free Node files (`bin/clipforge.mjs`, `mcp/clipforge-mcp.mjs`).
 
 ## Notes
+- Footage auto-fill groups shots that mention the same entity and leans them toward one source/author (coherent look). `clipforge_create_video` reports `sameSourceShots` when it happened — worth relaying to the user as a quality signal.
 - Subtitles can be exported as SRT/WebVTT: `GET /api/project/[id]/subtitle?format=srt|vtt`.
 - `compose` is async — poll until `status: "done"`, then the response carries the downloadable mp4 URL.
 - The free path (free stock + Edge TTS + local FFmpeg) costs nothing; only paid AI image/video/voice models bill per use.

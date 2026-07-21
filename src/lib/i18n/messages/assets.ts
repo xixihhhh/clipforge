@@ -35,6 +35,7 @@ export const assets: NamespaceMessages = {
     stockFillHint: "从免费素材库（Openverse 图片，无需 Key）按分镜检索词自动配画面",
     stockFillTip: "无需生图 Key：点「自动配画面」即可从免费素材库为每个分镜配好画面",
     stockFilledMsg: "已为 {filled}/{total} 个分镜配好画面",
+    stockSameSourceMsg: "，其中 {n} 镜同源连贯（同实体镜头复用同一作者素材）",
     stockFillFailed: "自动配画面失败，请重试",
     // 上传自有图片（解锁 user_upload 分镜死路 + 任意分镜「换一张」）
     btnUpload: "上传图片",
@@ -103,6 +104,7 @@ export const assets: NamespaceMessages = {
     stockFillHint: "Auto-fill each shot from free stock (Openverse images, no key needed) using its search terms",
     stockFillTip: "No image-gen key needed — click \"Auto-fill footage\" to pull footage for every shot from free stock",
     stockFilledMsg: "Filled {filled}/{total} shots",
+    stockSameSourceMsg: ", {n} shot(s) source-matched (same-entity shots reuse one author's footage)",
     stockFillFailed: "Auto-fill failed, please retry",
     btnUpload: "Upload",
     btnReplaceUpload: "Replace",

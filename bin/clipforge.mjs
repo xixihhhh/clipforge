@@ -197,7 +197,7 @@ async function cmdCreate(flags) {
       `免费素材库没给「${topic}」配到画面，无法合成。换个更常见/具体的主题，或设置 CLIPFORGE_PEXELS_KEY 后重试。`,
     );
   }
-  step(`画面就绪：${fill.filled}/${fill.total}`);
+  step(`画面就绪：${fill.filled}/${fill.total}${fill.sameSourceHits ? ` · 同源连贯 ${fill.sameSourceHits} 镜` : ""}`);
 
   const body = composeBodyFromFlags(flags);
   if (!body.freeTts.voice) {
@@ -270,7 +270,7 @@ async function cmdProduct(flags) {
     method: "POST",
     body: { source: "all", mediaType, apiKeys: STOCK_KEYS, ...(LLM.baseUrl && LLM.model ? { llmConfig: LLM } : {}) },
   });
-  step(`画面就绪：${fill.filled ?? 0}/${fill.total ?? 0}`);
+  step(`画面就绪：${fill.filled ?? 0}/${fill.total ?? 0}${fill.sameSourceHits ? ` · 同源连贯 ${fill.sameSourceHits} 镜` : ""}`);
 
   const body = composeBodyFromFlags(flags);
   const usedVoice = body.freeTts.voice || "zh-CN-XiaoxiaoNeural";

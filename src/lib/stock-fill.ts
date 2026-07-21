@@ -13,7 +13,7 @@ import { join, basename } from "path";
 import { getUploadsDir } from "@/lib/paths";
 import { downloadStockFile, orientationOf, type StockSourceId } from "@/lib/providers/stock-types";
 import { searchStock, searchAllStock, type StockSearchOptions } from "@/lib/providers/stock-registry";
-import { broadenQuery, pickBestCandidate } from "@/lib/stock-matcher";
+import { broadenQuery, pickBestCandidate, authorKeyOf } from "@/lib/stock-matcher";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
 
@@ -26,6 +26,8 @@ export interface FillShotInput {
   searchOpts: StockSearchOptions;
   /** IDs of stock items already used (deduplication across shots to avoid the same image repeating throughout the video); maintained and passed in by the caller */
   usedIds?: Set<string>;
+  /** Author keys already picked by shots of the same entity group (material continuity: prefer same-source footage); maintained and passed in by the caller */
+  sameSourceAuthors?: Set<string>;
 }
 
 /** A stock search hit normalized for scoring: string id + orientation + image/video type. */
@@ -102,13 +104,19 @@ export async function persistCandidate(
  * Returns the persisted asset row on success, or null if nothing could be found.
  */
 export async function fillShotStock(input: FillShotInput): Promise<Record<string, unknown> | null> {
-  const { projectId, shotId, query, source, searchOpts, usedIds } = input;
+  const { projectId, shotId, query, source, searchOpts, usedIds, sameSourceAuthors } = input;
 
   const scored = await searchShotCandidates(query, source, searchOpts);
   if (scored.length === 0) return null;
 
-  // Pick the best candidate: prefer portrait orientation + deduplicate across shots, instead of just taking the first result (the old logic often produced landscape clips or repeated the same image throughout)
-  const c = pickBestCandidate({ description: query }, scored, { preferPortrait: true, usedIds }) ?? scored[0];
+  // Pick the best candidate: prefer portrait orientation + deduplicate across shots + lean toward
+  // sources already used by same-entity shots (material continuity), instead of just taking the first result
+  const c = pickBestCandidate({ description: query }, scored, { preferPortrait: true, usedIds, sameSourceAuthors }) ?? scored[0];
+  const authorKey = authorKeyOf(c);
+  // whether this pick actually reused a same-group source — computed BEFORE feeding the key back
+  const sameSource = authorKey !== null && sameSourceAuthors?.has(authorKey) === true;
   usedIds?.add(c.id);
-  return persistCandidate(projectId, shotId, query, c);
+  if (authorKey) sameSourceAuthors?.add(authorKey);
+  const asset = await persistCandidate(projectId, shotId, query, c);
+  return { ...asset, sameSource };
 }

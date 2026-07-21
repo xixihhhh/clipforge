@@ -584,6 +584,8 @@ async function handleCreateVideo(args) {
     aspectRatio: ASPECT_RATIOS.includes(args.aspectRatio) ? args.aspectRatio : "9:16",
     shots: shots.length,
     footageFilled: `${fill.filled}/${fill.total}`,
+    // material continuity: how many shots reused a provider+author already picked by a same-entity shot
+    ...(fill.sameSourceHits ? { sameSourceShots: fill.sameSourceHits } : {}),
     videoUrl: absVideoUrl(composition),
     status: composition.status,
     hint: "videoUrl 可直接下载/播放（mp4）。在 ClipForge 网页 /project/" + projectId + "/export 可进一步多平台导出。",

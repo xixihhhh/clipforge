@@ -208,7 +208,10 @@ export default function AssetsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || t("stockFillFailed"));
       await reloadAssets();
-      setStockMsg(t("stockFilledMsg", { filled: data.filled ?? 0, total: data.total ?? 0 }));
+      setStockMsg(
+        t("stockFilledMsg", { filled: data.filled ?? 0, total: data.total ?? 0 }) +
+          (data.sameSourceHits ? t("stockSameSourceMsg", { n: data.sameSourceHits }) : "")
+      );
     } catch (e) {
       setStockMsg(e instanceof Error ? e.message : t("stockFillFailed"));
     } finally {

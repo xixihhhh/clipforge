@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 import { getDataDir } from "@/lib/paths";
 import { scripts as scriptsTable, assets as assetsTable, type Shot } from "@/lib/db/schema";
 import { fillShotStock, searchShotCandidates, persistCandidate, type ScoredStockCandidate } from "@/lib/stock-fill";
-import { shotQuery, scoreCandidate, pickBestCandidate } from "@/lib/stock-matcher";
+import { shotQuery, scoreCandidate, pickBestCandidate, continuityGroups, authorKeyOf } from "@/lib/stock-matcher";
 import { rerankShotCandidates, type RerankShot, type SemanticLLMConfig } from "@/lib/semantic-match";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import type { StockSourceId, StockMediaType, StockOrientation } from "@/lib/providers/stock-types";
@@ -27,6 +27,9 @@ const SEMANTIC_TOP_K = 6;
  *  - llmConfig {baseUrl, apiKey?, model} opt-in: semantic rerank — ONE batched LLM call picks the
  *    candidate that best matches each shot's narration (falls back to the keyword heuristic on any failure)
  * Cross-shot dedup: one shared usedIds set spans the whole fill, so the same stock item never repeats across shots.
+ * Material continuity: shots sharing an entity keyword form a group (continuityGroups); within a group,
+ * earlier picks' provider+author keys bias later picks toward the same source (coherent look, never
+ * overriding relevance). Per-shot results carry sameSource:true when the bias actually landed.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -95,11 +98,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     mediaType?: StockMediaType;
     /** which ranker chose the asset: semantic (LLM) or heuristic (keyword/orientation score) */
     matchedBy?: "semantic" | "heuristic";
+    /** true when the pick reused a provider+author already chosen by a same-entity shot (material continuity) */
+    sameSource?: boolean;
     reason?: string;
   };
 
   // one shared dedup set across the whole fill: the same stock item never repeats across shots
   const usedIds = new Set<string>();
+  // material continuity: shots sharing an entity keyword form a group; each group accumulates
+  // the author keys it has picked so later shots in the group lean toward the same source
+  const groups = continuityGroups(shots);
 
   const skipOf = (shot: Shot): ShotFillResult | null => {
     const sid = shot.shotId;
@@ -155,31 +163,53 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       console.warn("[stock-fill] 语义配片失败，回退关键词启发式:", e instanceof Error ? e.message : e);
     }
 
-    // phase 3: resolve the final candidate per shot (LLM pick if valid and unused, else heuristic) and persist
-    const results = await mapWithConcurrency<Gathered, ShotFillResult>(gathered, 4, async (g) => {
+    // phase 3a (sync, in shot order): resolve the final candidate per shot — LLM pick if valid and
+    // unused, else heuristic with the same-source continuity bonus. Picks and set updates have no
+    // await in between, so no two shots grab the same item AND later same-group shots see earlier
+    // authors deterministically (whichever ranker chose them — an LLM pick also anchors its group).
+    const groupIdxOf = new Map<number, number>();
+    groups.forEach((g, gi) => g.forEach((sid) => groupIdxOf.set(sid, gi)));
+    const authorsOfGroup = new Map<number, Set<string>>();
+    type Resolved = Gathered & { chosen?: ScoredStockCandidate; matchedBy?: "semantic" | "heuristic"; sameSource?: boolean };
+    const resolved: Resolved[] = [...gathered]
+      .sort((a, b) => a.shot.shotId - b.shot.shotId)
+      .map((g) => {
+        if (g.cands.length === 0) return g;
+        const sid = g.shot.shotId;
+        const gi = groupIdxOf.get(sid) ?? -1;
+        let authors = authorsOfGroup.get(gi);
+        if (!authors) authorsOfGroup.set(gi, (authors = new Set()));
+        const topK = topKOf.get(sid) ?? g.cands;
+        const pickIdx = picks.get(sid);
+        const llmPick = pickIdx !== undefined ? topK[pickIdx] : undefined;
+        const chosen =
+          llmPick && !usedIds.has(llmPick.id)
+            ? llmPick
+            : (pickBestCandidate({ description: g.query }, g.cands, { preferPortrait: true, usedIds, sameSourceAuthors: authors }) ??
+              g.cands[0]);
+        const authorKey = authorKeyOf(chosen);
+        const sameSource = authorKey !== null && authors.has(authorKey);
+        usedIds.add(chosen.id);
+        if (authorKey) authors.add(authorKey);
+        return { ...g, chosen, matchedBy: chosen === llmPick && semanticOk ? "semantic" : "heuristic", sameSource };
+      });
+
+    // phase 3b: persist the resolved picks with bounded concurrency
+    const results = await mapWithConcurrency<Resolved, ShotFillResult>(resolved, 4, async (g) => {
       const sid = g.shot.shotId;
-      if (g.cands.length === 0) {
+      if (!g.chosen) {
         return { shotId: sid, ok: false, query: g.query, reason: g.error ?? "no asset found" };
       }
-      // pick + usedIds.add happen synchronously (no await in between), so concurrent shots can't grab the same item
-      const topK = topKOf.get(sid) ?? g.cands;
-      const pickIdx = picks.get(sid);
-      const llmPick = pickIdx !== undefined ? topK[pickIdx] : undefined;
-      const chosen =
-        llmPick && !usedIds.has(llmPick.id)
-          ? llmPick
-          : (pickBestCandidate({ description: g.query }, g.cands, { preferPortrait: true, usedIds }) ?? g.cands[0]);
-      const matchedBy: "semantic" | "heuristic" = chosen === llmPick && semanticOk ? "semantic" : "heuristic";
-      usedIds.add(chosen.id);
       try {
-        const asset = await persistCandidate(id, sid, g.query, chosen);
+        const asset = await persistCandidate(id, sid, g.query, g.chosen);
         return {
           shotId: sid,
           ok: true,
           query: g.query,
           provider: String(asset.provider),
           mediaType: (asset.mediaType as StockMediaType) ?? mediaType,
-          matchedBy,
+          matchedBy: g.matchedBy,
+          ...(g.sameSource ? { sameSource: true } : {}),
         };
       } catch (e) {
         return { shotId: sid, ok: false, query: g.query, reason: e instanceof Error ? e.message : String(e) };
@@ -188,34 +218,75 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const skipped = shots.map(skipOf).filter((r): r is ShotFillResult => r !== null);
     const all = [...results, ...skipped].sort((a, b) => a.shotId - b.shotId);
     const filled = all.filter((r) => r.ok).length;
-    return NextResponse.json({ projectId: id, scriptId: script.id, total: shots.length, filled, semantic: semanticOk, results: all });
+    const sameSourceHits = all.filter((r) => r.sameSource).length;
+    return NextResponse.json({
+      projectId: id,
+      scriptId: script.id,
+      total: shots.length,
+      filled,
+      semantic: semanticOk,
+      sameSourceHits,
+      results: all,
+    });
   }
 
   // ---------- heuristic path (default, no LLM) ----------
-  // Per-shot searches are independent (each result depends only on itself and writes a distinct asset row); bounded concurrency (4) replaces serial execution — faster overall without hammering downstream APIs
-  const results = await mapWithConcurrency<Shot, ShotFillResult>(shots, 4, async (shot) => {
-    const sid = shot.shotId;
-    const skip = skipOf(shot);
-    if (skip) return skip;
-    const query = shotQuery(shot);
-    try {
-      let asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts, usedIds });
-      // In auto mode, if no video was found → fall back to image to ensure the shot is never empty
-      if (!asset && autoMode && mediaType !== "image") {
-        asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts: { ...searchOpts, mediaType: "image" }, usedIds });
+  // Scheduling unit is the continuity group, not the shot: groups run concurrently (bounded 4, no
+  // hammering of downstream APIs), shots WITHIN a group run serially so earlier picks can bias later
+  // ones toward the same source. Singleton groups — the common case — behave exactly as before.
+  const shotById = new Map(shots.map((s) => [s.shotId, s]));
+  const grouped = await mapWithConcurrency<number[], ShotFillResult[]>(groups, 4, async (group) => {
+    const sameSourceAuthors = new Set<string>();
+    const out: ShotFillResult[] = [];
+    for (const sid of group) {
+      const shot = shotById.get(sid);
+      if (!shot) continue;
+      const skip = skipOf(shot);
+      if (skip) {
+        out.push(skip);
+        continue;
       }
-      // Report the ACTUAL downloaded media type (from the chosen candidate), not the requested one:
-      // keyless "video" requests routinely fall back to Openverse images (its only video-less keyless
-      // source), so reporting the requested "video" would mislabel an image asset as a video.
-      const actualType = (asset?.mediaType as StockMediaType) ?? mediaType;
-      return asset
-        ? { shotId: sid, ok: true, query, provider: String(asset.provider), mediaType: actualType, matchedBy: "heuristic" }
-        : { shotId: sid, ok: false, query, reason: "no asset found" };
-    } catch (e) {
-      return { shotId: sid, ok: false, query, reason: e instanceof Error ? e.message : String(e) };
+      const query = shotQuery(shot);
+      try {
+        let asset = await fillShotStock({ projectId: id, shotId: sid, query, source, searchOpts, usedIds, sameSourceAuthors });
+        // In auto mode, if no video was found → fall back to image to ensure the shot is never empty
+        if (!asset && autoMode && mediaType !== "image") {
+          asset = await fillShotStock({
+            projectId: id,
+            shotId: sid,
+            query,
+            source,
+            searchOpts: { ...searchOpts, mediaType: "image" },
+            usedIds,
+            sameSourceAuthors,
+          });
+        }
+        // Report the ACTUAL downloaded media type (from the chosen candidate), not the requested one:
+        // keyless "video" requests routinely fall back to Openverse images (its only video-less keyless
+        // source), so reporting the requested "video" would mislabel an image asset as a video.
+        const actualType = (asset?.mediaType as StockMediaType) ?? mediaType;
+        out.push(
+          asset
+            ? {
+                shotId: sid,
+                ok: true,
+                query,
+                provider: String(asset.provider),
+                mediaType: actualType,
+                matchedBy: "heuristic",
+                ...(asset.sameSource === true ? { sameSource: true } : {}),
+              }
+            : { shotId: sid, ok: false, query, reason: "no asset found" }
+        );
+      } catch (e) {
+        out.push({ shotId: sid, ok: false, query, reason: e instanceof Error ? e.message : String(e) });
+      }
     }
+    return out;
   });
 
+  const results = grouped.flat().sort((a, b) => a.shotId - b.shotId);
   const filled = results.filter((r) => r.ok).length;
-  return NextResponse.json({ projectId: id, scriptId: script.id, total: shots.length, filled, results });
+  const sameSourceHits = results.filter((r) => r.sameSource).length;
+  return NextResponse.json({ projectId: id, scriptId: script.id, total: shots.length, filled, sameSourceHits, results });
 }
