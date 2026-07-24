@@ -77,7 +77,7 @@ export function defaultVoiceForTopic(topic) {
 
 /** Shared "output options" JSON-Schema properties for create_video / compose */
 const OUTPUT_OPTION_PROPS = {
-  voice: { type: "string", description: "Edge TTS 音色 value（见 clipforge_list_voices）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日/韩同理；中文→晓晓）" },
+  voice: { type: "string", description: "Edge TTS 音色 value（如 zh-CN-XiaoxiaoNeural / en-US-AriaNeural，必须来自 clipforge_list_voices，猜测的 id 会合成失败或读错语种）。create_video 不指定则按主题语言自动挑（英文主题→英文音色，日/韩同理；中文→晓晓）" },
   aspectRatio: { type: "string", enum: ASPECT_RATIOS, description: "画幅，默认 9:16 竖屏" },
   quality: { type: "string", enum: QUALITY_PRESETS, description: "画质预设 fast/standard/hd，默认 standard" },
   bgm: {
@@ -115,6 +115,12 @@ const OUTPUT_OPTION_PROPS = {
     type: "string",
     description: "片尾购买 CTA 文案（如「👇 点击下方小黄车下单」），不传则不加片尾 CTA",
   },
+};
+
+/** Shared projectId schema property — most tools operate on an existing project */
+const PROJECT_ID_PROP = {
+  type: "string",
+  description: "项目 ID（来自 clipforge_list_projects，或 create/ingest/generate 类工具返回的 projectId）",
 };
 
 /** Call the ClipForge HTTP API; throws an error with the backend error message on non-2xx responses */
@@ -203,7 +209,7 @@ const TOOLS = [
       properties: {
         topic: { type: "string", description: "一句话主题，如「在家如何泡一杯手冲咖啡」" },
         narrationStyle: { type: "string", enum: NARRATION_STYLES, description: "旁白风格，默认 knowledge" },
-        durationSec: { type: "number", description: "目标时长（秒），默认 25" },
+        durationSec: { type: "number", description: "目标时长（秒），默认 25，建议 15-60" },
         footage: {
           type: "string",
           enum: FOOTAGE_KINDS,
@@ -217,7 +223,7 @@ const TOOLS = [
   {
     name: "clipforge_ingest_product",
     description:
-      "贴一个商品页链接，自动抓取标题/价格/商品图（解析优先级 schema.org JSON-LD > OpenGraph > Twitter Card > 标题/meta），可一键建带货项目并下载前几张商品图。带货成片的「链接优先」入口。不需要 LLM；对带标准 OG/JSON-LD 标签的页面（Shopify、独立站、TikTok Shop 等）支持最好，部分平台有反爬可能解析不全。",
+      "贴一个商品页链接，自动抓取标题/价格/商品图（解析优先级 schema.org JSON-LD > OpenGraph > Twitter Card > 标题/meta），可一键建带货项目并下载前几张商品图。带货成片的「链接优先」入口。返回 projectId、解析出的商品信息与已下载商品图列表。不需要 LLM；对带标准 OG/JSON-LD 标签的页面（Shopify、独立站、TikTok Shop 等）支持最好，部分平台有反爬可能解析不全。",
     inputSchema: {
       type: "object",
       properties: {
@@ -243,7 +249,7 @@ const TOOLS = [
           enum: ["pain_point", "scene", "comparison", "story", "auto"],
           description: "脚本风格：痛点种草/场景安利/对比测评/剧情故事，默认 auto（按历史转化数据智能推荐）",
         },
-        durationSec: { type: "number", description: "目标时长（秒），默认 30" },
+        durationSec: { type: "number", description: "目标时长（秒），默认 30，建议 15-60" },
         category: {
           type: "string",
           enum: ["beauty", "food", "home", "fashion", "tech", "other"],
@@ -262,7 +268,7 @@ const TOOLS = [
       properties: {
         topic: { type: "string", description: "一句话主题" },
         narrationStyle: { type: "string", enum: NARRATION_STYLES, description: "旁白风格，默认 knowledge" },
-        durationSec: { type: "number", description: "目标时长（秒），默认 25" },
+        durationSec: { type: "number", description: "目标时长（秒），默认 25，建议 15-60" },
       },
       required: ["topic"],
     },
@@ -270,7 +276,7 @@ const TOOLS = [
   {
     name: "clipforge_search_stock",
     description:
-      "从免费可商用素材库检索画面（keyless Openverse 图片优先；配了 Pexels/Pixabay Key 的实例还会聚合视频）。检索词建议英文。不需要 LLM。",
+      "从免费可商用素材库检索画面（keyless Openverse 图片优先；配了 Pexels/Pixabay Key 的实例还会聚合视频）。返回候选列表（title/provider/license/author/预览图与来源页链接），只检索不下载——用于人工挑素材或核对授权；自动配画面无需先调它（create_video/compose 内置逐镜配片）。检索词建议英文。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
@@ -283,7 +289,7 @@ const TOOLS = [
   },
   {
     name: "clipforge_list_projects",
-    description: "列出 ClipForge 里的项目（id / 名称 / 类型 / 状态）。不需要 LLM。",
+    description: "列出 ClipForge 里的项目。返回项目数组（id / 名称 / 类型 / 状态 / 主题），后续工具的 projectId 从这里取。不需要 LLM。",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -293,7 +299,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID（来自 list_projects / generate_script）" },
+        projectId: PROJECT_ID_PROP,
         autoFillStock: { type: "boolean", description: "合成前是否先自动从免费素材库配齐缺画面的分镜，默认 true" },
         footage: { type: "string", enum: FOOTAGE_KINDS, description: "自动配画面的类型，默认 auto" },
         ...OUTPUT_OPTION_PROPS,
@@ -303,23 +309,23 @@ const TOOLS = [
   },
   {
     name: "clipforge_list_voices",
-    description: "列出可用的免费 Edge TTS 多语言音色（中/英/日/韩/西，含 value/label/gender/lang）及默认音色，供 create_video / compose 的 voice 参数选用。不需要 LLM。",
+    description: "列出可用的免费 Edge TTS 多语言音色（中/英/日/韩/西）。返回音色数组（value/label/gender/lang）与默认音色，create_video / compose 的 voice 参数只能从这里选。不需要 LLM。",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "clipforge_get_video",
     description:
-      "查询某项目最新一次合成的视频结果（状态 / 可下载地址），不触发重新合成——用于轮询 create_video/compose 的异步产物或取回此前做过的视频。不需要 LLM。",
+      "查询某项目最新一次合成的视频结果，不触发重新合成——用于轮询 create_video/compose 的异步产物或取回此前做过的视频。返回状态（composing/done/failed/none）与可下载的 mp4 地址。不需要 LLM。",
     inputSchema: {
       type: "object",
-      properties: { projectId: { type: "string", description: "项目 ID" } },
+      properties: { projectId: PROJECT_ID_PROP },
       required: ["projectId"],
     },
   },
   {
     name: "clipforge_trends",
     description:
-      "拉某地区每日热搜，建议「该做什么主题」（含热度 + 相关新闻背景），可直接当 clipforge_create_video 的 topic。免 Key，不需要 LLM。",
+      "拉某地区每日热搜，建议「该做什么主题」。返回话题数组（含热度 + 相关新闻背景），条目可直接当 clipforge_create_video 的 topic。免 Key，不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: { geo: { type: "string", description: "地区两字母码，如 US/JP/GB，默认 US（en 系国家覆盖最全）" } },
@@ -328,11 +334,11 @@ const TOOLS = [
   {
     name: "clipforge_import_script",
     description:
-      "把你已经写好的整段旁白导入某项目，自动切成分镜（免 AI 生成），之后用 clipforge_compose 出片。配合本地素材即「自带稿子+自带素材」全自主成片。不需要 LLM。",
+      "把你已经写好的整段旁白导入某项目，自动切成分镜（免 AI 生成），之后用 clipforge_compose 出片。配合本地素材即「自带稿子+自带素材」全自主成片。返回 scriptId 与切出的分镜数。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID（来自 list_projects）" },
+        projectId: PROJECT_ID_PROP,
         script: { type: "string", description: "你写好的整段旁白文案" },
         title: { type: "string", description: "可选标题" },
       },
@@ -346,8 +352,8 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
-        targetLang: { type: "string", description: "目标语种码，如 en/ja/ko/es" },
+        projectId: PROJECT_ID_PROP,
+        targetLang: { type: "string", description: "目标语种码，如 en。免费音色覆盖 en/ja/ko/es/zh，其它语种可译出但需自备音色" },
       },
       required: ["projectId", "targetLang"],
     },
@@ -355,11 +361,11 @@ const TOOLS = [
   {
     name: "clipforge_cover",
     description:
-      "从某项目最新成片抽一帧 + 叠加大标题生成封面图/缩略图（提升点击率）。需先合成过视频。不需要 LLM。",
+      "从某项目最新成片抽一帧 + 叠加大标题生成封面图/缩略图（提升点击率）。返回封面 PNG 地址。需先合成过视频。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         title: { type: "string", description: "封面标题（短而吸睛）" },
         position: { type: "string", enum: ["center", "lower", "upper"], description: "标题位置，默认 center" },
         frameAt: { type: "number", description: "抽帧位置（秒），默认 1" },
@@ -370,11 +376,11 @@ const TOOLS = [
   {
     name: "clipforge_shop_qr",
     description:
-      "为某项目的商品链接生成「扫码购买」二维码 PNG（可放片尾引导转化）。编码的链接自动打 UTM 追踪参数（utm_source=平台、campaign=clipforge）。项目需已有商品链接（ingest 商品链接会自动保留），或用 url 传入。不需要 LLM。",
+      "为某项目的商品链接生成「扫码购买」二维码 PNG（可放片尾引导转化）。编码的链接自动打 UTM 追踪参数（utm_source=平台、campaign=clipforge）。返回二维码 PNG 地址与实际编码的 shopLink。项目需已有商品链接（ingest 商品链接会自动保留），或用 url 传入。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         url: { type: "string", description: "商品链接（不填则用项目已存的 shopUrl）" },
         platform: { type: "string", description: "投放平台（作为 utm_source，如 douyin/tiktok/xiaohongshu）" },
         size: { type: "number", description: "二维码边长像素，默认 512" },
@@ -385,11 +391,11 @@ const TOOLS = [
   {
     name: "clipforge_end_card",
     description:
-      "把「扫码购买」二维码烧进某项目最新成片的片尾最后几秒（后处理，不改合成管线），输出新 mp4，引导扫码转化。二维码编码项目商品链接（UTM 追踪）。需先合成过视频、且项目有商品链接（或用 url 传入）。CTA 文字默认关闭（易与视频自带贴片重叠），可 ctaText 开启。不需要 LLM。",
+      "把「扫码购买」二维码烧进某项目最新成片的片尾最后几秒（后处理，不改合成管线），引导扫码转化。二维码编码项目商品链接（UTM 追踪）。返回处理后的新 mp4 地址与 shopLink（不覆盖原片）。需先合成过视频、且项目有商品链接（或用 url 传入）。CTA 文字默认关闭（易与视频自带贴片重叠），可 ctaText 开启。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         url: { type: "string", description: "商品链接（不填则用项目已存的 shopUrl）" },
         platform: { type: "string", description: "投放平台（作为 utm_source）" },
         seconds: { type: "number", description: "片尾展示二维码的秒数，默认 3" },
@@ -405,7 +411,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         platform: { type: "string", enum: ["douyin", "kuaishou", "xiaohongshu", "shipinhao", "tiktok", "reels", "shorts"], description: "目标平台" },
       },
       required: ["projectId", "platform"],
@@ -418,7 +424,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         compositionId: { type: "string", description: "指定要质检的合成 ID（不填则用最新一次合成）" },
       },
       required: ["projectId"],
@@ -431,7 +437,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         compositionId: { type: "string", description: "指定要检查的合成 ID（不填则用最新一次成功合成）" },
         strict: { type: "boolean", description: "严格模式：warn 也视为拦截（ok=false），投流前建议开" },
       },
@@ -445,7 +451,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
       },
       required: ["projectId"],
     },
@@ -453,11 +459,11 @@ const TOOLS = [
   {
     name: "clipforge_native_feel",
     description:
-      "把某项目最新成片重渲成「原生实拍感」（后处理，不改合成管线）：手持微抖动（确定性正弦驱动，可用 seed 让 A/B 变体动线不同）+ 轻颗粒 + 轻微去精致化调色。应对 2026 平台对「过度精致 AI 感」内容的降权，让 AI 成片更像手机实拍。输出新 mp4。需先合成过视频。不需要 LLM。",
+      "把某项目最新成片重渲成「原生实拍感」（后处理，不改合成管线）：手持微抖动（确定性正弦驱动，可用 seed 让 A/B 变体动线不同）+ 轻颗粒 + 轻微去精致化调色。应对 2026 平台对「过度精致 AI 感」内容的降权，让 AI 成片更像手机实拍。返回处理后的新 mp4 地址（不覆盖原片）。需先合成过视频。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         strength: { type: "string", enum: ["subtle", "medium"], description: "力度：subtle 轻微(默认) / medium 明显手持感" },
         seed: { type: "number", description: "抖动相位种子（不同变体传不同值避免动线一致）" },
         grain: { type: "boolean", description: "是否加颗粒，默认 true" },
@@ -469,11 +475,11 @@ const TOOLS = [
   {
     name: "clipforge_preview_gif",
     description:
-      "从某项目最新成片切一小段转成循环 GIF 预览（分享 / 嵌入 / 列表 hover 用）。需先合成过视频。不需要 LLM。",
+      "从某项目最新成片切一小段转成循环 GIF 预览（分享 / 嵌入 / 列表 hover 用）。返回 GIF 地址。需先合成过视频。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         startSec: { type: "number", description: "起始秒，默认 0" },
         durationSec: { type: "number", description: "时长秒（1-10），默认 4" },
         width: { type: "number", description: "宽度 px，默认 360" },
@@ -484,11 +490,11 @@ const TOOLS = [
   {
     name: "clipforge_contact_sheet",
     description:
-      "把某项目最新成片渲成一张速览图 PNG：默认 smart 模式按真实场景切换抽帧——拼接点缩略图带红框、波形时间轴上红线标出所有检测到的切点，一眼看出黑屏/字幕遮挡/拼接突兀/爆音/静音尾巴。合成后建议调用并查看这张图再告知用户成片可用。proxy=true 额外生成短边≤720、烧录时间码的审片小样 mp4，便于人工按精确时刻反馈。需先合成过视频。不需要 LLM。",
+      "把某项目最新成片渲成一张速览图 PNG：默认 smart 模式按真实场景切换抽帧——拼接点缩略图带红框、波形时间轴上红线标出所有检测到的切点，一眼看出黑屏/字幕遮挡/拼接突兀/爆音/静音尾巴。返回速览图 PNG 地址、切点秒数组 cuts、抽帧时刻 frameTimes（proxy=true 时另含审片小样地址）。合成后建议调用并查看这张图再告知用户成片可用。proxy=true 额外生成短边≤720、烧录时间码的审片小样 mp4，便于人工按精确时刻反馈。需先合成过视频。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         frames: { type: "number", description: "胶片条帧数（4-12），默认 8" },
         thumbWidth: { type: "number", description: "单帧宽度 px（120-320），默认 180" },
         mode: { type: "string", enum: ["smart", "even"], description: "抽帧模式：smart=场景切点优先（默认）；even=均匀抽帧" },
@@ -500,11 +506,11 @@ const TOOLS = [
   {
     name: "clipforge_export_subtitle",
     description:
-      "导出某项目脚本字幕为 SRT 或 WebVTT（二次剪辑 / 平台原生字幕 / 无障碍）。不需要 LLM。",
+      "导出某项目脚本字幕为 SRT 或 WebVTT（二次剪辑 / 平台原生字幕 / 无障碍）。返回字幕文本内容（subtitle 字段，可直接存为 .srt/.vtt 文件）。不需要 LLM。",
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         format: { type: "string", enum: ["srt", "vtt"], description: "字幕格式，默认 srt" },
       },
       required: ["projectId"],
@@ -517,7 +523,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        projectId: { type: "string", description: "项目 ID" },
+        projectId: PROJECT_ID_PROP,
         width: { type: "number", description: "卡片宽 px，默认 1080" },
         height: { type: "number", description: "卡片高 px，默认 1440（3:4）" },
         theme: { type: "string", enum: ["night", "warm", "mint", "mono", "rose"], description: "卡片主题色，默认 night" },
@@ -974,7 +980,7 @@ const HANDLERS = {
 
 // ---- Start MCP server ----
 const server = new Server(
-  { name: "clipforge", version: "0.1.0" },
+  { name: "clipforge", version: "0.1.1" },
   { capabilities: { tools: {} } },
 );
 
@@ -983,7 +989,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const handler = HANDLERS[req.params.name];
   if (!handler) {
-    return { content: [{ type: "text", text: `未知工具：${req.params.name}` }], isError: true };
+    // Name the valid tools so the calling model can self-correct instead of retrying blind
+    return {
+      content: [{ type: "text", text: `未知工具：${req.params.name}。可用工具：${Object.keys(HANDLERS).join("、")}` }],
+      isError: true,
+    };
   }
   try {
     return await handler(req.params.arguments ?? {});

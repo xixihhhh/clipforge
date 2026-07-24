@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.xixihhhh/clipforge",
+  "description": "Drive ClipForge's keyless short-video pipeline (script → free stock footage → free TTS → captions → BGM → FFmpeg compose) from any MCP client — one sentence or a product link becomes a finished vertical video.",
+  "repository": {
+    "url": "https://github.com/xixihhhh/clipforge",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "clipforge-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CLIPFORGE_BASE_URL",
+          "description": "URL of the running ClipForge instance (default http://localhost:3000; start it with `pnpm dev` or `pnpm start`)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "CLIPFORGE_LLM_BASE_URL",
+          "description": "OpenAI-compatible LLM endpoint for script generation (optional — footage and voiceover are keyless without it)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "CLIPFORGE_LLM_API_KEY",
+          "description": "API key for the LLM endpoint (optional, only needed for script generation)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "CLIPFORGE_LLM_MODEL",
+          "description": "LLM model id for script generation (optional, e.g. deepseek-ai/deepseek-v3.2)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

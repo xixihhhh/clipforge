@@ -1,0 +1,28 @@
+{
+  "name": "clipforge",
+  "owner": {
+    "name": "xixihhhh",
+    "url": "https://github.com/xixihhhh"
+  },
+  "plugins": [
+    {
+      "name": "clipforge",
+      "source": "./skills",
+      "description": "AI short-video production: a topic or product link becomes a finished vertical video (script → free stock footage → free TTS → captions → BGM → FFmpeg compose), keyless by default. Installs the clipforge-video skill plus the ClipForge MCP server (clipforge_create_video, clipforge_product_script, clipforge_gate …) targeting your local ClipForge instance. 一句话/商品链接直接出带货短视频。",
+      "version": "0.8.55",
+      "author": { "name": "xixihhhh" },
+      "homepage": "https://github.com/xixihhhh/clipforge",
+      "license": "AGPL-3.0-only",
+      "category": "media",
+      "tags": ["video", "ai-video", "short-video", "tiktok", "douyin", "ecommerce", "ffmpeg", "mcp"],
+      "strict": false,
+      "skills": ["./clipforge-video"],
+      "mcpServers": {
+        "clipforge": {
+          "command": "npx",
+          "args": ["-y", "clipforge-mcp"]
+        }
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 # 发版流水线：push 形如 vX.Y.Z 的 tag 时，在 mac + windows runner 上分别打桌面安装包，
-# 并把 .dmg / .exe 上传到对应的 GitHub Release（即"别人一键下载即用"）。
+# 并把 .dmg / .exe 上传到对应的 GitHub Release（即"别人一键下载即用"）；
+# 另出一份 clipforge-skill.zip（zip 根即 skill 文件夹，可直接上传 claude.ai 的 Skills 面板）。
 name: Release Desktop
 
 on:
@@ -66,5 +67,26 @@ jobs:
             - **Windows (x64)**: download the `.exe` installer. ⚠️ The Windows build is auto-generated and untested — feedback welcome.
 
             On first launch, app data is stored under your user directory (macOS: `~/Library/Application Support/ClipForge`).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Agent-skill bundle for claude.ai: the zip root must be the skill folder itself
+  # (clipforge-video/SKILL.md), matching claude.ai's upload requirement.
+  skill-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 打包 agent skill（clipforge-skill.zip）
+        run: cd skills && zip -r ../clipforge-skill.zip clipforge-video
+
+      - name: 上传 skill zip 到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: clipforge-skill.zip
+          fail_on_unmatched_files: true
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

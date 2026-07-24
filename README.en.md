@@ -19,6 +19,7 @@
   <img src="https://img.shields.io/badge/Tailwind-4-06B6D4?style=flat-square&logo=tailwindcss" alt="Tailwind CSS 4" />
   <img src="https://img.shields.io/badge/FFmpeg-compositing-007808?style=flat-square&logo=ffmpeg" alt="FFmpeg" />
   <img src="https://img.shields.io/badge/AI-multi--model-FF6F00?style=flat-square" alt="AI Multi-Model" />
+  <a href="https://skills.sh/xixihhhh/clipforge"><img src="https://skills.sh/b/xixihhhh/clipforge" alt="Agent Skill installs" /></a>
 </p>
 
 ## 🛍️ Not just another AI video tool — **built for selling**
@@ -35,7 +36,7 @@ There's no shortage of AI short-video tools, but most can't really sell: **they 
 - **Truly free, zero-key**: free stock assets (Openverse images + **Wikimedia real footage**) + free Microsoft Edge TTS voiceover (Chinese / English / Japanese / Korean / Spanish — native pronunciation for going global) + free background music + local FFmpeg compositing — **you can render a full video without any AI key.**
 - **No watermark · local & private**: self-hosted, open-source (AGPL-3.0). Your product images / projects / keys all stay on your own machine — nothing is uploaded to any cloud.
 - **Add a key for higher quality**: one interface aggregates **7** image/video platforms and 30+ models (GPT Image 2 / Seedance 2.0 / Kling 3.0 …).
-- **Callable by AI agents**: a built-in **MCP Server** (`clipforge_product_script` turns a **product link straight into a sales script** in one call) + a **CLI** (`clipforge product --url "…" --compose` goes link → finished video in one command) + an **agent Skill** ([skills/clipforge](skills/clipforge/SKILL.md) — teaches an assistant the whole pipeline; just say *"make a 9:16 from this product link"*; **to install, paste the one-line Setup prompt from [skills/README](skills/README.md) to your agent** and it installs everything itself); bilingual UI (中文 / English).
+- **Callable by AI agents**: a built-in **MCP Server** (`clipforge_product_script` turns a **product link straight into a sales script** in one call) + a **CLI** (`clipforge product --url "…" --compose` goes link → finished video in one command) + an **agent Skill** ([skills/clipforge-video](skills/clipforge-video/SKILL.md) — teaches an assistant the whole pipeline; just say *"make a 9:16 from this product link"*; install via `npx skills add xixihhhh/clipforge`, or Claude Code's `/plugin marketplace add xixihhhh/clipforge` for skill + MCP in one, or **paste the one-line Setup prompt from [skills/README](skills/README.md) to your agent** and it installs everything itself); bilingual UI (中文 / English).
 
 ## ✅ Compliance-first by default (ship to China without getting throttled)
 

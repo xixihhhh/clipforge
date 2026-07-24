@@ -1,17 +1,27 @@
 ---
 name: clipforge-video
 description: Create short vertical videos (TikTok / Reels / Shorts / 抖音 / 快手 / 小红书) from a topic, a product link/image, or a script you already wrote. ClipForge runs the full pipeline — script → footage → voiceover → subtitles → BGM → compose — with a free, no-API-key path (free stock + Edge TTS + local FFmpeg). Use when the user wants to turn an idea, product, or written narration into a finished short video. Pipeline-correctness rules are hard; everything creative is your call.
-version: 0.8.54
 license: AGPL-3.0-only
-homepage: https://github.com/xixihhhh/clipforge
-keywords: [ai-video, faceless-video, text-to-video, tiktok, reels, shorts, 抖音, 快手, 小红书, product-video, tiktok-shop, ugc, ffmpeg, edge-tts]
+compatibility: Requires a running local ClipForge instance (Node 20+, FFmpeg). Designed for Claude Code and other local coding agents — web sandboxes cannot reach the local pipeline.
+metadata:
+  {
+    "version": "0.8.55",
+    "homepage": "https://github.com/xixihhhh/clipforge",
+    "keywords": "ai-video, faceless-video, text-to-video, tiktok, reels, shorts, 抖音, 快手, 小红书, product-video, tiktok-shop, ugc, ffmpeg, edge-tts",
+    "openclaw":
+      {
+        "emoji": "🎬",
+        "homepage": "https://github.com/xixihhhh/clipforge",
+        "requires": { "bins": ["node", "ffmpeg"] },
+      },
+  }
 ---
 
 # ClipForge — AI short-video production
 
 ClipForge produces a finished vertical short video end to end. You drive it through its **MCP tools** (preferred), its **CLI**, or its **HTTP API**. The free path needs no API keys; only AI script generation needs one LLM key.
 
-**Install this skill:** copy this folder into your assistant's skills directory — e.g. `cp -r skills/clipforge ~/.claude/skills/` (or your project's `.claude/skills/`). See [../README.md](../README.md) for per-assistant paths (Claude Code / Cursor / Copilot / Windsurf).
+**Install this skill:** `npx skills add xixihhhh/clipforge` (works across 70+ agent hosts), or copy this folder into your assistant's skills directory — e.g. `cp -r skills/clipforge-video ~/.claude/skills/` (or your project's `.claude/skills/`). Claude Code can also `/plugin marketplace add xixihhhh/clipforge` to install the skill and the ClipForge MCP server together. See [../README.md](../README.md) for per-assistant paths (Claude Code / Cursor / Copilot / Windsurf).
 
 ## Hard rules
 

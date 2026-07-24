@@ -23,8 +23,8 @@ Drive ClipForge's text-to-video pipeline from any MCP client (Claude Desktop / C
 > 素材（Openverse）与配音（微软 Edge TTS）全程 **免 Key**；只有「生成脚本」需要一个 OpenAI 兼容的 LLM Key。
 > Stock footage (Openverse) and voiceover (Edge TTS) are **key-less**; only script generation needs an OpenAI-compatible LLM key.
 
-> **出片后工具**（同为 MCP 工具，交付前把关/变现增强）：发布门禁 `clipforge_gate`（脚本就绪+质检+授权一键体检，`fail` 别交付）、成片质检 `clipforge_qc`、成片速览 `clipforge_contact_sheet`（agent 看图自检）、素材授权 `clipforge_credits`、平台导出 `clipforge_export_platform`、原生感 `clipforge_native_feel`、封面/图文卡/二维码/片尾扫码/译制等——完整清单与交付检查单见 [`skills/clipforge/SKILL.md`](../skills/clipforge/SKILL.md)。
-> **Post-compose tools** (also MCP tools): release gate `clipforge_gate` (readiness + QC + licensing in one verdict — don't deliver on `fail`), `clipforge_qc`, `clipforge_contact_sheet` (visual self-check), `clipforge_credits`, `clipforge_export_platform`, `clipforge_native_feel`, plus cover/carousel/QR/end-card/dub — full list and the delivery checklist live in [`skills/clipforge/SKILL.md`](../skills/clipforge/SKILL.md).
+> **出片后工具**（同为 MCP 工具，交付前把关/变现增强）：发布门禁 `clipforge_gate`（脚本就绪+质检+授权一键体检，`fail` 别交付）、成片质检 `clipforge_qc`、成片速览 `clipforge_contact_sheet`（agent 看图自检）、素材授权 `clipforge_credits`、平台导出 `clipforge_export_platform`、原生感 `clipforge_native_feel`、封面/图文卡/二维码/片尾扫码/译制等——完整清单与交付检查单见 [`skills/clipforge-video/SKILL.md`](../skills/clipforge-video/SKILL.md)。
+> **Post-compose tools** (also MCP tools): release gate `clipforge_gate` (readiness + QC + licensing in one verdict — don't deliver on `fail`), `clipforge_qc`, `clipforge_contact_sheet` (visual self-check), `clipforge_credits`, `clipforge_export_platform`, `clipforge_native_feel`, plus cover/carousel/QR/end-card/dub — full list and the delivery checklist live in [`skills/clipforge-video/SKILL.md`](../skills/clipforge-video/SKILL.md).
 
 > **成片选项**：`create_video` / `compose` 支持 `voice`（多语言音色，见 `clipforge_list_voices`；`create_video` 不指定则按主题语言自动挑，英文主题→英文音色）、`aspectRatio`（`9:16` 竖屏默认 / `16:9` / `1:1`）、`quality`（`fast` / `standard` / `hd`）、`bgm`（`true` 自动加一段免费 CC 背景音乐，混在旁白下方自动压低；来源 Wikimedia Commons，CC 多需署名）。一个画面都没配到时 `create_video` 会直接返回可操作的提示而非空白片。
 > **Output options**: `create_video` / `compose` accept `voice` (multilingual — zh/en/ja/ko/es; `create_video` auto-picks one matching the topic's language when unset, e.g. an English topic gets an English voice), `aspectRatio` (`9:16` default / `16:9` / `1:1`), `quality` (`fast`/`standard`/`hd`) and `bgm` (`true` = add free CC background music, ducked under the voiceover).
@@ -99,18 +99,15 @@ claude mcp add clipforge -- node /绝对路径/clipforge/mcp/clipforge-mcp.mjs
 
 让任意 MCP 客户端 `npx` 即装，并被 Glama / Smithery / PulseMCP 等生态自动收录（本仓库已备好 `mcp/package.json`）：
 
-```bash
-# 1) 发布 npm 包（在 mcp/ 目录，用你的 npm 账号）
-cd mcp && npm publish --access public
-#   若 clipforge-mcp 名被占用，把 package.json 的 name 改成 @xixihhhh/clipforge-mcp 再发
+`mcp/package.json` 已带 registry 归属验证字段 `mcpName: io.github.xixihhhh/clipforge`，`mcp/server.json`（2025-12-11 schema）也已备好——发布只剩三条命令：
 
-# 2) 发布到官方 MCP Registry（registry.modelcontextprotocol.io）
-#   装 mcp-publisher，生成并校验「当前 schema」的 server.json：
-mcp-publisher init
-#   编辑 server.json：name 用 io.github.xixihhhh/clipforge（GitHub OAuth 自动验证归属、免 DNS），
-#   packages 指向 npm 包 clipforge-mcp，环境变量按上表补全（均可选）
-mcp-publisher login github
-mcp-publisher publish
+```bash
+# 1) 发布 npm 包（在 mcp/ 目录，用你的 npm 账号；registry 校验 npm 包里必须含 mcpName，已就位）
+cd mcp && npm publish --access public
+#   若 clipforge-mcp 名被占用，把 package.json 的 name 改成 @xixihhhh/clipforge-mcp，并同步 server.json 的 packages[].identifier
+
+# 2) 发布到官方 MCP Registry（registry.modelcontextprotocol.io；brew install mcp-publisher）
+cd mcp && mcp-publisher login github && mcp-publisher publish
 ```
 
 ## 试一试 / Try it
