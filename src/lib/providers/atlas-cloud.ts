@@ -63,6 +63,45 @@ interface AtlasPrediction {
   [key: string]: unknown
 }
 
+// ==================== Model catalog ====================
+
+/**
+ * Static model catalog, confirmed from the Atlas Cloud official model list
+ * (2026-06, verified via official MCP). Module-level so both listModels()
+ * and the mode-capability guard share one source of truth.
+ */
+const ATLAS_MODELS: Array<Omit<Model, 'provider'>> = [
+  // ==================== Video generation ====================
+  // --- Doubao Seedance 2.0 (latest, native audio) ---
+  { id: 'bytedance/seedance-2.0/text-to-video', name: 'Seedance 2.0 (文生视频)', description: '字节最新视频模型，原生音频，4-15秒，最高1440p', modes: ['text-to-video'], mediaType: 'video', supportsAudio: true },
+  { id: 'bytedance/seedance-2.0/image-to-video', name: 'Seedance 2.0 (图生视频)', description: '首帧/尾帧图生视频，原生音频', modes: ['image-to-video'], mediaType: 'video', supportsAudio: true },
+  { id: 'bytedance/seedance-2.0/reference-to-video', name: 'Seedance 2.0 (参考生视频)', description: '多模态参考图/视频/音频生成，支持视频编辑', modes: ['image-to-video', 'video-to-video'], mediaType: 'video', supportsAudio: true },
+  { id: 'bytedance/seedance-2.0-fast/text-to-video', name: 'Seedance 2.0 Fast (文生视频)', description: 'Seedance 2.0 快速版，原生音频', modes: ['text-to-video'], mediaType: 'video', supportsAudio: true },
+  { id: 'bytedance/seedance-2.0-fast/image-to-video', name: 'Seedance 2.0 Fast (图生视频)', description: 'Seedance 2.0 快速版图生视频', modes: ['image-to-video'], mediaType: 'video', supportsAudio: true },
+  // --- Doubao Seedance 1.5 ---
+  { id: 'bytedance/seedance-v1.5-pro/text-to-video', name: 'Seedance 1.5 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', supportsAudio: true },
+  { id: 'bytedance/seedance-v1.5-pro/image-to-video', name: 'Seedance 1.5 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', supportsAudio: true },
+  // --- Kling 3.0 ---
+  { id: 'kwaivgi/kling-v3.0-pro/text-to-video', name: 'Kling 3.0 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video' },
+  { id: 'kwaivgi/kling-v3.0-pro/image-to-video', name: 'Kling 3.0 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video' },
+  { id: 'kwaivgi/kling-v3.0-std/text-to-video', name: 'Kling 3.0 Std (文生视频)', modes: ['text-to-video'], mediaType: 'video' },
+  { id: 'kwaivgi/kling-v3.0-std/image-to-video', name: 'Kling 3.0 Std (图生视频)', modes: ['image-to-video'], mediaType: 'video' },
+  // --- Vidu Q3 ---
+  { id: 'vidu/q3-pro/text-to-video', name: 'Vidu Q3 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video' },
+  { id: 'vidu/q3-pro/image-to-video', name: 'Vidu Q3 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video' },
+  { id: 'vidu/q3-pro/start-end-to-video', name: 'Vidu Q3 Pro (首尾帧过渡)', description: '指定首尾帧生成过渡视频', modes: ['image-to-video'], mediaType: 'video' },
+  { id: 'vidu/q3-turbo/image-to-video', name: 'Vidu Q3 Turbo (图生视频)', modes: ['image-to-video'], mediaType: 'video' },
+  // --- Wan (Wanxiang) ---
+  { id: 'alibaba/wan-2.6/image-to-video-flash', name: '万相 2.6 Flash (图生视频)', modes: ['image-to-video'], mediaType: 'video' },
+  // ==================== Image generation ====================
+  // --- OpenAI GPT Image 2 (latest) ---
+  { id: 'openai/gpt-image-2/text-to-image', name: 'GPT Image 2 (文生图)', description: 'OpenAI 最新生图模型，支持任意分辨率，商品图质感好', modes: ['text-to-image'], mediaType: 'image' },
+  { id: 'openai/gpt-image-2/edit', name: 'GPT Image 2 (图片编辑)', description: '自然语言精准编辑：换背景、调光线、改文字', modes: ['image-to-image'], mediaType: 'image' },
+  // --- Other image generation models ---
+  { id: 'bytedance/seedream-v5.0-lite', name: 'Seedream 5.0 Lite (文生图)', modes: ['text-to-image'], mediaType: 'image' },
+  { id: 'google/nano-banana-2/text-to-image', name: 'Nano Banana 2 (文生图)', modes: ['text-to-image'], mediaType: 'image' },
+]
+
 // ==================== Provider implementation ====================
 
 export class AtlasCloudProvider extends BaseProvider {
@@ -118,9 +157,15 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * Generate a video
+   * Submit a video generation task without waiting for the result (two-phase mode).
+   * Validates/remaps the model against the requested mode BEFORE any billable call,
+   * and returns the provider task ID as soon as Atlas acknowledges the task so the
+   * caller can persist it before polling (issue #16).
    */
-  async generateVideo(options: VideoOptions): Promise<VideoResult> {
+  async submitVideoTask(options: VideoOptions): Promise<{ taskId: string; modelId: string }> {
+    // mode-capability guard: never bill a text-to-video model for an image-to-video request
+    const modelId = this.resolveVideoModel(options)
+
     // models that support audio (e.g. Seedance 2.0) embed the voiceover copy into the prompt
     let prompt = options.prompt
     if (options.audioEnabled && options.voiceover) {
@@ -128,7 +173,7 @@ export class AtlasCloudProvider extends BaseProvider {
     }
 
     const body = {
-      model: options.modelId,
+      model: modelId,
       prompt,
       // first frame for image-to-video mode
       ...(options.firstFrameUrl && { image: options.firstFrameUrl }),
@@ -147,13 +192,25 @@ export class AtlasCloudProvider extends BaseProvider {
       ...options.extra,
     }
 
-    const startTime = Date.now()
+    // Task-creating POST: base.request() will NOT auto-retry it on timeout/network errors
+    // (money safety, issue #16). Longer timeout than the 30s default — a slow acknowledge
+    // must not be misreported as failure when the server may have accepted the task.
     const response = await this.request<AtlasCreateResponse>('/model/generateVideo', {
       method: 'POST',
       body,
+      timeout: 60000,
     })
 
-    const taskId = this.extractTaskId(response)
+    return { taskId: this.extractTaskId(response), modelId }
+  }
+
+  /**
+   * Generate a video (submit + wait). Prefer submitVideoTask + waitForTask when the
+   * caller can persist the task ID in between.
+   */
+  async generateVideo(options: VideoOptions): Promise<VideoResult> {
+    const startTime = Date.now()
+    const { taskId, modelId } = await this.submitVideoTask(options)
 
     // video generation takes longer; use a longer polling interval
     const finalStatus = await this.pollTaskStatus(taskId, { interval: 5000 })
@@ -165,7 +222,7 @@ export class AtlasCloudProvider extends BaseProvider {
       videoUrls: outputs,
       duration: options.duration,
       processingTime: Date.now() - startTime,
-      modelId: options.modelId,
+      modelId,
       hasAudio: options.audioEnabled ?? false,
     }
   }
@@ -217,42 +274,10 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   /**
-   * List available models
-   * Confirmed from Atlas Cloud official model list (2026-06, verified via official MCP)
+   * List available models (from the shared static catalog)
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    let models: Model[] = [
-      // ==================== Video generation ====================
-      // --- Doubao Seedance 2.0 (latest, native audio) ---
-      { id: 'bytedance/seedance-2.0/text-to-video', name: 'Seedance 2.0 (文生视频)', description: '字节最新视频模型，原生音频，4-15秒，最高1440p', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      { id: 'bytedance/seedance-2.0/image-to-video', name: 'Seedance 2.0 (图生视频)', description: '首帧/尾帧图生视频，原生音频', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      { id: 'bytedance/seedance-2.0/reference-to-video', name: 'Seedance 2.0 (参考生视频)', description: '多模态参考图/视频/音频生成，支持视频编辑', modes: ['image-to-video', 'video-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      { id: 'bytedance/seedance-2.0-fast/text-to-video', name: 'Seedance 2.0 Fast (文生视频)', description: 'Seedance 2.0 快速版，原生音频', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      { id: 'bytedance/seedance-2.0-fast/image-to-video', name: 'Seedance 2.0 Fast (图生视频)', description: 'Seedance 2.0 快速版图生视频', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      // --- Doubao Seedance 1.5 ---
-      { id: 'bytedance/seedance-v1.5-pro/text-to-video', name: 'Seedance 1.5 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      { id: 'bytedance/seedance-v1.5-pro/image-to-video', name: 'Seedance 1.5 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name, supportsAudio: true },
-      // --- Kling 3.0 ---
-      { id: 'kwaivgi/kling-v3.0-pro/text-to-video', name: 'Kling 3.0 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'kwaivgi/kling-v3.0-pro/image-to-video', name: 'Kling 3.0 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'kwaivgi/kling-v3.0-std/text-to-video', name: 'Kling 3.0 Std (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'kwaivgi/kling-v3.0-std/image-to-video', name: 'Kling 3.0 Std (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      // --- Vidu Q3 ---
-      { id: 'vidu/q3-pro/text-to-video', name: 'Vidu Q3 Pro (文生视频)', modes: ['text-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'vidu/q3-pro/image-to-video', name: 'Vidu Q3 Pro (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'vidu/q3-pro/start-end-to-video', name: 'Vidu Q3 Pro (首尾帧过渡)', description: '指定首尾帧生成过渡视频', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      { id: 'vidu/q3-turbo/image-to-video', name: 'Vidu Q3 Turbo (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      // --- Wan (Wanxiang) ---
-      { id: 'alibaba/wan-2.6/image-to-video-flash', name: '万相 2.6 Flash (图生视频)', modes: ['image-to-video'], mediaType: 'video', provider: this.name },
-      // ==================== Image generation ====================
-      // --- OpenAI GPT Image 2 (latest) ---
-      { id: 'openai/gpt-image-2/text-to-image', name: 'GPT Image 2 (文生图)', description: 'OpenAI 最新生图模型，支持任意分辨率，商品图质感好', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
-      { id: 'openai/gpt-image-2/edit', name: 'GPT Image 2 (图片编辑)', description: '自然语言精准编辑：换背景、调光线、改文字', modes: ['image-to-image'], mediaType: 'image', provider: this.name },
-      // --- Other image generation models ---
-      { id: 'bytedance/seedream-v5.0-lite', name: 'Seedream 5.0 Lite (文生图)', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
-      { id: 'google/nano-banana-2/text-to-image', name: 'Nano Banana 2 (文生图)', modes: ['text-to-image'], mediaType: 'image', provider: this.name },
-    ]
-
+    let models: Model[] = ATLAS_MODELS.map((m) => ({ ...m, provider: this.name }))
     if (mediaType) {
       models = models.filter((m) => m.mediaType === mediaType)
     }
@@ -260,6 +285,62 @@ export class AtlasCloudProvider extends BaseProvider {
   }
 
   // ==================== Private methods ====================
+
+  /**
+   * Validate the requested video model against the actual generation intent, remapping to
+   * the matching sibling variant when possible. Atlas model IDs follow `family/model/mode`,
+   * so the text-to-video and image-to-video variants of one family differ only in the last
+   * segment — but they are DIFFERENT billable endpoints.
+   *
+   * Root cause of issue #16: the default video model auto-picked in settings is a
+   * text-to-video variant, and submitting it with a first-frame image silently billed
+   * text-to-video while the user clicked "convert image to motion". Now:
+   * - first frame present + t2v-only model → remap to the sibling image-to-video model
+   *   (throw before submitting if no sibling exists);
+   * - image-to-video mode requested but no first frame available → throw before submitting;
+   * - unknown/custom model IDs pass through unchanged (nothing to validate against).
+   */
+  private resolveVideoModel(options: VideoOptions): string {
+    const { modelId, firstFrameUrl } = options
+    const catalog = new Map(ATLAS_MODELS.map((m) => [m.id, m]))
+    const entry = catalog.get(modelId)
+
+    // image-to-video was requested but no usable first frame reached the provider —
+    // submitting anyway would bill a video unrelated to the user's image
+    if (options.mode === 'image-to-video' && !firstFrameUrl) {
+      throw new ProviderError(
+        `图生视频缺少首帧图片：请确认图片已生成且可访问（模型 ${modelId} 未提交，未产生费用）`,
+        'MISSING_FIRST_FRAME',
+        this.name
+      )
+    }
+
+    if (!entry) return modelId // custom model: no capability info, pass through
+
+    if (firstFrameUrl && !entry.modes.includes('image-to-video')) {
+      // remap to the image-to-video sibling of the same family, e.g.
+      // bytedance/seedance-2.0/text-to-video -> bytedance/seedance-2.0/image-to-video
+      const sibling = modelId.replace(/\/text-to-video$/, '/image-to-video')
+      if (sibling !== modelId && catalog.has(sibling)) {
+        return sibling
+      }
+      throw new ProviderError(
+        `模型 ${modelId} 不支持图生视频，且没有对应的图生视频变体。请在设置中选择带「图生视频」标识的模型（任务未提交，未产生费用）`,
+        'MODEL_MODE_MISMATCH',
+        this.name
+      )
+    }
+
+    if (!firstFrameUrl && !entry.modes.includes('text-to-video')) {
+      throw new ProviderError(
+        `模型 ${modelId} 是图生视频模型，需要首帧图片才能生成（任务未提交，未产生费用）`,
+        'MODEL_MODE_MISMATCH',
+        this.name
+      )
+    }
+
+    return modelId
+  }
 
   /** Extract task ID from the create-task response (compatible with both wrapped and unwrapped formats) */
   private extractTaskId(response: AtlasCreateResponse): string {

@@ -143,6 +143,8 @@ Yes. ClipForge ships an **MCP Server** — one sentence in an MCP-capable client
 ### 2. AI asset generation (multi-model aggregation)
 
 > 🎬 **Image-to-video is the quality path**: with a video model configured, each generated image is **automatically turned into a real moving shot via image-to-video** (the product photo is the first frame, so it stays faithful), replacing the "still + fake pan" look for a big quality lift. Toggle it off anytime; it falls back to the still on failure. With no video model, it uses the 0-cost keyless stitching fallback.
+>
+> 💰 **Paid-task safety** (v0.8.56, fixes [#16](https://github.com/xixihhhh/clipforge/issues/16)): every cloud video task is **persisted with its provider task ID the moment it is accepted** — a poll timeout, network drop, or restart can no longer lose a task you already paid for (the assets page offers "resume query" to retrieve it, preventing duplicate billing); task-creating requests are **never auto-retried** (only on an explicit 429 rejection); image-to-video requests are **validated and mapped to a true i2v model**, so "add motion" can never be billed as text-to-video again.
 
 One interface aggregates 7 image/video platforms + OpenRouter LLMs and 30+ mainstream models:
 

@@ -24,6 +24,12 @@ export class ProviderError extends Error {
   statusCode?: number
   /** Provider name */
   provider: string
+  /**
+   * Provider task ID attached when the error happened AFTER a paid task was already
+   * created (e.g. polling failed). Lets callers persist/recover the task instead of
+   * silently dropping something the user already paid for (issue #16).
+   */
+  taskId?: string
 
   constructor(message: string, code: string, provider: string, statusCode?: number) {
     super(message)
@@ -67,9 +73,21 @@ export abstract class BaseProvider implements AIProvider {
       body?: unknown
       headers?: Record<string, string>
       timeout?: number
+      /**
+       * Whether this request is idempotent (safe to auto-retry).
+       * Defaults to `method === 'GET'`.
+       *
+       * Money-safety rule (issue #16): a POST that creates a billable task must NEVER be
+       * auto-retried on timeout/network errors/5xx — the client aborting says nothing about
+       * whether the server accepted the task, so a blind retry can silently create duplicate
+       * paid jobs. Non-idempotent requests are only retried on HTTP 429, which guarantees the
+       * server rejected the request without processing it.
+       */
+      idempotent?: boolean
     } = {}
   ): Promise<T> {
     const { method = 'GET', body, headers = {}, timeout } = options
+    const idempotent = options.idempotent ?? method === 'GET'
     const url = `${this.config.baseUrl}${path}`
     const requestTimeout = timeout ?? this.config.timeout ?? 30000
 
@@ -81,7 +99,9 @@ export abstract class BaseProvider implements AIProvider {
       ...headers,
     }
 
-    // auto-retry on transient errors (429 rate-limit, 5xx, network failure, timeout), up to 2 retries with exponential backoff
+    // auto-retry on transient errors, up to 2 retries with exponential backoff.
+    // Idempotent requests (GET) retry on 429 / 5xx / network failure / timeout;
+    // non-idempotent requests (task-creating POST) retry ONLY on 429 — see `idempotent` doc above.
     const maxRetries = 2
     let lastError: unknown
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -97,8 +117,9 @@ export abstract class BaseProvider implements AIProvider {
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '')
-          // 429/5xx are retryable transient errors
-          if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
+          // 429 = request rejected before processing, always safe to retry;
+          // 5xx may have side effects on the server, so only idempotent requests retry
+          if ((response.status === 429 || (response.status >= 500 && idempotent)) && attempt < maxRetries) {
             lastError = new ProviderError(
               `API 请求失败: ${response.status} ${response.statusText}`,
               'API_ERROR',
@@ -124,13 +145,19 @@ export abstract class BaseProvider implements AIProvider {
           throw error
         }
         const isTimeout = error instanceof DOMException && error.name === 'AbortError'
+        // For a non-idempotent request, a client-side timeout does NOT mean the server-side
+        // task failed or was never billed — surface that explicitly instead of a bare timeout
+        const timeoutMessage = idempotent
+          ? `请求超时（${requestTimeout}ms）`
+          : `请求超时（${requestTimeout}ms）——注意：服务端可能已受理该任务并计费，请先查询任务状态，不要直接重试提交`
         lastError = isTimeout
-          ? new ProviderError(`请求超时（${requestTimeout}ms）`, 'TIMEOUT', this.name)
+          ? new ProviderError(timeoutMessage, 'TIMEOUT', this.name)
           : error instanceof ProviderError
             ? error
             : new ProviderError(`网络请求异常: ${error instanceof Error ? error.message : String(error)}`, 'NETWORK_ERROR', this.name)
-        // network/timeout/transient errors: back off and retry if attempts remain
-        if (attempt < maxRetries) {
+        // network/timeout errors: only idempotent requests may back off and retry
+        // (a non-idempotent POST could have reached the server — retrying risks duplicate paid tasks)
+        if (idempotent && attempt < maxRetries) {
           await this.sleep(500 * Math.pow(2, attempt))
           continue
         }
@@ -166,6 +193,8 @@ export abstract class BaseProvider implements AIProvider {
       interval?: number
       /** Maximum number of poll attempts, default 200 */
       maxAttempts?: number
+      /** Max consecutive status-query failures tolerated before giving up, default 5 */
+      maxConsecutiveErrors?: number
       /** Terminal state check; defaults to checking for completed/failed/cancelled */
       isTerminal?: (status: TaskStatusEnum) => boolean
     } = {}
@@ -173,19 +202,43 @@ export abstract class BaseProvider implements AIProvider {
     const {
       interval = 3000,
       maxAttempts = 200,
+      maxConsecutiveErrors = 5,
       isTerminal = (s) => ['completed', 'failed', 'cancelled'].includes(s),
     } = options
 
+    // A transient status-query failure must NOT abort the wait: the task keeps running (and
+    // billing) server-side regardless of whether our GET succeeded (issue #16). Only give up
+    // after several consecutive failures, and even then report "status unknown", not "failed".
+    let consecutiveErrors = 0
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const status = await this.getTaskStatus(taskId)
+      let status: TaskStatus
+      try {
+        status = await this.getTaskStatus(taskId)
+        consecutiveErrors = 0
+      } catch (error) {
+        consecutiveErrors++
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          const err = new ProviderError(
+            `任务状态查询连续失败 ${consecutiveErrors} 次（任务 ${taskId} 可能仍在云端执行，未必失败）: ${error instanceof Error ? error.message : String(error)}`,
+            'STATUS_UNKNOWN',
+            this.name
+          )
+          err.taskId = taskId
+          throw err
+        }
+        await this.sleep(interval)
+        continue
+      }
 
       if (isTerminal(status.status)) {
         if (status.status === 'failed') {
-          throw new ProviderError(
+          const err = new ProviderError(
             `任务失败: ${status.error ?? '未知错误'}`,
             status.errorCode ?? 'TASK_FAILED',
             this.name
           )
+          err.taskId = taskId
+          throw err
         }
         return status
       }
@@ -194,11 +247,25 @@ export abstract class BaseProvider implements AIProvider {
       await this.sleep(interval)
     }
 
-    throw new ProviderError(
-      `任务轮询超时，已尝试 ${maxAttempts} 次`,
+    const err = new ProviderError(
+      `任务轮询超时，已尝试 ${maxAttempts} 次（任务 ${taskId} 可能仍在云端执行）`,
       'POLL_TIMEOUT',
       this.name
     )
+    err.taskId = taskId
+    throw err
+  }
+
+  /**
+   * Public wrapper around pollTaskStatus — the two-phase entry point paired with
+   * submitVideoTask (see AIProvider.waitForTask). Kept separate so external callers
+   * (API routes resuming a persisted task) don't need access to the protected poller.
+   */
+  async waitForTask(
+    taskId: string,
+    options: { interval?: number; maxAttempts?: number } = {}
+  ): Promise<TaskStatus> {
+    return this.pollTaskStatus(taskId, options)
   }
 
   /**

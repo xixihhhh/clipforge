@@ -228,6 +228,23 @@ export interface AIProvider {
   getTaskStatus(taskId: string): Promise<TaskStatus>
 
   /**
+   * Submit a video generation task WITHOUT waiting for the result (two-phase mode).
+   * Returns as soon as the provider acknowledges the task, so the caller can persist
+   * the task ID before any polling starts — a poll failure then never loses a paid task
+   * (issue #16). `modelId` is the model actually submitted (may differ from the request
+   * when the provider remaps it, e.g. text-to-video → image-to-video).
+   * Optional: providers without async task support keep using generateVideo only.
+   */
+  submitVideoTask?(options: VideoOptions): Promise<{ taskId: string; modelId: string }>
+
+  /**
+   * Wait for a previously submitted task to finish (companion to submitVideoTask).
+   * Transient status-query failures are tolerated instead of aborting — only a
+   * definitive terminal state (or persistent query failure) ends the wait.
+   */
+  waitForTask?(taskId: string, options?: { interval?: number; maxAttempts?: number }): Promise<TaskStatus>
+
+  /**
    * Get the list of available models
    * @param mediaType Optional media type filter
    * @returns List of models

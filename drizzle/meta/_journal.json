@@ -50,6 +50,13 @@
       "when": 1782919292496,
       "tag": "0006_add_shop_affiliate",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784873148423,
+      "tag": "0007_add_ai_tasks",
+      "breakpoints": true
     }
   ]
 }

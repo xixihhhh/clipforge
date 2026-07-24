@@ -33,6 +33,16 @@ interface ImageModelTarget {
   baseUrl?: string;
 }
 
+// persisted cloud AI task row (from /api/ai/tasks, issue #16 recovery flow)
+interface PendingAiTask {
+  id: string;
+  shotId: number | null;
+  provider: string;
+  model: string;
+  taskId: string;
+  status: "submitted" | "processing" | "completed" | "failed" | "unknown";
+}
+
 // shot types that "feature the product": when product fidelity is enabled, these AI shots use image-to-image (redraw with product photo to lock in the subject)
 const PRODUCT_SHOT_TYPES = new Set(["product_reveal", "demo", "cta"]);
 
@@ -73,6 +83,11 @@ export default function AssetsPage() {
   // state for "auto-fill visuals (free stock)" feature
   const [isFillingStock, setIsFillingStock] = useState(false);
   const [stockMsg, setStockMsg] = useState<string | null>(null);
+  // cloud paid tasks with unretrieved results (issue #16): submitted/processing/unknown rows
+  // persisted server-side the moment the provider acknowledged the task
+  const [pendingTasks, setPendingTasks] = useState<PendingAiTask[]>([]);
+  const [resumingTasks, setResumingTasks] = useState<Set<string>>(new Set());
+  const [taskMsg, setTaskMsg] = useState<string | null>(null);
 
   const doneCount = assets.filter((a) => a.status === "done").length;
   const allDone = assets.length > 0 && doneCount === assets.length;
@@ -291,6 +306,92 @@ export default function AssetsPage() {
     };
   }, [providers, defaultVideoModel, customModels]);
 
+  // load cloud tasks whose results were never retrieved (issue #16) so the user can
+  // recover a paid task instead of resubmitting (and paying again)
+  const reloadPendingTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai/tasks?projectId=${id}&active=1`);
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (Array.isArray(rows)) setPendingTasks(rows);
+    } catch {
+      // recovery UI is best-effort; never block the page on it
+    }
+  }, [id]);
+
+  useEffect(() => {
+    reloadPendingTasks();
+  }, [reloadPendingTasks]);
+
+  // save a generated video as the shot's asset (shared by the normal flow and task recovery)
+  const saveVideoAsset = useCallback(
+    async (shotId: number, url: string, prompt: string | undefined, provider: string, model: string) => {
+      const saveRes = await fetch(`/api/project/${id}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shotId, type: "ai_generate", sourceUrl: url, prompt, provider, model }),
+      });
+      let savedUrl = url;
+      if (saveRes.ok) {
+        const saved = await saveRes.json();
+        if (saved.filePath) savedUrl = saved.filePath;
+      }
+      setAssets((prev) =>
+        prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl, isVideo: true, error: undefined } : a))
+      );
+    },
+    [id]
+  );
+
+  // resume a persisted cloud task: query (and wait for) its status, then save the result
+  const resumeTask = useCallback(
+    async (task: PendingAiTask) => {
+      const prov = providers[task.provider];
+      if (!prov?.apiKey) {
+        setTaskMsg(t("errorNoVideoModel"));
+        return;
+      }
+      setResumingTasks((prev) => new Set(prev).add(task.id));
+      setTaskMsg(null);
+      try {
+        const res = await fetch("/api/ai/video/task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: task.provider,
+            apiKey: prov.apiKey,
+            baseUrl: prov.baseUrl,
+            taskId: task.taskId,
+            wait: true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || t("taskResumeFailed"));
+        if (data.status === "completed" && data.videoUrls?.[0]) {
+          if (task.shotId != null) {
+            const asset = assets.find((a) => a.shotId === task.shotId);
+            await saveVideoAsset(task.shotId, data.videoUrls[0], asset?.prompt, task.provider, task.model);
+          }
+          setTaskMsg(t("taskResumeDone"));
+        } else if (data.status === "failed" || data.status === "cancelled") {
+          setTaskMsg(`${t("taskResumeFailed")}${data.error ? `: ${data.error}` : ""}`);
+        } else {
+          setTaskMsg(t("taskResumeProcessing"));
+        }
+        await reloadPendingTasks();
+      } catch (e) {
+        setTaskMsg(e instanceof Error ? e.message : t("taskResumeFailed"));
+      } finally {
+        setResumingTasks((prev) => {
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
+      }
+    },
+    [providers, assets, saveVideoAsset, reloadPendingTasks, t]
+  );
+
   // convert to motion shot: use the already-generated image for this shot as the first frame, call the image-to-video model, and save the result as the shot's asset (video)
   const generateMotion = useCallback(
     async (shotId: number, firstFrameOverride?: string) => {
@@ -317,31 +418,30 @@ export default function AssetsPage() {
             mode: "image-to-video",
             prompt: asset?.prompt || asset?.description,
             imageUrl: firstFrame,
+            // issue #16: identify the task server-side so the paid task ID is persisted
+            // against this project/shot and stays recoverable after timeout or restart
+            projectId: id,
+            shotId,
             // user-defined video parameters (aspect ratio / resolution / duration / frame rate / motion / seed / negative prompt)
             options: buildVideoOptions(videoParams),
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || t("errorImageToVideoFailed"));
+        if (!res.ok) {
+          // the paid task may already exist in the cloud — surface its ID and the recovery
+          // path instead of a bare failure that invites a duplicate (billed) resubmit
+          if (data.taskId) {
+            await reloadPendingTasks();
+            throw new Error(
+              t("errorWithTaskId", { msg: data.error || t("errorImageToVideoFailed"), taskId: data.taskId })
+            );
+          }
+          throw new Error(data.error || t("errorImageToVideoFailed"));
+        }
         const url = data.videoUrls?.[0];
         if (!url) throw new Error(t("errorEmptyResult"));
         // save as this shot's asset (video will be downloaded locally); compose processes it as a video clip (including native audio track detection)
-        const saveRes = await fetch(`/api/project/${id}/assets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            shotId, type: "ai_generate", sourceUrl: url,
-            prompt: asset?.prompt, provider: videoModelTarget.provider, model: videoModelTarget.model,
-          }),
-        });
-        let savedUrl = url;
-        if (saveRes.ok) {
-          const saved = await saveRes.json();
-          if (saved.filePath) savedUrl = saved.filePath;
-        }
-        setAssets((prev) =>
-          prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl, isVideo: true, error: undefined } : a))
-        );
+        await saveVideoAsset(shotId, url, asset?.prompt, videoModelTarget.provider, data.modelId || videoModelTarget.model);
       } catch (e) {
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, error: e instanceof Error ? e.message : t("errorImageToVideoFailed") } : a))
@@ -354,7 +454,7 @@ export default function AssetsPage() {
         });
       }
     },
-    [assets, videoModelTarget, id, videoParams]
+    [assets, videoModelTarget, id, videoParams, saveVideoAsset, reloadPendingTasks, t]
   );
 
   // actually generate a single asset
@@ -605,6 +705,48 @@ export default function AssetsPage() {
           </div>
         )}
 
+        {/* cloud paid-task recovery (issue #16): submitted tasks whose results were never
+            retrieved — offer resume instead of a duplicate (billed) resubmit */}
+        {pendingTasks.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200">
+            <div className="flex items-start gap-3">
+              <LuLoaderCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900">
+                  {t("pendingTasksTitle", { n: pendingTasks.length })}
+                </p>
+                <p className="text-xs text-blue-700 mt-0.5">{t("pendingTasksDesc")}</p>
+                <div className="mt-2 space-y-1.5">
+                  {pendingTasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-2 text-xs text-blue-800">
+                      <span className="truncate">
+                        {t("taskLabel", { shot: task.shotId ?? "-", model: task.model, taskId: task.taskId })}
+                      </span>
+                      <Button
+                        onClick={() => resumeTask(task)}
+                        disabled={resumingTasks.has(task.id)}
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] border-blue-300 text-blue-700 hover:bg-blue-100 shrink-0"
+                      >
+                        {resumingTasks.has(task.id) ? (
+                          <>
+                            <LuLoaderCircle className="animate-spin w-3 h-3 mr-1" />
+                            {t("btnResumingTask")}
+                          </>
+                        ) : (
+                          t("btnResumeTask")
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {taskMsg && <p className="text-xs text-blue-700 mt-2">{taskMsg}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* no image model configured warning (only shown when there are still AI shots pending generation) */}
         {showModelWarning && (
           <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
@@ -750,7 +892,13 @@ export default function AssetsPage() {
                               className="text-xs w-24 text-muted-foreground hover:text-primary"
                               disabled={motionShots.has(asset.shotId)}
                               onClick={() => generateMotion(asset.shotId)}
-                              title={t("motionTip")}
+                              // pre-call transparency (issue #16): show which provider/model this
+                              // paid call actually uses, so a t2v/i2v mix-up is visible up front
+                              title={
+                                videoModelTarget
+                                  ? `${t("motionTip")}\n${videoModelTarget.provider} · ${videoModelTarget.model}`
+                                  : t("motionTip")
+                              }
                             >
                               {motionShots.has(asset.shotId) ? t("btnConvertingMotion") : t("btnConvertMotion")}
                             </Button>

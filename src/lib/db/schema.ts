@@ -99,6 +99,30 @@ export const videoClips = sqliteTable("video_clips", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
+// AI generation tasks table — every billable cloud task is persisted the moment the
+// provider acknowledges it (issue #16: a poll timeout used to silently drop tasks the
+// user had already paid for). Non-terminal rows can be resumed after a restart.
+export const aiTasks = sqliteTable("ai_tasks", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  // nullable on purpose: generation can be triggered outside a project context
+  projectId: text("project_id"),
+  shotId: integer("shot_id"),
+  provider: text("provider").notNull(),
+  // the model actually submitted to the provider (after any mode remapping)
+  model: text("model").notNull(),
+  mediaType: text("media_type", { enum: ["image", "video"] }).notNull().default("video"),
+  mode: text("mode"),
+  prompt: text("prompt"),
+  // provider-side task/prediction ID — the recovery handle for a paid task
+  taskId: text("task_id").notNull(),
+  // unknown = client lost contact (poll timeout / restart); the cloud task may still be running
+  status: text("status", { enum: ["submitted", "processing", "completed", "failed", "unknown"] }).notNull().default("submitted"),
+  resultUrls: text("result_urls", { mode: "json" }).$type<string[]>(),
+  error: text("error"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // Compositions table
 export const compositions = sqliteTable("compositions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
