@@ -143,7 +143,9 @@ export class VolcEngineProvider extends BaseProvider {
     const body: Record<string, unknown> = {
       model: options.modelId,
       content,
-      ratio: toRatio(options.width, options.height),
+      // first-frame mode: Ark rejects an explicit ratio — the output ratio follows
+      // the first-frame image (InvalidParameter.TaskTypeConstraint)
+      ...(options.firstFrameUrl ? {} : { ratio: toRatio(options.width, options.height) }),
       ...(options.duration != null && { duration: options.duration }),
       generate_audio: options.audioEnabled ?? false,
       watermark: false,
