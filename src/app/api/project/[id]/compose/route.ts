@@ -512,10 +512,12 @@ export async function POST(
         ).catch(() => {});
         // 封面缩略图：抽首帧存成片旁（本地抽取永不过期），作品流/项目卡靠它凭画面找片；失败不阻断
         const thumbnailPath = await extractFirstFrame(outputPath);
-        // 完成：更新合成记录与项目状态
+        // 完成：更新合成记录与项目状态。bgmPath 一并落库——credits（素材授权清单）与 gate
+        // （发布门禁）都从 compositions.bgmPath 回读 BGM 的 .credit.json 授权 sidecar，
+        // 此前该列从未被写入，BGM 授权信息一直进不了清单（修复）
         await db
           .update(compositions)
-          .set({ outputPath, status: "done", ...(thumbnailPath && { thumbnailPath }) })
+          .set({ outputPath, status: "done", ...(thumbnailPath && { thumbnailPath }), ...(bgmLocal && { bgmPath: bgmLocal }) })
           .where(eq(compositions.id, comp.id));
         await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));
       } catch (e) {
