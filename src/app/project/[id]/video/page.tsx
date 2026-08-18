@@ -156,6 +156,10 @@ export default function VideoPage() {
   // 背景音乐
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
   const [bgmUploading, setBgmUploading] = useState(false);
+  // AI 生成配乐（Sonilo）：按已合成的成片生成，选用后重新合成混入
+  const [aiBgmBusy, setAiBgmBusy] = useState(false);
+  const [aiBgmDoneName, setAiBgmDoneName] = useState<string | null>(null);
+  const [aiBgmError, setAiBgmError] = useState<string | null>(null);
   // 是否已配置付费 TTS（否则配音走免费 Edge keyless TTS）
   const paidTtsReady = isPaidTTSReady(tts, providers);
   // 免费配音试听状态
@@ -196,6 +200,30 @@ export default function VideoPage() {
       setBgm(null);
     } finally {
       setBgmUploading(false);
+    }
+  };
+
+  // AI 按成片生成配乐/音效（Sonilo）：成功后与「上传 BGM」同路——落进 bgm 状态，重新合成时混入并自动压低。
+  // 当前配乐情绪（none 除外）作为风格提示传给后端；换情绪再点一次 = 同一条成片 A/B 不同配乐方向。
+  const generateAiBgm = async (sfx: boolean) => {
+    if (aiBgmBusy) return;
+    setAiBgmBusy(true);
+    setAiBgmError(null);
+    setAiBgmDoneName(null);
+    try {
+      const res = await fetch(`/api/project/${id}/bgm/sonilo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sfx, ...(config.bgm !== "none" && { mood: config.bgm }) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("aiBgmFailed"));
+      setBgm({ path: data.path, name: data.name });
+      setAiBgmDoneName(data.name);
+    } catch (e) {
+      setAiBgmError(e instanceof Error ? e.message : t("aiBgmFailed"));
+    } finally {
+      setAiBgmBusy(false);
     }
   };
 
@@ -1030,6 +1058,35 @@ export default function VideoPage() {
                 <div className="rounded-lg overflow-hidden border border-border/50 bg-black">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video src={outputUrl} controls className="w-full max-h-[360px]" />
+                </div>
+              )}
+
+              {/* AI 生成配乐（Sonilo，可选）：有成片后才出现——按这条成片的节奏生成整轨配乐/音效，
+                  选用后重新合成即混入（与上传 BGM 同一条链路，自动压低让位配音） */}
+              {composeDone && outputUrl && (
+                <div className="p-3 rounded-lg border border-border/40 bg-muted/10 space-y-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">{t("aiBgmTitle")}</p>
+                    <p className="text-[11px] text-muted-foreground">{t("aiBgmHint")}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => generateAiBgm(false)}
+                      disabled={aiBgmBusy || isComposing}
+                      className={`inline-flex items-center h-8 px-3 rounded-md border border-border/60 text-xs hover:border-primary/50 ${(aiBgmBusy || isComposing) ? "opacity-50 pointer-events-none" : ""}`}
+                    >
+                      {aiBgmBusy ? t("aiBgmGenerating") : t("aiBgmMusicCta")}
+                    </button>
+                    <button
+                      onClick={() => generateAiBgm(true)}
+                      disabled={aiBgmBusy || isComposing}
+                      className={`inline-flex items-center h-8 px-3 rounded-md border border-border/60 text-xs text-muted-foreground hover:border-primary/50 ${(aiBgmBusy || isComposing) ? "opacity-50 pointer-events-none" : ""}`}
+                    >
+                      {t("aiBgmSfxCta")}
+                    </button>
+                  </div>
+                  {aiBgmDoneName && <p className="text-[11px] text-emerald-500">{t("aiBgmDone", { name: aiBgmDoneName })}</p>}
+                  {aiBgmError && <p className="text-[11px] text-destructive">⚠ {aiBgmError}</p>}
                 </div>
               )}
 

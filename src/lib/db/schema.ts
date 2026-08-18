@@ -158,7 +158,8 @@ export const aiTasks = sqliteTable("ai_tasks", {
   provider: text("provider").notNull(),
   // the model actually submitted to the provider (after any mode remapping)
   model: text("model").notNull(),
-  mediaType: text("media_type", { enum: ["image", "video"] }).notNull().default("video"),
+  // audio: Sonilo AI 配乐/音效等付费音频任务（无 CHECK 约束，纯类型层放宽，无需迁移）
+  mediaType: text("media_type", { enum: ["image", "video", "audio"] }).notNull().default("video"),
   mode: text("mode"),
   prompt: text("prompt"),
   controlPlan: text("control_plan", { mode: "json" }).$type<GenerationControlSummary>(),

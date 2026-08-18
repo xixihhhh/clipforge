@@ -104,3 +104,31 @@ describe("renderCreditsMarkdown", () => {
     expect(buildAttributionLine({ author: null, license: "by-2.0", sourceUrl: null })).toBe("Unknown author · by-2.0");
   });
 });
+
+describe("AI 生成 BGM（带 licenseId 授权留档，如 Sonilo）", () => {
+  it("licenseId 存在：与 ai_generated 素材同级（origin=ai / risk=ok / 免署名），note 带 license_id", () => {
+    const m = buildCreditsManifest("p", [], {
+      provider: "sonilo",
+      author: "Sonilo",
+      license: "Sonilo AI 生成配乐 · 自带授权、可商用（以条款为准）",
+      sourceUrl: "https://sonilo.com",
+      licenseId: "lic-123",
+    });
+    expect(m.bgm?.origin).toBe("ai");
+    expect(m.bgm?.risk).toBe("ok");
+    expect(m.bgm?.requiresAttribution).toBe(false);
+    expect(m.bgm?.note.zh).toContain("lic-123");
+    expect(m.summary.commercialSafe).toBe(true);
+  });
+
+  it("没有 licenseId 的 provider sidecar：不整体放行，仍走 classifyLicense（未知许可 → 人工复核）", () => {
+    const m = buildCreditsManifest("p", [], {
+      provider: "sonilo",
+      author: "Sonilo",
+      license: "unknown",
+    });
+    expect(m.bgm?.origin).toBe("stock");
+    expect(m.bgm?.risk).toBe("review");
+    expect(m.summary.commercialSafe).toBe(false);
+  });
+});

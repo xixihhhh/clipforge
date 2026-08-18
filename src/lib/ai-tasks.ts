@@ -24,7 +24,7 @@ export interface RecordAiTaskInput {
   shotId?: number;
   provider: string;
   model: string;
-  mediaType?: "image" | "video";
+  mediaType?: "image" | "video" | "audio";
   mode?: string;
   prompt?: string;
   taskId: string;

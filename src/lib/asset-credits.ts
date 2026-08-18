@@ -54,6 +54,10 @@ export interface BgmCredit {
   author?: string;
   license?: string;
   sourceUrl?: string;
+  /** AI 生成 BGM 的来源（如 "sonilo"），由对应集成写入 sidecar */
+  provider?: string;
+  /** 按音轨的授权留档 ID（AI 生成且带 license 记录时存在），投流审核可出示 */
+  licenseId?: string;
 }
 
 const VIDEO_EXT = /\.(mp4|webm|mov|mkv|avi)$/i;
@@ -153,7 +157,25 @@ export function buildCreditsManifest(
 ): CreditsManifest {
   const items = assets.map(toItem);
   let bgmItem: CreditItem | undefined;
-  if (bgm) {
+  if (bgm && bgm.licenseId) {
+    // AI 生成且带按轨 license 留档的 BGM（如 Sonilo）：与 ai_generated 素材同级（origin=ai、商用 OK），
+    // 且比普通 AI 素材多一层可出示的授权记录——licenseId 显式写进 note，投流送审直接引用
+    bgmItem = {
+      shotId: -1,
+      kind: "audio",
+      origin: "ai",
+      provider: bgm.provider,
+      author: bgm.author,
+      license: bgm.license,
+      sourceUrl: bgm.sourceUrl,
+      requiresAttribution: false,
+      risk: "ok",
+      note: {
+        zh: `AI 生成 BGM：授权随音频留档（license_id: ${bgm.licenseId}），商用以条款为准`,
+        en: `AI-generated BGM with an archived license record (license_id: ${bgm.licenseId}); commercial use per provider terms`,
+      },
+    };
+  } else if (bgm) {
     const { risk, requiresAttribution } = classifyLicense(bgm.license);
     bgmItem = {
       shotId: -1,
