@@ -16,6 +16,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:credits:live": "node scripts/verify-credits-safety.mjs",
     "db:generate": "drizzle-kit generate --config=drizzle.saas.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.saas.config.ts",
     "mcp": "node mcp/clipforge-mcp.mjs",

@@ -4,10 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requirePageUser } from "@/lib/saas/authorization";
 import { projectRepository } from "@/lib/saas/project-repository";
+import { getBillingSummary } from "@/lib/saas/billing";
+import { PLAN_CATALOG } from "@/lib/saas/billing-core";
 
 export default async function DashboardPage() {
   const { user } = await requirePageUser();
-  const projects = await projectRepository.getProjects(user.id);
+  const [projects, billing] = await Promise.all([
+    projectRepository.getProjects(user.id),
+    getBillingSummary(user.id),
+  ]);
   const firstName = user.displayName?.split(/\s+/)[0] || user.email?.split("@")[0] || "creator";
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -16,8 +21,8 @@ export default async function DashboardPage() {
         <Link href="/dashboard/projects?create=1"><Button><LuPlus className="mr-2 h-4 w-4" />Create New Project</Button></Link>
       </div>
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        <StatCard icon={<LuWalletCards />} label="Current Plan" value="Free" />
-        <StatCard icon={<LuSparkles />} label="Credits" value="0" />
+        <StatCard icon={<LuWalletCards />} label="Current Plan" value={PLAN_CATALOG[billing.subscription.plan].name} />
+        <StatCard icon={<LuSparkles />} label="Credits" value={billing.balance.toLocaleString()} />
         <StatCard icon={<LuFolderOpen />} label="Projects" value={String(projects.length)} />
       </section>
       <Card className="mt-8">
