@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { existsSync } from "fs";
 import { join } from "path";
 import { and, desc, eq } from "drizzle-orm";
@@ -33,6 +34,9 @@ async function findComposition(projectId: string, compositionId?: string) {
  * local mastering operations. The source composition is never overwritten.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
 

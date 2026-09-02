@@ -101,6 +101,21 @@ export async function updateAiTaskByProviderTaskId(
   }
 }
 
+/** Resolve the persisted row before a SaaS resume request is authorized. */
+export async function findAiTaskByProviderTaskId(provider: string, taskId: string) {
+  try {
+    const [task] = await getDb()
+      .select({ id: aiTasks.id, projectId: aiTasks.projectId })
+      .from(aiTasks)
+      .where(and(eq(aiTasks.provider, provider), eq(aiTasks.taskId, taskId)))
+      .limit(1);
+    return task ?? null;
+  } catch (error) {
+    console.error("ai_tasks 查询失败:", error);
+    return null;
+  }
+}
+
 /** List a project's tasks, optionally only the ones still needing attention */
 export async function listAiTasks(projectId: string, activeOnly: boolean) {
   const db = getDb();

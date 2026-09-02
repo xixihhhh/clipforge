@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 /**
  * Local-tool CORS for /api/*.
@@ -38,17 +39,67 @@ function corsHeaders(origin: string, req: NextRequest): Record<string, string> {
   };
 }
 
-export function proxy(req: NextRequest) {
+export function proxy(req: NextRequest): NextResponse;
+export function proxy(req: NextRequest): NextResponse | Promise<NextResponse> {
   const origin = allowedOrigin(req.headers.get("origin"));
   // answer preflights here — API routes have no OPTIONS handlers
   if (req.method === "OPTIONS" && origin) {
     return new NextResponse(null, { status: 204, headers: corsHeaders(origin, req) });
   }
-  const res = NextResponse.next();
-  if (origin) {
-    for (const [k, v] of Object.entries(corsHeaders(origin, req))) res.headers.set(k, v);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (supabaseUrl && supabaseAnonKey) {
+    return updateSaasSession(req, origin, supabaseUrl, supabaseAnonKey);
   }
+
+  return addCorsHeaders(NextResponse.next({ request: req }), origin, req);
+}
+
+async function updateSaasSession(
+  req: NextRequest,
+  origin: string | null,
+  supabaseUrl: string,
+  supabaseAnonKey: string,
+): Promise<NextResponse> {
+    let res = NextResponse.next({ request: req });
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet, headers) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
+          res = NextResponse.next({ request: req });
+          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+          Object.entries(headers).forEach(([key, value]) => res.headers.set(key, value));
+        },
+      },
+    });
+
+    const { data } = await supabase.auth.getClaims();
+    const isAuthenticated = Boolean(data?.claims?.sub);
+    const path = req.nextUrl.pathname;
+    const isProtectedPage = path === "/dashboard" || path.startsWith("/dashboard/");
+    const isPublicAuthPage = ["/login", "/register", "/forgot-password"].includes(path);
+
+    if (isProtectedPage && !isAuthenticated) {
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("next", `${path}${req.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (isPublicAuthPage && isAuthenticated) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+
+    return addCorsHeaders(res, origin, req);
+}
+
+function addCorsHeaders(res: NextResponse, origin: string | null, req: NextRequest): NextResponse {
+  if (origin) for (const [key, value] of Object.entries(corsHeaders(origin, req))) res.headers.set(key, value);
   return res;
 }
 
-export const config = { matcher: "/api/:path*" };
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+};

@@ -564,6 +564,47 @@ src/
 
 ---
 
+## SaaS Development Setup
+
+SaaS Web 使用 Supabase Auth + PostgreSQL；Electron 桌面版在没有 SaaS 环境变量时仍使用原有本地 SQLite。
+
+1. 安装 Node.js 20+ 与 pnpm 10+：`corepack enable && corepack prepare pnpm@10.33.0 --activate`
+2. 创建一个 PostgreSQL 数据库，并取得 `DATABASE_URL`。
+3. 创建 Supabase 项目，在 Authentication 中启用 Email + Password，并把本地回调地址 `http://localhost:3000/auth/callback` 加入 Redirect URLs。
+4. 复制环境模板：`Copy-Item .env.example .env.local`（macOS/Linux：`cp .env.example .env.local`），填入 PostgreSQL 与 Supabase 配置。
+5. 安装依赖：`pnpm install`
+6. 运行 SaaS migration：`pnpm db:migrate`
+7. 启动开发服务器：`pnpm dev`，访问 `http://localhost:3000/register`。
+
+数据库命令：
+
+```bash
+# 修改 src/lib/saas-db/schema.ts 后生成 PostgreSQL migration
+pnpm db:generate
+
+# 将已提交的 migration 应用到 DATABASE_URL
+pnpm db:migrate
+```
+
+`drizzle-saas/0001_enable_rls.sql` 是 Supabase 专用 migration：它为 `users`、`projects`
+以及部署时已存在的 `project_id` / `user_id` / `owner_id` 子表开启并强制 RLS。该 SQL
+依赖 Supabase 的 `auth.uid()` 与数据库角色，因此 `DATABASE_URL` 必须指向 Supabase
+PostgreSQL。服务端直连数据库仍必须保留应用层 owner 校验，service role 与数据库连接串
+只能存在于受信任的服务端环境。
+
+需要的环境变量：
+
+| 变量 | 使用位置 | 说明 |
+|------|----------|------|
+| `DATABASE_URL` | 仅服务端 | PostgreSQL 连接字符串 |
+| `NEXT_PUBLIC_SUPABASE_URL` | 服务端与浏览器 | Supabase 项目 URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 服务端与浏览器 | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | 仅服务端 | 预留给服务端管理操作，禁止暴露到客户端 |
+
+> 任一 SaaS 环境变量存在时应用都会按 SaaS 模式“安全失败”，缺少其余配置不会退回无鉴权本地模式。Electron/纯本地启动不要设置这些变量，即可继续使用 `data/sqlite.db`。
+
+---
+
 ## 开发
 
 ```bash
@@ -573,8 +614,8 @@ pnpm test
 # 代码规范检查
 pnpm lint
 
-# 数据库迁移（修改 schema 后生成迁移）
-pnpm drizzle-kit generate
+# SaaS PostgreSQL migration（修改 SaaS schema 后生成）
+pnpm db:generate
 
 # 构建生产版本（含 .next/standalone，供 Electron 打包）
 pnpm build

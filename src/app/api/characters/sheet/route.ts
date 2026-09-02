@@ -5,6 +5,8 @@ import { getDataDir } from "@/lib/paths";
 import { createProvider } from "@/lib/providers";
 import { buildCharacterSheetPrompt } from "@/lib/character-sheet";
 import { apiError, errText } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
 
 /**
  * POST /api/characters/sheet — generate a presenter's 2x2 multi-view reference
@@ -16,6 +18,17 @@ import { apiError, errText } from "@/lib/api-error";
  * body: { appearance, name?, provider, model, apiKey, baseUrl?, options? }
  */
 export async function POST(req: NextRequest) {
+  if (isSaasMode()) {
+    const access = await requireApiIdentity();
+    if (!access.ok) return access.response;
+    return apiError(
+      req,
+      "SaaS 第一阶段尚未迁移共享主播素材库",
+      "The shared presenter media library is not available in SaaS phase one",
+      501,
+    );
+  }
+
   try {
     const body = await req.json();
     const { appearance, name, provider: providerName, model, apiKey, baseUrl, options } = body as {

@@ -10,7 +10,11 @@
  * preserving the original behavior exactly.
  */
 
-import { join } from "path";
+import { join, posix } from "path";
+
+function joinRuntimePath(root: string, child: string): string {
+  return root.startsWith("/") ? posix.join(root, child) : join(root, child);
+}
 
 /** Writable data root directory (sqlite.db / uploads / output all live under here) */
 export function getDataDir(): string {
@@ -34,10 +38,10 @@ export function fileNameOf(p: string | null | undefined): string {
 
 /** Upload assets root directory: data/uploads */
 export function getUploadsDir(): string {
-  return join(getDataDir(), "uploads");
+  return joinRuntimePath(getDataDir(), "uploads");
 }
 
 /** Composition output root directory: data/output */
 export function getOutputDir(): string {
-  return join(getDataDir(), "output");
+  return joinRuntimePath(getDataDir(), "output");
 }

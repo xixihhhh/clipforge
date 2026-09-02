@@ -20,6 +20,7 @@ describe("resolveUploadFilePath 路径穿越防护", () => {
 
   it("非 /api/files 路径返回 null（交由调用方原样透传）", () => {
     expect(resolveUploadFilePath("https://example.com/x.png")).toBeNull();
+    expect(resolveUploadFilePath("https://example.com/api/files/private.png")).toBeNull();
     expect(resolveUploadFilePath("random-string")).toBeNull();
   });
 });

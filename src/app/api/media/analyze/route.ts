@@ -8,6 +8,7 @@ import { analyzeVisualMedia } from "@/lib/media-analysis";
 import { probeMedia } from "@/lib/media-probe";
 import type { LLMConfig } from "@/lib/script-engine/generator";
 import { generateContactSheet } from "@/lib/video-composer/contact-sheet";
+import { requireApiIdentity } from "@/lib/saas/authorization";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,9 @@ function parseConfig(value: FormDataEntryValue | null): LLMConfig | null {
 }
 
 export async function POST(req: NextRequest) {
+  const access = await requireApiIdentity();
+  if (!access.ok) return access.response;
+
   let form: FormData;
   try {
     form = await req.formData();

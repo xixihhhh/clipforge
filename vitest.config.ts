@@ -1,15 +1,20 @@
+import ffprobe from "@ffprobe-installer/ffprobe";
+import ffmpegPath from "ffmpeg-static";
+import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
-import path from "path";
 
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": resolve(__dirname, "src"),
     },
   },
   test: {
     environment: "jsdom",
-    // exclude node_modules, build artifacts (.next/standalone copies e2e in), and the Playwright e2e directory
-    exclude: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/e2e/**"],
+    exclude: ["e2e/**", "node_modules/**", ".next/**", "integrations/**", "release/**"],
+    env: {
+      FFMPEG_PATH: process.env.FFMPEG_PATH || ffmpegPath || "ffmpeg",
+      FFPROBE_PATH: process.env.FFPROBE_PATH || ffprobe.path || "ffprobe",
+    },
   },
 });

@@ -13,7 +13,9 @@ import { getDataDir } from "@/lib/paths";
  * Pure function, easy to unit-test (no disk access). Returns a safe absolute path, or null (non-/api/files path or path traversal).
  */
 export function resolveUploadFilePath(ref: string): string | null {
-  const m = ref.match(/\/api\/files\/(.+)/);
+  // Only same-origin relative references are local files. Never reinterpret an
+  // attacker-controlled remote URL containing `/api/files/` as a local path.
+  const m = ref.match(/^\/api\/files\/(.+)$/);
   if (!m) return null;
   const uploadsRoot = join(getDataDir(), "uploads");
   const filePath = join(uploadsRoot, m[1]);

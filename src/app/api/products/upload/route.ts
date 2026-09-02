@@ -3,6 +3,8 @@ import { getDataDir } from "@/lib/paths";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { apiError } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
 
 /** Allowlist of permitted upload MIME types */
 const ALLOWED_MIME_TYPES = new Set([
@@ -25,6 +27,17 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 // Upload product-library images: not tied to a project; written to disk at data/uploads/products/<productId>/ by productId.
 // The returned /api/files/products/... path is served by the existing static-file route and stays valid across page reloads and navigation (replacing short-lived blob: URLs).
 export async function POST(req: NextRequest) {
+  if (isSaasMode()) {
+    const access = await requireApiIdentity();
+    if (!access.ok) return access.response;
+    return apiError(
+      req,
+      "SaaS 第一阶段尚未迁移共享商品库，请在项目内上传素材",
+      "The shared product library is not available in SaaS phase one; upload media inside a project",
+      501,
+    );
+  }
+
   let formData: FormData;
   try {
     formData = await req.formData();

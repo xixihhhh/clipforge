@@ -9,6 +9,9 @@ import { parseProductFromHtml } from "@/lib/product-ingest";
 import { inferExtension, MAX_DOWNLOAD_BYTES } from "@/lib/providers/stock-types";
 import { safeFetch } from "@/lib/ssrf-guard";
 import { apiError, errText } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
+import { projectRepository } from "@/lib/saas/project-repository";
 
 const UA = "Mozilla/5.0 (compatible; ClipForge/1.0; +https://github.com/xixihhhh/clipforge)";
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
@@ -34,6 +37,9 @@ async function safeDownloadImage(url: string, destDir: string, base: string): Pr
  * Fetch product page → parse title/price/description/images → (optionally) persist as a project; the frontend/MCP can then use the projectId to go straight to script → video generation.
  */
 export async function POST(req: NextRequest) {
+  const access = isSaasMode() ? await requireApiIdentity() : null;
+  if (access && !access.ok) return access.response;
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -82,6 +88,14 @@ export async function POST(req: NextRequest) {
       ? body.libraryProductId
       : undefined;
   if (libraryProductId) {
+    if (isSaasMode()) {
+      return apiError(
+        req,
+        "SaaS 第一阶段尚未迁移共享商品库，请先创建项目后上传商品图",
+        "The shared product library is not available in SaaS phase one; create a project and upload images there instead",
+        501,
+      );
+    }
     const destDir = join(getUploadsDir(), "products", libraryProductId);
     await mkdir(destDir, { recursive: true });
     const savedImages: string[] = [];
@@ -101,9 +115,16 @@ export async function POST(req: NextRequest) {
   // Create a commerce project + download the first few product images and persist them
   const db = getDb();
   const name = (product.title || "导入的商品").slice(0, 60);
+  const saasProject = access?.ok && access.identity
+    ? await projectRepository.createProject(access.identity.user.id, {
+        name,
+        description: product.description ?? null,
+      })
+    : null;
   const [proj] = await db
     .insert(projects)
     .values({
+      ...(saasProject ? { id: saasProject.id } : {}),
       name,
       contentType: "product",
       productName: name,

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDataDir } from "@/lib/paths";
-import { readFile } from "fs/promises";
-import { join } from "path";
 import { generateScript, analyzeProduct } from "@/lib/script-engine/generator";
 import { styleNameMap, type ScriptStyleType } from "@/lib/script-engine/prompts";
 import { hookPatternName, HOOK_PATTERNS } from "@/lib/script-engine/hook-patterns";
 import type { ProductCategory } from "@/lib/script-engine/templates";
 import { getDb } from "@/lib/db";
 import { scripts as scriptsTable, projects, publishMetrics } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
 import { llmErrorPair } from "@/lib/llm-error";
 import { topConvertingStyle, topConvertingHook, buildPerformanceHint, type MetricInput } from "@/lib/performance-insights";
+import { requireProjectAccess } from "@/lib/saas/authorization";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { mediaReferencesBelongToProject } from "@/lib/saas/media-access";
+import { projectRepository } from "@/lib/saas/project-repository";
+import { toRemoteUsableImage } from "@/lib/remote-image";
 
 /** Allowed enum values for the styleType column in the scripts table */
 const VALID_SCRIPT_STYLE = new Set([
@@ -22,34 +24,7 @@ const VALID_SCRIPT_STYLE = new Set([
 
 /** Convert a local image path to a base64 data URI for use with LLM vision models */
 async function imagePathToBase64(imagePath: string): Promise<string> {
-  // Already a full URL or base64 data URI, return as-is
-  if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
-    return imagePath;
-  }
-
-  // Local API path e.g. /api/files/projectId/filename.png
-  // Extract the actual file path: data/uploads/projectId/filename.png
-  const match = imagePath.match(/\/api\/files\/(.+)/);
-  if (!match) return imagePath;
-
-  const relativePath = match[1];
-  const filePath = join(getDataDir(), "uploads", relativePath);
-
-  try {
-    const buffer = await readFile(filePath);
-    const base64 = buffer.toString("base64");
-    // Infer MIME type from file extension
-    const ext = filePath.split(".").pop()?.toLowerCase() || "png";
-    const mimeMap: Record<string, string> = {
-      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
-      webp: "image/webp", gif: "image/gif", svg: "image/svg+xml",
-    };
-    const mime = mimeMap[ext] || "image/png";
-    return `data:${mime};base64,${base64}`;
-  } catch {
-    console.warn(`无法读取图片文件: ${filePath}`);
-    return imagePath;
-  }
+  return (await toRemoteUsableImage(imagePath)) ?? imagePath;
 }
 
 /** Normalize a frontend category value to a ProductCategory supported by the engine */
@@ -95,10 +70,17 @@ function normalizeStyle(raw: unknown): ScriptStyleType {
  * enough samples, and degrades to an empty hint on cold start or any DB error (never blocks generation).
  * Returns the hint text plus the top-converting style key (used to bias "auto"/smart-recommend mode).
  */
-async function loadInsights(category: string): Promise<{ hint: string; topStyle: string | null }> {
+async function loadInsights(
+  category: string,
+  ownedProjectIds: string[] | null,
+): Promise<{ hint: string; topStyle: string | null }> {
   try {
     const db = getDb();
-    const rows = await db.select().from(publishMetrics);
+    const rows = ownedProjectIds === null
+      ? await db.select().from(publishMetrics)
+      : ownedProjectIds.length > 0
+        ? await db.select().from(publishMetrics).where(inArray(publishMetrics.projectId, ownedProjectIds))
+        : [];
     if (rows.length === 0) return { hint: "", topStyle: null };
     const toRec = (r: (typeof rows)[number]): MetricInput => ({
       style: r.style,
@@ -147,6 +129,26 @@ export async function POST(req: NextRequest) {
   const duration = body.targetDuration ?? body.duration ?? 30;
   // data flywheel: performance feedback is on by default; pass insightMode:false to opt out
   const useInsights = body.insightMode !== false;
+  const projectId = typeof body.projectId === "string" ? body.projectId : "";
+
+  if (isSaasMode() && !projectId) {
+    return apiError(req, "SaaS 模式必须指定项目", "A project is required in SaaS mode", 400);
+  }
+
+  let ownedProjectIds: string[] | null = null;
+  if (projectId) {
+    const projectAccess = await requireProjectAccess(projectId);
+    if (!projectAccess.ok) return projectAccess.response;
+    if (
+      projectAccess.identity &&
+      !mediaReferencesBelongToProject(projectId, Array.isArray(productImages) ? productImages : [])
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (projectAccess.identity) {
+      ownedProjectIds = (await projectRepository.getProjects(projectAccess.identity.user.id)).map((project) => project.id);
+    }
+  }
 
   if (!productName) {
     return apiError(req, "请填写商品名称", "Please enter the product name");
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
     // Data flywheel (read side): pull the creator's real conversion feedback for this category.
     // Used two ways: (1) bias smart-recommend ("auto") mode toward the top-converting style,
     // (2) inject an advisory hint into the prompt so generated variants lean toward what sells.
-    const insights = useInsights ? await loadInsights(category) : { hint: "", topStyle: null };
+    const insights = useInsights ? await loadInsights(category, ownedProjectIds) : { hint: "", topStyle: null };
     if (useInsights && isAutoStyle && insights.topStyle) {
       styleType = normalizeStyle(insights.topStyle);
     }
@@ -207,7 +209,6 @@ export async function POST(req: NextRequest) {
 
     // Persist: write generated scripts to the scripts table so the script/assets pages can read them by projectId
     let savedScripts = scripts;
-    const projectId = body.projectId;
     if (projectId) {
       const db = getDb();
       // Refuse to overwrite a one-liner topic project with a commerce script (contentType mismatch — would delete its topic scripts)

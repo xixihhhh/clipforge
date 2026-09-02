@@ -3,6 +3,8 @@ import { desc, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { projects, scripts as scriptsTable } from "@/lib/db/schema";
 import { fingerprintOf, homogeneityReport } from "@/lib/structure-fingerprint";
+import { requireApiIdentity } from "@/lib/saas/authorization";
+import { projectRepository } from "@/lib/saas/project-repository";
 
 /**
  * GET /api/insights/homogeneity?limit=8 — cross-project template self-check: fingerprints the latest
@@ -10,14 +12,24 @@ import { fingerprintOf, homogeneityReport } from "@/lib/structure-fingerprint";
  * "your recent videos are one template" before the platform's duplication detector does.
  */
 export async function GET(req: NextRequest) {
+  const auth = await requireApiIdentity();
+  if (!auth.ok) return auth.response;
+
   const url = new URL(req.url);
   const limitRaw = parseInt(url.searchParams.get("limit") ?? "8", 10);
   const limit = Number.isFinite(limitRaw) ? Math.max(2, Math.min(20, limitRaw)) : 8;
 
   const db = getDb();
-  const recent = await db
+  const ownedProjects = auth.identity
+    ? await projectRepository.getProjects(auth.identity.user.id)
+    : null;
+  const ownedIds = ownedProjects?.map((project) => project.id);
+  const recent = ownedIds?.length === 0
+    ? []
+    : await db
     .select({ id: projects.id, name: projects.name })
     .from(projects)
+    .where(ownedIds ? inArray(projects.id, ownedIds) : undefined)
     .orderBy(desc(projects.createdAt))
     .limit(limit);
   if (recent.length < 2) {

@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { writeFile, mkdir, readdir } from "fs/promises";
@@ -25,6 +26,9 @@ function materialsDir(projectId: string) {
 
 /** GET /api/project/[id]/materials —— list the project's local material pool (built-in B-roll) */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID", 400);
   let names: string[] = [];
@@ -46,6 +50,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
  * multipart: files=<File[]>. Written to uploads/{id}/materials/ with renamed filenames (original names not used to avoid security issues).
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID", 400);
 

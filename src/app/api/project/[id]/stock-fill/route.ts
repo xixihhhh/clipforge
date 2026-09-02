@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { join } from "path";
@@ -40,6 +41,9 @@ const SEMANTIC_TOP_K = 6;
  * overriding relevance). Per-shot results carry sameSource:true when the bias actually landed.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) {
     return apiError(req, "无效的项目ID", "Invalid project ID");
