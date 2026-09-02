@@ -1,3 +1,5 @@
+import "server-only";
+
 export function isSaasMode(): boolean {
   return Boolean(
     process.env.DATABASE_URL ||

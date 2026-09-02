@@ -592,6 +592,11 @@ pnpm db:migrate
 PostgreSQL。服务端直连数据库仍必须保留应用层 owner 校验，service role 与数据库连接串
 只能存在于受信任的服务端环境。
 
+`drizzle-saas/0002_windy_sharon_ventura.sql` 增加套餐与积分账本：新用户默认 Free 并获得
+一次性 100 credits 注册赠送；余额扣减由 PostgreSQL 原子函数执行，余额不足时整笔拒绝。
+浏览器只能读取自己的 subscription、余额与流水，不能直接修改余额或套餐。当前只开放
+Free / Pro，Business / Team 已在类型与 Stripe price 槽位中预留但尚未开放。
+
 需要的环境变量：
 
 | 变量 | 使用位置 | 说明 |
@@ -600,6 +605,11 @@ PostgreSQL。服务端直连数据库仍必须保留应用层 owner 校验，ser
 | `NEXT_PUBLIC_SUPABASE_URL` | 服务端与浏览器 | Supabase 项目 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 服务端与浏览器 | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | 仅服务端 | 预留给服务端管理操作，禁止暴露到客户端 |
+| `STRIPE_SECRET_KEY` | 仅服务端 | 未来 Stripe API 密钥；当前不要求配置 |
+| `STRIPE_WEBHOOK_SECRET` | 仅服务端 | 未来验证 Stripe webhook 签名 |
+| `STRIPE_PRICE_PRO` | 仅服务端 | 未来 Pro 套餐 Price ID |
+| `STRIPE_PRICE_BUSINESS` | 仅服务端 | 预留 Business 套餐 Price ID |
+| `STRIPE_PRICE_TEAM` | 仅服务端 | 预留 Team 套餐 Price ID |
 
 > 任一 SaaS 环境变量存在时应用都会按 SaaS 模式“安全失败”，缺少其余配置不会退回无鉴权本地模式。Electron/纯本地启动不要设置这些变量，即可继续使用 `data/sqlite.db`。
 

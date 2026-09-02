@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { getSaasDb } from "@/lib/saas-db";
 import { users, type SaasUser } from "@/lib/saas-db/schema";
+import { ensureBillingProfile } from "@/lib/saas/billing";
 
 export async function ensureAppUser(authUser: User): Promise<SaasUser> {
   const displayName =
@@ -31,6 +32,7 @@ export async function ensureAppUser(authUser: User): Promise<SaasUser> {
       },
     })
     .returning();
+  await ensureBillingProfile(user.id);
   return user;
 }
 
