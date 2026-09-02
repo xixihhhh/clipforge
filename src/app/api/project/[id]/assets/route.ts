@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { assets } from "@/lib/db/schema";
@@ -13,6 +14,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const db = getDb();
@@ -37,6 +41,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const body = await req.json();
@@ -95,6 +102,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!/^[a-zA-Z0-9-]+$/.test(id)) return NextResponse.json({ error: "无效的项目ID" }, { status: 400 });

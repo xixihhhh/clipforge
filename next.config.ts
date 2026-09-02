@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // used by the Electron main process to fork-start the server without requiring npm install on the user's machine. Does not affect next dev.
   output: "standalone",
   // better-sqlite3 is a native module; mark it external (loaded via require, so the bundler won't try to bundle its .node file)
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "ffmpeg-static", "@ffprobe-installer/ffprobe"],
   // Keep the file trace honest: nft's conservative directory collection was dragging the local
   // data/ (user uploads/outputs — 96MB of it), the docs site and other repo-only folders into
   // .next/standalone, which then shipped inside every desktop installer (issue: 330MB dmg).

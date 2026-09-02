@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -12,6 +13,9 @@ const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
  * Timestamps are accumulated from the planned shot durations in the script, for use in re-editing, platform-native captions, accessibility, or proofreading (the final video still has burnt-in subtitles).
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
 

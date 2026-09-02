@@ -3,6 +3,15 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { batchJobItems, batchJobs } from "@/lib/db/schema";
 import { apiError } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
+
+async function rejectSaasBatch(req: NextRequest) {
+  if (!isSaasMode()) return null;
+  const access = await requireApiIdentity();
+  if (!access.ok) return access.response;
+  return apiError(req, "SaaS 第一阶段暂不支持批量任务", "Batch jobs are not available in SaaS phase one", 403);
+}
 
 /**
  * Batch job persistence (batch_jobs / batch_job_items).
@@ -17,6 +26,8 @@ import { apiError } from "@/lib/api-error";
  * GET   ?active=1 → latest running job + items; ?jobId=xxx → that job + items
  */
 export async function POST(req: NextRequest) {
+  const saasResponse = await rejectSaasBatch(req);
+  if (saasResponse) return saasResponse;
   try {
     const body = (await req.json().catch(() => ({}))) as {
       config?: Record<string, unknown>;
@@ -56,6 +67,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const saasResponse = await rejectSaasBatch(req);
+  if (saasResponse) return saasResponse;
   try {
     const body = (await req.json().catch(() => ({}))) as {
       jobId?: unknown;
@@ -102,6 +115,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const saasResponse = await rejectSaasBatch(req);
+  if (saasResponse) return saasResponse;
   try {
     const db = getDb();
     const jobId = req.nextUrl.searchParams.get("jobId");

@@ -135,6 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return best && best.length >= item.href.length ? best : item.href;
   }, null);
   const settingsActive = pathname?.startsWith("/settings") ?? false;
+  const isSaasSurface = pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname?.startsWith("/dashboard");
 
   const navLink = (item: NavItem) => (
     <Link
@@ -151,6 +152,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!collapsed && t(item.key)}
     </Link>
   );
+
+  if (isSaasSurface) return <>{children}</>;
 
   return (
     <div className="flex min-h-screen">

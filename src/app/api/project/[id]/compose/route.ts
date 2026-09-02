@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
@@ -29,6 +30,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const db = getDb();
@@ -99,6 +103,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const body = await req.json().catch(() => ({}));

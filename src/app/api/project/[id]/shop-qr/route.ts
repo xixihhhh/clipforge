@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { join } from "path";
@@ -16,6 +17,9 @@ const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
  * body: { url?: string (override the project's shopUrl), platform?: string, size?: number }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
 

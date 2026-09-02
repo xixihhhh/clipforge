@@ -21,6 +21,7 @@ import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
 import { apiError, errText } from "@/lib/api-error";
 import { and, eq } from "drizzle-orm";
+import { requireProjectAccess } from "@/lib/saas/authorization";
 
 /** validate projectId to prevent path traversal (consistent with the upload route) */
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
@@ -131,6 +132,8 @@ export async function POST(req: NextRequest) {
   if (!projectId || !SAFE_ID.test(projectId)) {
     return apiError(req, "download=true 时需提供合法 projectId", "A valid projectId is required when download=true");
   }
+  const projectAccess = await requireProjectAccess(projectId);
+  if (!projectAccess.ok) return projectAccess.response;
   // "always have footage" fallback: when the original query returns nothing, retry with broader fallback terms to prevent blank shots caused by niche topics
   if (candidates.length === 0) {
     for (const bq of broadenQuery(query)) {

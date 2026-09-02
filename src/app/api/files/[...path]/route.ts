@@ -6,6 +6,8 @@ import { stat } from "fs/promises";
 import { join, normalize, sep } from "path";
 import { createReadStream, existsSync } from "fs";
 import { Readable } from "stream";
+import { requireProjectAccess } from "@/lib/saas/authorization";
+import { isSaasMode } from "@/lib/saas/runtime";
 
 // Static file server - serves uploaded images/videos.
 // Streams from disk (no whole-file buffering) and supports single-range HTTP Range requests (206),
@@ -15,6 +17,8 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
+  const access = await requireProjectAccess(path[0] ?? "");
+  if (!access.ok) return access.response;
 
   // Root directory for uploads
   const uploadsRoot = join(getDataDir(), "uploads");
@@ -54,7 +58,7 @@ export async function GET(
 
   const baseHeaders: Record<string, string> = {
     "Content-Type": mimeTypes[ext || ""] || "application/octet-stream",
-    "Cache-Control": "public, max-age=31536000",
+    "Cache-Control": isSaasMode() ? "private, no-store" : "public, max-age=31536000",
     "Accept-Ranges": "bytes",
   };
 

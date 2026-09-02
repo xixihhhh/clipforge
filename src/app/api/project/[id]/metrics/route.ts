@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -9,6 +10,9 @@ const num = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
 
 /** GET /api/project/[id]/metrics —— list the publish metrics recorded for this project (newest → oldest) */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
   const db = getDb();
@@ -27,6 +31,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
  * body: { style?, category?, platform?, views?, likes?, comments?, shares?, orders?, note?, publishedAt? }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
 

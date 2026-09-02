@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { existsSync } from "fs";
 import { getDb } from "@/lib/db";
 import { compositions, projects } from "@/lib/db/schema";
 import { fileNameOf } from "@/lib/paths";
 import { extractFirstFrame } from "@/lib/video-composer/frame-extract";
+import { requireApiIdentity } from "@/lib/saas/authorization";
+import { projectRepository } from "@/lib/saas/project-repository";
 
 /** Poster backfill budget per request — keeps the first works-page load snappy on old libraries. */
 const BACKFILL_MAX = 6;
@@ -19,6 +21,12 @@ const BACKFILL_MAX = 6;
  */
 export async function GET() {
   try {
+    const access = await requireApiIdentity();
+    if (!access.ok) return access.response;
+    const scopedProjectIds = access.identity
+      ? (await projectRepository.getProjects(access.identity.user.id)).map((project) => project.id)
+      : null;
+    if (scopedProjectIds?.length === 0) return NextResponse.json({ works: [] });
     const db = getDb();
     const rows = await db
       .select({
@@ -35,7 +43,10 @@ export async function GET() {
       })
       .from(compositions)
       .innerJoin(projects, eq(compositions.projectId, projects.id))
-      .where(eq(compositions.status, "done"))
+      .where(and(
+        eq(compositions.status, "done"),
+        ...(scopedProjectIds ? [inArray(compositions.projectId, scopedProjectIds)] : []),
+      ))
       .orderBy(desc(compositions.createdAt))
       .limit(200);
 

@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -20,6 +21,9 @@ const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
  * interrupted:true so the UI can offer the resume choice.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");
@@ -81,6 +85,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID");

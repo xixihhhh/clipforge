@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -59,6 +60,9 @@ async function persistGridImage(projectId: string, sourceUrl: string): Promise<{
  * body: { scriptId, provider, model, apiKey, baseUrl?, options? }
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!/^[a-zA-Z0-9-]+$/.test(id)) {

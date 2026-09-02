@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -19,6 +20,9 @@ const MAX_DOWNLOAD_SIZE = 200 * 1024 * 1024;
  * The clip is downloaded into data/output/{id}/ (provider URLs expire).
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id } = await params;
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID", 400);
 

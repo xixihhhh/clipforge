@@ -5,6 +5,8 @@ import { getDataDir, getMigrationsDir } from "@/lib/paths";
 import { db, dbInitError, dbMigrationError } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
 
 /**
  * 一站式自诊断接口：用户报障时只需截 http://127.0.0.1:<端口>/api/health 一张图，
@@ -12,6 +14,17 @@ import { sql } from "drizzle-orm";
  * 只读、无副作用、不含任何密钥信息。
  */
 export async function GET() {
+  if (isSaasMode()) {
+    const access = await requireApiIdentity();
+    if (!access.ok) return access.response;
+    return NextResponse.json({
+      version: process.env.npm_package_version || "unknown",
+      time: new Date().toISOString(),
+      mode: "saas",
+      status: "ok",
+    });
+  }
+
   // 数据库连通性：真实执行一条查询（能同时暴露原生模块 ABI 问题与表缺失问题）
   let dbStatus = "ok";
   let projectCount: number | null = null;

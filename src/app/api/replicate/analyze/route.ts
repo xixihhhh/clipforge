@@ -6,6 +6,8 @@ import { probeMedia } from "@/lib/media-probe";
 import { detectSceneTimes } from "@/lib/video-composer/contact-sheet";
 import { shotPlanFromCuts, replicateReferenceStructure, REPLICATE_MAX_REF_SEC } from "@/lib/replicate-plan";
 import { apiError, errText } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity } from "@/lib/saas/authorization";
 
 /** Single-file limit (matches the materials route; the model tier's own cap is 50MB/15s, reported per-mode) */
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
@@ -22,6 +24,17 @@ const EXT_BY_MIME: Record<string, string> = { "video/mp4": "mp4", "video/webm": 
  * shot-duration skeleton plus the ready-to-use referenceStructure prompt block.
  */
 export async function POST(req: NextRequest) {
+  if (isSaasMode()) {
+    const access = await requireApiIdentity();
+    if (!access.ok) return access.response;
+    return apiError(
+      req,
+      "SaaS 第一阶段尚未迁移共享复刻素材目录",
+      "The shared replication media directory is not available in SaaS phase one",
+      501,
+    );
+  }
+
   let formData: FormData;
   try {
     formData = await req.formData();

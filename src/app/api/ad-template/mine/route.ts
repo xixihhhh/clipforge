@@ -11,6 +11,8 @@ import {
   type AdTemplate,
   type AdTemplateShareError,
 } from "@/lib/ad-templates";
+import { requireApiIdentity } from "@/lib/saas/authorization";
+import { isSaasMode } from "@/lib/saas/runtime";
 
 /**
  * "My templates" — the user-owned side of the template economy. The curated
@@ -22,6 +24,18 @@ import {
  */
 
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
+
+async function requireLocalTemplateStore() {
+  const auth = await requireApiIdentity();
+  if (!auth.ok) return auth.response;
+  if (isSaasMode()) {
+    return NextResponse.json(
+      { error: "Personal template storage is not available in SaaS phase one" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
 
 const SHARE_ERRORS: Record<AdTemplateShareError, { zh: string; en: string }> = {
   invalid_json: { zh: "不是有效的 JSON 文本", en: "Not valid JSON" },
@@ -35,6 +49,8 @@ const SHARE_ERRORS: Record<AdTemplateShareError, { zh: string; en: string }> = {
 
 /** GET /api/ad-template/mine —— list saved templates (newest first) */
 export async function GET() {
+  const unavailable = await requireLocalTemplateStore();
+  if (unavailable) return unavailable;
   const db = getDb();
   const rows = await db
     .select()
@@ -54,6 +70,8 @@ export async function GET() {
  *       OR { template: object, source?: "edit" } (AI custom result / editor fork).
  */
 export async function POST(req: NextRequest) {
+  const unavailable = await requireLocalTemplateStore();
+  if (unavailable) return unavailable;
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
@@ -99,6 +117,8 @@ export async function POST(req: NextRequest) {
  * body: { id: string, template: object }. Runs the same sanitize + compliance rules.
  */
 export async function PUT(req: NextRequest) {
+  const unavailable = await requireLocalTemplateStore();
+  if (unavailable) return unavailable;
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
@@ -136,6 +156,8 @@ export async function PUT(req: NextRequest) {
 
 /** DELETE /api/ad-template/mine?id=... —— remove one saved template */
 export async function DELETE(req: NextRequest) {
+  const unavailable = await requireLocalTemplateStore();
+  if (unavailable) return unavailable;
   const id = req.nextUrl.searchParams.get("id") ?? "";
   if (!id || !SAFE_ID.test(id)) return apiError(req, "无效的模板ID", "Invalid template ID");
   const db = getDb();

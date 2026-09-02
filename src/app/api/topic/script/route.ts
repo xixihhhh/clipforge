@@ -6,6 +6,8 @@ import { scripts as scriptsTable, projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
 import { llmErrorPair } from "@/lib/llm-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { requireApiIdentity, requireProjectAccess } from "@/lib/saas/authorization";
 
 const VALID_NARRATION = new Set<TopicNarrationStyle>([
   "knowledge",
@@ -59,6 +61,8 @@ export async function POST(req: NextRequest) {
   // use an existing project or create a new topic project (create before generation so a draft project exists for retry even if generation fails)
   let projectId = typeof body.projectId === "string" && body.projectId ? body.projectId : "";
   if (projectId) {
+    const projectAccess = await requireProjectAccess(projectId);
+    if (!projectAccess.ok) return projectAccess.response;
     const exists = await db
       .select({ id: projects.id, contentType: projects.contentType })
       .from(projects)
@@ -74,6 +78,11 @@ export async function POST(req: NextRequest) {
       );
     }
   } else {
+    if (isSaasMode()) {
+      const access = await requireApiIdentity();
+      if (!access.ok) return access.response;
+      return apiError(req, "请先在 Dashboard 创建项目", "Create a project in the Dashboard first", 403);
+    }
     const [created] = await db
       .insert(projects)
       .values({ name: topicToName(topic), contentType: "topic", topic, status: "draft" })

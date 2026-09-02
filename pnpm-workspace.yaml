@@ -1,3 +1,10 @@
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
+  - electron
+  - electron-winstaller
+  - ffmpeg-static
+  - '@ffprobe-installer/ffprobe'
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

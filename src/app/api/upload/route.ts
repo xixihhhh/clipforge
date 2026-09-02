@@ -3,6 +3,7 @@ import { getDataDir } from "@/lib/paths";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { apiError } from "@/lib/api-error";
+import { requireProjectAccess } from "@/lib/saas/authorization";
 
 /** Whitelist of allowed upload MIME types */
 const ALLOWED_MIME_TYPES = new Set([
@@ -45,6 +46,9 @@ export async function POST(req: NextRequest) {
   if (!/^[a-zA-Z0-9\-]+$/.test(projectId)) {
     return apiError(req, "无效的项目ID格式", "Invalid project ID format");
   }
+
+  const access = await requireProjectAccess(projectId);
+  if (!access.ok) return access.response;
 
   // Create upload directory
   const uploadDir = join(getDataDir(), "uploads", projectId);

@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, errText } from "@/lib/api-error";
@@ -29,6 +30,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; mediaId: string }> },
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id, mediaId } = await params;
   if (!SAFE_ID.test(id) || !SAFE_ID.test(mediaId)) return apiError(req, "无效的素材ID", "Invalid media ID", 400);
   try {
@@ -96,6 +100,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; mediaId: string }> },
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   const { id, mediaId } = await params;
   if (!SAFE_ID.test(id) || !SAFE_ID.test(mediaId)) return apiError(req, "无效的素材ID", "Invalid media ID", 400);
   try {

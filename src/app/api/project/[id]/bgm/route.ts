@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { writeFile, mkdir } from "fs/promises";
@@ -11,6 +12,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!/^[a-zA-Z0-9-]+$/.test(id)) {

@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/saas/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { rm } from "fs/promises";
 import { join } from "path";
@@ -6,6 +7,8 @@ import { projects } from "@/lib/db/schema";
 import { getUploadsDir, getOutputDir } from "@/lib/paths";
 import { eq } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
+import { isSaasMode } from "@/lib/saas/runtime";
+import { projectRepository } from "@/lib/saas/project-repository";
 
 // Project ids are UUIDs; validate before using one in a filesystem path (guards the rm below against traversal)
 const SAFE_ID = /^[a-zA-Z0-9-]+$/;
@@ -13,6 +16,7 @@ const SAFE_ID = /^[a-zA-Z0-9-]+$/;
 // Allowlist of fields that may be updated via PATCH (id/createdAt etc. are blocked to prevent field injection / primary-key corruption)
 const PATCHABLE_FIELDS = [
   "name",
+  "description",
   "productName",
   "productCategory",
   "productDescription",
@@ -45,12 +49,18 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const db = getDb();
     const result = await db.select().from(projects).where(eq(projects.id, id));
 
     if (result.length === 0) {
+      if (isSaasMode() && projectAccess.project) {
+        return NextResponse.json(projectAccess.project);
+      }
       return apiError(req, "项目不存在", "Project not found", 404);
     }
 
@@ -69,6 +79,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     const body = await req.json();
@@ -91,11 +104,23 @@ export async function PATCH(
       return apiError(req, "没有可更新的字段", "No updatable fields provided", 400);
     }
 
+    const localUpdates = { ...updates };
+    delete localUpdates.description;
     const result = await db
       .update(projects)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...localUpdates, updatedAt: new Date() })
       .where(eq(projects.id, id))
       .returning();
+
+    if (isSaasMode() && projectAccess.identity) {
+      await projectRepository.updateProject(id, projectAccess.identity.user.id, {
+        ...(typeof body.name === "string" ? { name: body.name.slice(0, 255) } : {}),
+        ...(typeof body.description === "string" || body.description === null
+          ? { description: body.description }
+          : {}),
+        ...(typeof body.status === "string" ? { status: body.status } : {}),
+      });
+    }
 
     if (result.length === 0) {
       return apiError(req, "项目不存在", "Project not found", 404);
@@ -116,6 +141,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: accessProjectId } = await params;
+  const projectAccess = await requireProjectAccess(accessProjectId);
+  if (!projectAccess.ok) return projectAccess.response;
   try {
     const { id } = await params;
     if (!id || !SAFE_ID.test(id)) {
@@ -126,6 +154,9 @@ export async function DELETE(
     // but the project's on-disk files do not — remove them too so deletes don't leak orphaned
     // uploads/output directories. force:true ignores missing dirs; failures never block the delete.
     await db.delete(projects).where(eq(projects.id, id));
+    if (isSaasMode() && projectAccess.identity) {
+      await projectRepository.deleteProject(id, projectAccess.identity.user.id);
+    }
     await Promise.all([
       rm(join(getUploadsDir(), id), { recursive: true, force: true }).catch(() => {}),
       rm(join(getOutputDir(), id), { recursive: true, force: true }).catch(() => {}),
