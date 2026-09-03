@@ -140,7 +140,10 @@ export async function addCreditsTrusted(
   input: {
     amount: number;
     type: Exclude<CreditTransactionType, "consume">;
-    source: Extract<CreditTransactionSource, "signup_bonus" | "plan_grant" | "manual" | "refund" | "rollback">;
+    source: Extract<
+      CreditTransactionSource,
+      "signup_bonus" | "plan_grant" | "subscription_grant" | "manual" | "refund" | "rollback"
+    >;
     referenceId: string;
     metadata?: Record<string, unknown>;
   },
@@ -172,7 +175,8 @@ export async function setSubscriptionTrusted(
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
     currentPeriodEnd?: Date | null;
-    priceId?: string | null;
+    stripePriceId?: string | null;
+    cancelAtPeriodEnd?: boolean;
   },
 ) {
   const [subscription] = await getSaasDb()

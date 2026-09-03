@@ -22,6 +22,13 @@
       "when": 1788339800125,
       "tag": "0002_windy_sharon_ventura",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788353459969,
+      "tag": "0003_odd_enchantress",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,8 @@ export async function GET() {
     name: PLAN_CATALOG[subscription.plan].name,
     status: subscription.status,
     currentPeriodEnd: subscription.currentPeriodEnd,
-    priceId: subscription.priceId,
+    stripePriceId: subscription.stripePriceId,
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    hasStripeCustomer: Boolean(subscription.stripeCustomerId),
   });
 }

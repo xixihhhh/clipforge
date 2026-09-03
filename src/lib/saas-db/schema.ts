@@ -1,8 +1,16 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export type SubscriptionPlan = "free" | "pro" | "business" | "team";
-export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "paused";
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+  | "paused"
+  | "unpaid";
 export type CreditTransactionType = "grant" | "consume" | "refund" | "adjustment";
 export type CreditTransactionSource =
   | "signup_bonus"
@@ -11,6 +19,7 @@ export type CreditTransactionSource =
   | "ai_image"
   | "tts"
   | "manual"
+  | "subscription_grant"
   | "refund"
   | "rollback";
 
@@ -59,7 +68,8 @@ export const subscriptions = pgTable(
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
-    priceId: varchar("price_id", { length: 255 }),
+    stripePriceId: varchar("stripe_price_id", { length: 255 }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -112,9 +122,27 @@ export const creditTransactions = pgTable(
   ],
 );
 
+export const stripeWebhookEvents = pgTable(
+  "stripe_webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stripeEventId: varchar("stripe_event_id", { length: 255 }).notNull(),
+    eventType: varchar("event_type", { length: 128 }).notNull(),
+    livemode: boolean("livemode").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("stripe_webhook_events_event_id_unique").on(table.stripeEventId),
+    index("stripe_webhook_events_user_created_at_idx").on(table.userId, table.createdAt),
+  ],
+);
+
 export type SaasUser = typeof users.$inferSelect;
 export type SaasProject = typeof projects.$inferSelect;
 export type NewSaasProject = Pick<typeof projects.$inferInsert, "name" | "description" | "status">;
 export type SaasSubscription = typeof subscriptions.$inferSelect;
 export type CreditAccount = typeof creditAccounts.$inferSelect;
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;

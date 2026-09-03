@@ -595,7 +595,12 @@ PostgreSQL。服务端直连数据库仍必须保留应用层 owner 校验，ser
 `drizzle-saas/0002_windy_sharon_ventura.sql` 增加套餐与积分账本：新用户默认 Free 并获得
 一次性 100 credits 注册赠送；余额扣减由 PostgreSQL 原子函数执行，余额不足时整笔拒绝。
 浏览器只能读取自己的 subscription、余额与流水，不能直接修改余额或套餐。当前只开放
-Free / Pro，Business / Team 已在类型与 Stripe price 槽位中预留但尚未开放。
+Free / Pro，Business / Team 已在类型中预留但尚未开放。
+
+`drizzle-saas/0003_odd_enchantress.sql` 增加 Stripe webhook 幂等事件表、订阅取消周期字段，
+并将 Pro Price ID 明确存为 `stripe_price_id`。Checkout 和 Billing Portal 只能由已登录用户
+为自己创建；套餐升级只接受签名验证后的 Stripe webhook 或服务端直接查询 Stripe 的认证补偿同步。每个已支付 Pro invoice 发放
+1000 credits，invoice ID 同时作为账本幂等 reference，重复 webhook 不会重复发放。
 
 需要的环境变量：
 
@@ -605,11 +610,27 @@ Free / Pro，Business / Team 已在类型与 Stripe price 槽位中预留但尚�
 | `NEXT_PUBLIC_SUPABASE_URL` | 服务端与浏览器 | Supabase 项目 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 服务端与浏览器 | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | 仅服务端 | 预留给服务端管理操作，禁止暴露到客户端 |
-| `STRIPE_SECRET_KEY` | 仅服务端 | 未来 Stripe API 密钥；当前不要求配置 |
-| `STRIPE_WEBHOOK_SECRET` | 仅服务端 | 未来验证 Stripe webhook 签名 |
-| `STRIPE_PRICE_PRO` | 仅服务端 | 未来 Pro 套餐 Price ID |
-| `STRIPE_PRICE_BUSINESS` | 仅服务端 | 预留 Business 套餐 Price ID |
-| `STRIPE_PRICE_TEAM` | 仅服务端 | 预留 Team 套餐 Price ID |
+| `STRIPE_SECRET_KEY` | 仅服务端 | Stripe Test/Live Mode Secret Key |
+| `STRIPE_WEBHOOK_SECRET` | 仅服务端 | 验证 Stripe webhook 签名 |
+| `STRIPE_PRO_PRICE_ID` | 仅服务端 | 白名单 Pro recurring Price ID |
+| `PRO_MONTHLY_CREDITS` | 仅服务端 | 每个已支付 Pro 账期发放积分，默认 1000 |
+| `NEXT_PUBLIC_APP_URL` | 服务端与浏览器 | Checkout/Portal 返回地址的规范站点 origin |
+
+Stripe Test Mode 本地验收：先在 Stripe Test Mode 创建一个 monthly recurring Pro Price，
+将对应配置仅写入未跟踪的 `.env.local`。安装 Stripe CLI 后运行
+`stripe listen --forward-to localhost:3000/api/stripe/webhook`，使用 CLI 当前监听会话提供的
+webhook signing secret，并从 Dashboard 点击 `Upgrade to Pro` 完成测试支付。最终应通过
+Dashboard、`subscriptions` 和 `credit_transactions` 验证 Pro 状态与 invoice 幂等积分发放；
+不要把 CLI 输出或 Test Mode secret 写入源码、日志或提交记录。
+
+如果首次支付成功但 webhook 遗漏，可用该账号登录 `/dashboard` 并点击 `Sync billing`。
+按钮调用认证后的 `POST /api/billing/sync`，不提交任何 user/customer/price/amount 参数。
+服务端仅查询数据库中当前用户绑定的 Customer：有效 Pro 订阅恢复 Pro，已取消或没有有效 Pro
+订阅则恢复 Free；只检查该订阅最新、已支付且对应当前账期的 Pro invoice。积分沿用
+`subscription_grant` + 真实 invoice ID 和现有 PostgreSQL 原子函数，重复同步或与 webhook
+并发处理不会重复发放。成功后 Dashboard 自动刷新；再次点击应显示 `Credits added: 0`。
+此入口不创建支付、不伪造 webhook、不补发历史账期，也不需要 webhook signing secret。
+须先应用已有 SaaS migrations（包含 `0003`，命令 `pnpm db:migrate`）；同步本身不执行 migration。
 
 > 任一 SaaS 环境变量存在时应用都会按 SaaS 模式“安全失败”，缺少其余配置不会退回无鉴权本地模式。Electron/纯本地启动不要设置这些变量，即可继续使用 `data/sqlite.db`。
 

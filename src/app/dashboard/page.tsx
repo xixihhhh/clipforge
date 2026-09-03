@@ -6,6 +6,7 @@ import { requirePageUser } from "@/lib/saas/authorization";
 import { projectRepository } from "@/lib/saas/project-repository";
 import { getBillingSummary } from "@/lib/saas/billing";
 import { PLAN_CATALOG } from "@/lib/saas/billing-core";
+import { BillingActions } from "@/components/billing-actions";
 
 export default async function DashboardPage() {
   const { user } = await requirePageUser();
@@ -18,7 +19,13 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-sm text-muted-foreground">ClipForge workspace</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome back, {firstName}</h1></div>
-        <Link href="/dashboard/projects?create=1"><Button><LuPlus className="mr-2 h-4 w-4" />Create New Project</Button></Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <BillingActions
+            plan={billing.subscription.plan}
+            hasStripeCustomer={Boolean(billing.subscription.stripeCustomerId)}
+          />
+          <Link href="/dashboard/projects?create=1"><Button variant="outline"><LuPlus className="mr-2 h-4 w-4" />Create New Project</Button></Link>
+        </div>
       </div>
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <StatCard icon={<LuWalletCards />} label="Current Plan" value={PLAN_CATALOG[billing.subscription.plan].name} />
