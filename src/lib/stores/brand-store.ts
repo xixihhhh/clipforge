@@ -1,3 +1,5 @@
+import { createPersistentStorage } from "./persistent-storage";
+import { randomUUID } from "@/lib/uuid";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -30,7 +32,7 @@ export const useBrandStore = create<BrandState>()(
   persist(
     (set) => ({
       brand: {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         name: "我的店铺",
         primaryColor: "#6366f1",
         secondaryColor: "#8b5cf6",
@@ -59,6 +61,7 @@ export const useBrandStore = create<BrandState>()(
         })),
     }),
     {
+      storage: createPersistentStorage<BrandState>(),
       name: "daihuo-jianshou-brand",
     }
   )

@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -129,7 +130,7 @@ export default function BatchPage() {
     getExampleProducts(locale).forEach((ex) => {
       if (existing.has(ex.name)) return;
       addProduct({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         name: ex.name,
         category: ex.category,
         description: ex.sellingPoints,

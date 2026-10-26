@@ -3,7 +3,7 @@
 //  - Data is written to app.getPath('userData')/data (writable), injected into the server via APP_DATA_DIR (standalone cwd is read-only)
 //  - ffmpeg/ffprobe use bundled binaries, injected via FFMPEG_PATH/FFPROBE_PATH (no ffmpeg install required on the user's machine)
 //  - Acquire a free port (not hardcoded to 3000), poll HTTP until ready before loadURL, kill child process on exit
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const { fork } = require("child_process");
 const http = require("http");
 const net = require("net");
@@ -15,6 +15,19 @@ let mainWindow = null;
 let childExited = false; // set once the server child errors/exits, so waitReady can fail fast instead of polling a dead port
 let childExitInfo = "";
 let logFilePath = "";
+let serverUrl = "";
+const { createSettingsStorage } = require("./settings-storage.cjs");
+
+// Multiple desktop instances must not race migrations or overwrite the same settings files.
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) app.quit();
+app.on("second-instance", () => {
+  if (!mainWindow && serverUrl) createWindow(serverUrl);
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
 
 /** Prepare the diagnostics log file (truncated once per launch). Startup failures on a packaged GUI app are otherwise invisible — there is no console — so everything funnels here. */
 function initLog() {
@@ -176,11 +189,25 @@ function killServer() {
   }
 }
 
-app.whenReady().then(async () => {
+if (hasInstanceLock) app.whenReady().then(async () => {
+  const storage = createSettingsStorage(path.join(app.getPath("userData"), "data", "settings"));
+  ipcMain.on("clipforge:settings", (event, operation, key, value) => {
+    try {
+      if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame ||
+          !serverUrl || new URL(event.senderFrame.url).origin !== serverUrl) {
+        throw new Error("Untrusted settings request");
+      }
+      if (!["getItem", "setItem", "removeItem"].includes(operation)) throw new Error("Unknown storage operation");
+      event.returnValue = { value: storage[operation](key, value) ?? null };
+    } catch (error) {
+      event.returnValue = { error: error.message };
+    }
+  });
   initLog();
   let url;
   try {
     url = await startServer();
+    serverUrl = url;
   } catch (e) {
     const msg = (e && (e.stack || e.message)) || String(e);
     log("启动本地服务失败: " + msg);
@@ -217,12 +244,16 @@ app.whenReady().then(async () => {
     return;
   }
 
+  createWindow(url);
+});
+
+function createWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
     title: "ClipForge",
     backgroundColor: "#0a0a0a",
-    webPreferences: { contextIsolation: true },
+    webPreferences: { contextIsolation: true, preload: path.join(__dirname, "preload.cjs") },
   });
   // Surface a failed page load (e.g. the server died right after readiness) rather than leaving a blank window.
   mainWindow.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
@@ -237,10 +268,14 @@ app.whenReady().then(async () => {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+app.on("activate", () => {
+  if (!mainWindow && serverUrl) createWindow(serverUrl);
 });
 
 app.on("window-all-closed", () => {
-  killServer();
+  // macOS stays alive in the Dock; keep its server available for the next activation.
   if (process.platform !== "darwin") app.quit();
 });
 

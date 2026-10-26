@@ -11,16 +11,17 @@
  *   DALL·E 2/3 支持 response_format=url。本实现统一把 base64 包成 data URI 返回，
  *   下游落库（persistSource）已支持 data: 协议。
  * - gpt-image-2 支持任意分辨率（宽高被 16 整除、比例 1:3~3:1），竖屏带货可直接出 9:16。
- * - 视频（Sora）下载需鉴权（GET /v1/videos/{id}/content 带 Bearer），
- *   而本应用素材落库走的是无鉴权直链下载，故暂不接入 OpenAI 视频，generateVideo 直接报错。
+ * - 视频任务支持 /videos 和兼容服务的 /video/generations，成片带鉴权下载到本地。
  */
 
 import { BaseProvider, ProviderError } from './base'
+import { downloadProviderVideo } from './video-download'
 import type {
   ProviderConfig,
   ImageOptions,
   ImageResult,
   VideoResult,
+  VideoOptions,
   TaskStatus,
   Model,
   MediaType,
@@ -44,11 +45,15 @@ export class OpenAIProvider extends BaseProvider {
   readonly name = 'openai'
   readonly displayName = 'OpenAI'
 
+  private readonly videoEndpoint: '/videos' | '/video/generations'
+
   constructor(config: ProviderConfig) {
-    super({
-      ...config,
-      baseUrl: config.baseUrl || 'https://api.openai.com/v1',
-    })
+    const base = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')
+    // A full submission URL selects the legacy compatible contract without probing or
+    // retrying a billable POST against a second endpoint.
+    const legacy = base.endsWith('/video/generations')
+    super({ ...config, baseUrl: base.replace(/\/(video\/generations|videos)$/, '') })
+    this.videoEndpoint = legacy ? '/video/generations' : '/videos'
   }
 
   /**
@@ -62,32 +67,83 @@ export class OpenAIProvider extends BaseProvider {
     return this.textToImage(options)
   }
 
-  /**
-   * 生成视频（暂不支持）
-   * OpenAI Sora 的成片需鉴权下载，本应用素材落库走无鉴权直链，故暂未接入。
-   */
-  async generateVideo(): Promise<VideoResult> {
-    throw new ProviderError(
-      'OpenAI 暂未接入视频生成（Sora），请改用 fal.ai / Replicate / 火山引擎 / 阿里百炼 等视频平台',
-      'NOT_SUPPORTED',
-      this.name
-    )
+  async submitVideoTask(options: VideoOptions): Promise<{ taskId: string; modelId: string }> {
+    if (options.mode === 'video-to-video' || options.lastFrameUrl || options.referenceVideoUrls?.length || options.referenceAudioUrls?.length) {
+      throw new ProviderError('此视频接口不支持尾帧、参考视频或参考音频', 'NOT_SUPPORTED', this.name)
+    }
+    if (options.mode === 'image-to-video' && !options.firstFrameUrl) {
+      throw new ProviderError('图生视频缺少首帧图片', 'BAD_REFERENCE', this.name)
+    }
+    const sora = /^sora(?:-|$)/.test(options.modelId)
+    const duration = options.duration
+    if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) {
+      throw new ProviderError('视频时长必须为正数', 'BAD_PARAMETER', this.name)
+    }
+    if (sora && duration !== undefined && ![4, 8, 12].includes(duration)) {
+      throw new ProviderError('Sora 视频时长须为 4、8 或 12 秒，请在生成参数中调整', 'BAD_PARAMETER', this.name)
+    }
+    const seconds = duration === undefined ? undefined : String(duration)
+    const size = options.openaiSize?.trim() || (sora ? `${options.width ?? 720}x${options.height ?? 1280}` : undefined)
+    if (sora && size && !['720x1280', '1280x720', '1024x1792', '1792x1024'].includes(size)) {
+      throw new ProviderError('Sora 不支持此尺寸，请选择 720p 横屏/竖屏或填写该模型支持的尺寸', 'BAD_PARAMETER', this.name)
+    }
+    let response: { id?: string }
+    if (this.videoEndpoint === '/video/generations') {
+      response = await this.request(this.videoEndpoint, {
+        method: 'POST',
+        body: { model: options.modelId, prompt: options.prompt, ...(seconds && { seconds }), ...(size && { size }),
+          ...(options.firstFrameUrl && { input_reference: options.firstFrameUrl }) },
+        timeout: 120000,
+      })
+    } else {
+      const form = new FormData()
+      form.append('model', options.modelId)
+      form.append('prompt', options.prompt)
+      if (seconds) form.append('seconds', seconds)
+      if (size) form.append('size', size)
+      if (options.firstFrameUrl) {
+        const { blob, filename } = await this.fetchReferenceImage(options.firstFrameUrl)
+        form.append('input_reference', blob, filename)
+      }
+      response = await this.postMultipart(this.videoEndpoint, form)
+    }
+    if (!response.id || typeof response.id !== 'string') throw new ProviderError('视频接口未返回任务 ID，请检查服务端记录，勿直接重复提交', 'NO_TASK_ID', this.name)
+    return { taskId: response.id, modelId: options.modelId }
   }
 
-  /**
-   * 查询任务状态
-   * 图片为同步生成，无异步任务可查
-   */
-  async getTaskStatus(): Promise<TaskStatus> {
-    throw new ProviderError('OpenAI 图片为同步生成，无需查询任务状态', 'NOT_SUPPORTED', this.name)
+  async generateVideo(options: VideoOptions): Promise<VideoResult> {
+    const { taskId } = await this.submitVideoTask(options)
+    const status = await this.waitForTask(taskId)
+    return this.requireResult(status.result) as VideoResult
+  }
+
+  async getTaskStatus(taskId: string): Promise<TaskStatus> {
+    const response = await this.request<{
+      id?: string; status?: string; progress?: number | null; model?: string;
+      error?: { message?: string; code?: string }; seconds?: string;
+    }>(`/videos/${encodeURIComponent(taskId)}`)
+    const statuses: Record<string, TaskStatus['status']> = {
+      queued: 'pending', pending: 'pending', in_progress: 'processing', processing: 'processing',
+      completed: 'completed', failed: 'failed', cancelled: 'cancelled', canceled: 'cancelled',
+    }
+    const status = response.status && statuses[response.status]
+    if (!status) throw new ProviderError(`未知视频任务状态: ${response.status}`, 'UNKNOWN_STATUS', this.name)
+    const result: TaskStatus = { taskId, status,
+      ...(typeof response.progress === 'number' && { progress: response.progress }),
+      ...(response.error && { error: response.error.message, errorCode: response.error.code }),
+    }
+    if (status === 'completed') {
+      const videoUrl = await downloadProviderVideo(`${this.config.baseUrl}/videos/${encodeURIComponent(taskId)}/content`, this.getAuthHeaders())
+      result.result = { taskId, modelId: response.model ?? '', videoUrls: [videoUrl],
+        ...(response.seconds && { duration: Number(response.seconds) }) }
+    }
+    return result
   }
 
   /**
    * 获取可用模型列表（2026 当前 GPT Image 系列，均支持文生图 + 图生图编辑）
    */
   async listModels(mediaType?: MediaType): Promise<Model[]> {
-    if (mediaType === 'video') return []
-
     const models: Model[] = [
       {
         id: 'gpt-image-2',
@@ -107,7 +163,10 @@ export class OpenAIProvider extends BaseProvider {
       },
     ]
 
-    return models
+    models.push(...['sora-2', 'sora-2-pro'].map((id): Model => ({
+      id, name: id, provider: this.name, mediaType: 'video', modes: ['text-to-video', 'image-to-video'],
+    })))
+    return mediaType ? models.filter((model) => model.mediaType === mediaType) : models
   }
 
   // ==================== 私有方法 ====================
@@ -226,7 +285,7 @@ export class OpenAIProvider extends BaseProvider {
       if (e instanceof ProviderError) throw e
       const isTimeout = e instanceof DOMException && e.name === 'AbortError'
       throw new ProviderError(
-        isTimeout ? `请求超时（${timeoutMs}ms）` : `网络请求异常: ${e instanceof Error ? e.message : String(e)}`,
+        isTimeout ? `请求超时（${timeoutMs}ms），服务端可能已受理并计费，请先核查任务，勿重复提交` : `网络请求异常: ${e instanceof Error ? e.message : String(e)}`,
         isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR',
         this.name
       )

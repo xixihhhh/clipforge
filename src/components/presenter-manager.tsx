@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,7 +100,7 @@ export function PresenterManager() {
       });
     } else {
       addCharacter({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         name: form.name,
         description: form.description,
         appearance: form.appearance,

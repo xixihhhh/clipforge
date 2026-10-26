@@ -1,4 +1,5 @@
 "use client";
+import { randomUUID } from "@/lib/uuid";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocale, useT } from "@/lib/i18n";
@@ -18,7 +19,7 @@ export function ClipBatch({ projectId, mediaId, clips, plan, revision, disabled,
     if (apply && !current) return;
     setBusy(true); setError("");
     try {
-      const body = apply ? current!.body : { batchId: crypto.randomUUID(), baseRevision: revision, items: clips.map((clip) => ({ label: clip.label, plan: { ...plan, sourceRange: clip.sourceRange } })) };
+      const body = apply ? current!.body : { batchId: randomUUID(), baseRevision: revision, items: clips.map((clip) => ({ label: clip.label, plan: { ...plan, sourceRange: clip.sourceRange } })) };
       const response = await fetch(`/api/project/${projectId}/media/${mediaId}/batch`, { method: "POST", headers: { "Content-Type": "application/json", "Accept-Language": locale }, body: JSON.stringify({ ...body, action: apply ? "apply" : "preview" }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || t("renderFailed"));
       if (apply) { setPreview(null); onChange([]); onQueued(); }

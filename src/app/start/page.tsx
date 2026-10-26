@@ -7,6 +7,7 @@
  * only prompted to configure a Key when AI is actually needed (Atlas one-click recommended).
  */
 
+import { randomUUID } from "@/lib/uuid";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -146,7 +147,7 @@ export default function StartPage() {
           const res = await fetch(src);
           const blob = await res.blob();
           const file = new File([blob], `product-${i}.png`, { type: blob.type || "image/png" });
-          files.push({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file });
+          files.push({ id: randomUUID(), url: URL.createObjectURL(file), file });
         } catch {
           /* non-fatal per image */
         }
@@ -290,7 +291,7 @@ export default function StartPage() {
       const next = Array.from(files)
         .slice(0, remaining)
         .filter((f) => f.type.startsWith("image/"))
-        .map((file) => ({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }));
+        .map((file) => ({ id: randomUUID(), url: URL.createObjectURL(file), file }));
       return [...prev, ...next];
     });
   }, []);
@@ -313,7 +314,7 @@ export default function StartPage() {
       const file = new File([blob], `${ex.id}.png`, { type: blob.type || "image/png" });
       setImages((prev) => {
         prev.forEach((i) => URL.revokeObjectURL(i.url));
-        return [{ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }];
+        return [{ id: randomUUID(), url: URL.createObjectURL(file), file }];
       });
     } catch {
       /* image fetch failure is fine; the text fields are already filled */

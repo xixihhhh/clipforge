@@ -43,6 +43,8 @@ export const generationSettings: NamespaceMessages = {
     duration: "时长（秒）",
     fps: "帧率 fps",
     motionStrength: "运动强度",
+    openaiVideoSize: "OpenAI 兼容视频尺寸（可选）",
+    openaiVideoSizePlaceholder: "例如 720x1280；自建模型留空则不发送尺寸",
     videoNegativePlaceholder: "不希望出现的元素",
   },
   en: {
@@ -87,6 +89,8 @@ export const generationSettings: NamespaceMessages = {
     duration: "Duration (s)",
     fps: "Frame rate (fps)",
     motionStrength: "Motion strength",
+    openaiVideoSize: "OpenAI-compatible video size (optional)",
+    openaiVideoSizePlaceholder: "e.g. 720x1280; blank omits size for custom models",
     videoNegativePlaceholder: "Elements to avoid",
   },
 };

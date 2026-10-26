@@ -23,7 +23,8 @@ const DEFAULT_BASE: Record<string, string> = {
 type Probe = { url: string; headers: Record<string, string>; authFirst?: boolean; method?: "GET" | "POST"; body?: string };
 
 function buildProbe(name: string, apiKey: string, baseUrl?: string): Probe {
-  const base = (baseUrl || DEFAULT_BASE[name] || "").replace(/\/$/, "");
+  const rawBase = (baseUrl || DEFAULT_BASE[name] || "").replace(/\/+$/, "");
+  const base = name === "openai" ? rawBase.replace(/\/(video\/generations|videos)$/, "") : rawBase;
   if (name === "fal-ai") {
     // fal 先校验鉴权再解析 request id：到达 404/422 即说明 Key 有效
     return {

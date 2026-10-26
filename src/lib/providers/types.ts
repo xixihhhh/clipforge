@@ -116,6 +116,8 @@ export interface ImageResult {
 
 /** Video generation options */
 export interface VideoOptions {
+  /** Explicit size for OpenAI-compatible video servers; custom models omit it by default. */
+  openaiSize?: string
   /** Model ID to use */
   modelId: string
   /** Generation mode */

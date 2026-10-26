@@ -38,8 +38,8 @@ export const settings: NamespaceMessages = {
     providerAlibabaTip: "万相系列，商品图生视频效果佳",
     providerSiliconflowDesc: "国产 AI 推理平台，提供高性价比的模型推理服务",
     providerSiliconflowTip: "国产高性价比推理平台",
-    providerOpenaiDesc: "OpenAI 官方平台，支持 gpt-image-2、gpt-image-1.5 图片生成与图生图编辑",
-    providerOpenaiTip: "2026 旗舰 gpt-image-2，9:16 竖屏直出 + 商品保真图生图（暂不支持视频）",
+    providerOpenaiDesc: "OpenAI 与兼容服务，支持图片编辑及 Sora 视频任务",
+    providerOpenaiTip: "视频默认使用 /videos；兼容服务可将 Base URL 填为完整的 /v1/video/generations 地址。自建模型请在自定义模型中添加。",
 
     // AI 平台卡片
     providerEnabled: "已启用",
@@ -235,8 +235,8 @@ export const settings: NamespaceMessages = {
     providerAlibabaTip: "Wanxiang series, great for product image-to-video",
     providerSiliconflowDesc: "Homegrown AI inference platform with cost-effective model inference",
     providerSiliconflowTip: "Cost-effective domestic inference platform",
-    providerOpenaiDesc: "OpenAI's official platform — gpt-image-2 and gpt-image-1.5 image generation and editing",
-    providerOpenaiTip: "2026 flagship gpt-image-2: native 9:16 + product-faithful editing (no video yet)",
+    providerOpenaiDesc: "OpenAI and compatible servers — image editing and Sora video tasks",
+    providerOpenaiTip: "Video uses /videos by default. For legacy servers, set Base URL to the full /v1/video/generations endpoint. Add self-hosted models under Custom models.",
 
     // AI platform card
     providerEnabled: "Enabled",

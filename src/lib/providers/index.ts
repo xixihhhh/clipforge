@@ -71,7 +71,7 @@ registerProvider({
 registerProvider({
   name: 'openai',
   displayName: 'OpenAI',
-  description: 'OpenAI 官方平台，支持 gpt-image-2 / gpt-image-1.5 图片生成与图生图编辑',
+  description: 'OpenAI 与兼容服务，支持图片编辑及异步视频生成',
   factory: (config) => new OpenAIProvider(config),
 })
 

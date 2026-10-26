@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LuUpload, LuX, LuCircleAlert, LuZap, LuUser, LuUserX, LuBox, LuLayoutGrid, LuEye, LuVideo, LuBookmark, LuLink2, LuLoader } from "react-icons/lu";
@@ -377,7 +378,7 @@ export default function NewProjectPage() {
         .slice(0, remaining)
         .filter((f) => f.type.startsWith("image/"))
         .map((file) => ({
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           url: URL.createObjectURL(file),
           file,
         }));
@@ -428,7 +429,7 @@ export default function NewProjectPage() {
       // revoke old preview URLs to avoid memory leaks
       setImages((prev) => {
         prev.forEach((img) => URL.revokeObjectURL(img.url));
-        return [{ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }];
+        return [{ id: randomUUID(), url: URL.createObjectURL(file), file }];
       });
     } catch {
       // fetching the example image is non-fatal; the text fields are already filled and the user can upload manually
@@ -448,7 +449,7 @@ export default function NewProjectPage() {
         const res = await fetch(src);
         const blob = await res.blob();
         const file = new File([blob], `product-${i}.png`, { type: blob.type || "image/png" });
-        files.push({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file });
+        files.push({ id: randomUUID(), url: URL.createObjectURL(file), file });
       } catch {
         // non-fatal if the image cannot be fetched
       }

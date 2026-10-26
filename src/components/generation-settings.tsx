@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "volcengine", label: "火山引擎" },
   { value: "alibaba", label: "阿里百炼" },
   { value: "siliconflow", label: "硅基流动" },
+  { value: "openai", label: "OpenAI / Compatible" },
 ];
 
 const labelOf = (opts: { value: string; label: string }[], v: string) =>
@@ -104,7 +106,7 @@ export function GenerationSettings() {
   const handleAdd = () => {
     if (!canAdd) return;
     const cm: CustomModel = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       provider: form.provider,
       modelId: form.modelId.trim(),
       name: form.name.trim() || form.modelId.trim(),
@@ -253,6 +255,10 @@ export function GenerationSettings() {
                     {RESOLUTION_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t("openaiVideoSize")}</Label>
+                <Input value={videoParams.openaiSize ?? ""} onChange={(e) => setVideoParams({ ...videoParams, openaiSize: e.target.value })} placeholder={t("openaiVideoSizePlaceholder")} className="font-mono text-xs" />
               </div>
               <NumberField label={t("duration")} value={videoParams.duration} onChange={(v) => setVideoParams({ ...videoParams, duration: v })} placeholder="5" />
               <NumberField label={t("fps")} value={videoParams.fps} onChange={(v) => setVideoParams({ ...videoParams, fps: v })} placeholder={t("platformDefault")} />

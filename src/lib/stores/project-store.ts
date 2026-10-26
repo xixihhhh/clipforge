@@ -1,3 +1,4 @@
+import { createPersistentStorage } from "./persistent-storage";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Shot, CharacterVoiceProfile } from "@/lib/db/schema";
@@ -133,6 +134,6 @@ export const useCharacterStore = create<CharacterState>()(
           ),
         })),
     }),
-    { name: "daihuo-jianshou-characters" }
+    { name: "daihuo-jianshou-characters", storage: createPersistentStorage<CharacterState>() }
   )
 );

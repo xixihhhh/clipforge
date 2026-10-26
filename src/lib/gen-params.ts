@@ -46,6 +46,8 @@ export interface ImageGenParams {
 
 /** Global default parameters for video generation */
 export interface VideoGenParams {
+  /** Optional free-form size for OpenAI-compatible video models. */
+  openaiSize?: string;
   aspectRatio: GenAspectRatio;
   resolution: GenResolution;
   /** Duration in seconds (leave empty to use the platform default) */
@@ -153,6 +155,7 @@ export function buildVideoOptions(p: VideoGenParams | undefined): Record<string,
   const motionStrength = finiteNumber(params.motionStrength);
   const seed = finiteInteger(params.seed, undefined);
   return {
+    ...(params.openaiSize?.trim() && { openaiSize: params.openaiSize.trim() }),
     width,
     height,
     ...(duration != null && { duration }),

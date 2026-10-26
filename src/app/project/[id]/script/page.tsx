@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { LuWand, LuClock, LuImage, LuArrowRight, LuBookmarkPlus, LuLoaderCircle, LuTriangleAlert, LuCircleCheck, LuCircleX, LuPencil } from "react-icons/lu";
@@ -280,7 +281,7 @@ export default function ScriptPage() {
   const doSaveTemplate = () => {
     if (!templateName.trim() || !currentScript) return;
     addTemplate({
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       name: templateName.trim(),
       styleType: currentScript.styleType,
       shots: currentScript.shots as Shot[],

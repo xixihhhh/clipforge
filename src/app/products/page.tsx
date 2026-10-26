@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { LuPlus, LuTrash2, LuPencil, LuPackage, LuImage, LuX, LuVideo, LuCircleAlert, LuLink, LuLoader } from "react-icons/lu";
@@ -63,7 +64,7 @@ export default function ProductsPage() {
     getExampleProducts(locale).forEach((ex) => {
       if (existingNames.has(ex.name)) return;
       addProduct({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         name: ex.name,
         category: ex.category,
         description: ex.sellingPoints,
@@ -111,7 +112,7 @@ export default function ProductsPage() {
     setImportLoading(true);
     setImportError(null);
     try {
-      const libraryProductId = crypto.randomUUID();
+      const libraryProductId = randomUUID();
       const res = await fetch("/api/ingest/product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -129,7 +130,7 @@ export default function ProductsPage() {
       setDescription(parsed.description ?? "");
       setPrice(parsed.priceText ?? "");
       setTargetAudience("");
-      setImages(savedImages.map((u) => ({ id: crypto.randomUUID(), url: u })));
+      setImages(savedImages.map((u) => ({ id: randomUUID(), url: u })));
       setSaveError(null);
       setIsFormOpen(true);
       setImportOpen(false);
@@ -172,7 +173,7 @@ export default function ProductsPage() {
         .slice(0, remaining)
         .filter((f) => f.type.startsWith("image/"))
         .map((file) => ({
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           url: URL.createObjectURL(file),
           file,
         }));
@@ -222,7 +223,7 @@ export default function ProductsPage() {
     // Convert existing image URLs to display format
     setImages(
       product.images.map((url) => ({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         url,
       }))
     );
@@ -241,7 +242,7 @@ export default function ProductsPage() {
     try {
       // Reuse existing id when editing; a link import already stored its images under a
       // pre-generated id, so Save must keep it; otherwise generate a new one
-      const productId = editingId ?? importIdRef.current ?? crypto.randomUUID();
+      const productId = editingId ?? importIdRef.current ?? randomUUID();
       const wasImport = !editingId && importIdRef.current !== null;
 
       // Only items with a file object are newly selected — those need uploading; existing server/example URLs stay as-is

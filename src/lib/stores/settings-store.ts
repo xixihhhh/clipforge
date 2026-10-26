@@ -1,3 +1,4 @@
+import { createPersistentStorage } from "./persistent-storage";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
@@ -274,6 +275,7 @@ export const useSettingsStore = create<SettingsState>()(
         }),
     }),
     {
+      storage: createPersistentStorage<SettingsState>(),
       name: "daihuo-jianshou-settings",
       // v1：清洗历史版本预设写入的失效模型名（旧预设填过不存在的模型 ID，"测试连接"只验 Key
       // 不验模型名所以一直显示正常，直到生成脚本才报 Model Not Exist——issue #12 用户即此场景）。

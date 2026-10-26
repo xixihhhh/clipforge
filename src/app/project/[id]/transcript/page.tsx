@@ -1,5 +1,6 @@
 "use client";
 
+import { randomUUID } from "@/lib/uuid";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -581,7 +582,7 @@ export default function TranscriptPage() {
     if (format === "json") {
       downloadText(`${stem}.json`, "application/json", JSON.stringify({
         format: TRANSCRIPT_EDIT_FORMAT,
-        operationId: crypto.randomUUID(),
+        operationId: randomUUID(),
         actor: "human",
         projectId: id,
         mediaId: selected.id,
@@ -671,7 +672,7 @@ export default function TranscriptPage() {
       const response = await fetch(`/api/project/${id}/media/${selected.id}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept-Language": locale },
-        body: JSON.stringify({ action: "preview", operationId: crypto.randomUUID(), actor: "human", baseRevision: latestRevision, plan }),
+        body: JSON.stringify({ action: "preview", operationId: randomUUID(), actor: "human", baseRevision: latestRevision, plan }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t("renderFailed"));
