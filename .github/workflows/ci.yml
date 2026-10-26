@@ -37,7 +37,20 @@ jobs:
       # ffmpeg-static 的 linux-x64 静态包（johnvansickle 构建）自 FFmpeg 7.x 起缺 harfbuzz、
       # 没有 drawtext 滤镜；装发行版 ffmpeg 作为回退，让 drawtext 真渲染回归测试在 CI 上真实执行
       - name: 安装系统 ffmpeg（供 drawtext 真渲染测试回退使用）
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 4
+        run: |
+          if command -v ffmpeg >/dev/null && ffmpeg -hide_banner -filters 2>/dev/null | grep ' drawtext ' >/dev/null; then
+            exit 0
+          fi
+          apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+          # Runner images include unrelated third-party feeds. Only Ubuntu packages
+          # are needed here; a stalled external feed must not block release validation.
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            apt_options+=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0)
+          fi
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
+          ffmpeg -hide_banner -filters 2>/dev/null | grep ' drawtext ' >/dev/null
 
       - name: 安装依赖（锁定版本，开箱即用）
         run: pnpm install --frozen-lockfile
