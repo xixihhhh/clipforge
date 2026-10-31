@@ -197,9 +197,14 @@ export class FalAIProvider extends BaseProvider {
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     // fal.ai taskId format: "modelId::requestId"
     const [modelId, requestId] = this.parseTaskId(taskId)
+    // Queue lookups use the application root, without the operation subpath.
+    // workflows/comfy roots also include their namespace before owner/application.
+    const modelParts = modelId.split('/')
+    const applicationPartCount = modelParts[0] === 'workflows' || modelParts[0] === 'comfy' ? 3 : 2
+    const applicationId = modelParts.slice(0, applicationPartCount).join('/')
 
     const statusResponse = await this.request<FalStatusResponse>(
-      `/${modelId}/requests/${requestId}/status`,
+      `/${applicationId}/requests/${requestId}/status`,
       {
         // use fal.ai status query baseUrl
         headers: {},
@@ -217,7 +222,7 @@ export class FalAIProvider extends BaseProvider {
     // fetch the result once the task completes
     if (status === 'completed') {
       const result = await this.request<FalResultResponse>(
-        `/${modelId}/requests/${requestId}`
+        `/${applicationId}/requests/${requestId}`
       )
       taskStatus.result = this.parseResult(taskId, result, modelId)
     }
