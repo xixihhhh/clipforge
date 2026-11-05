@@ -453,6 +453,12 @@ open http://localhost:3000
 
 > 视频合成依赖本机 **FFmpeg**（需自行安装：`brew install ffmpeg` / `apt install ffmpeg`）。
 
+### 一键部署
+
+不想自己装环境，也可以一键部署到云端，直接打开 Web 界面出片：
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/ClipForge/)
+
 ---
 
 ## 技术架构
