@@ -301,7 +301,7 @@ export async function POST(
     }
 
     // 廉价预检：至少一个分镜有可用素材（避免返回 202 后才发现没素材）
-    const hasAnyAsset = shots.some((s) => toLocalPath(assetByShot.get(s.shotId) ?? productImages[0]));
+    const hasAnyAsset = shots.some((s) => toLocalPath(assetByShot.get(s.shotId) ?? s.referenceCut?.productImage ?? productImages[0]));
     if (!hasAnyAsset) {
       return NextResponse.json(
         { error: "没有可用素材，请先在素材步骤生成素材或上传商品图" },
@@ -368,6 +368,7 @@ export async function POST(
       // as .mp4) would fail the whole single-pass filter_complex with an inscrutable error — swap
       // it for the product image instead of feeding it to ffmpeg, and log which shot degraded.
       if (isVideo && (await probeDuration(local)) <= 0) {
+        if (shot.referenceCut) throw new Error(errText(req, `第 ${shot.shotId} 镜的视频无法解码，请替换该素材`, `Cannot decode the video in reference shot ${shot.shotId}. Replace this take.`));
         const fallback = toLocalPath(productImages[0]);
         console.warn(`[compose] 分镜 ${shot.shotId} 的视频素材无法解码（${local}），已降级为商品图兜底`);
         if (fallback && fallback !== local) {
