@@ -209,3 +209,51 @@ describe("fal queue terminal errors (#44)", () => {
 it("selects the published fal edit endpoint for product redraws", () => {
   expect(toEditVariant("openai/gpt-image-2")).toBe("openai/gpt-image-2/edit");
 });
+
+describe("fal GPT Image 2.6 Flare", () => {
+  const application = "openai/gpt-image-2.6";
+  const catalogId = application + "/flare/text-to-image";
+  const editId = application + "/flare/edit";
+
+  it.each([
+    { references: [] as string[], endpoint: catalogId },
+    { references: ["https://example.invalid/product.png", "https://example.invalid/presenter.png"], endpoint: editId },
+  ])("uses the selected model for $endpoint", async ({ references, endpoint }) => {
+    const catalog = await provider().listModels("image");
+    expect(catalog[0].id).toBe("openai/gpt-image-2");
+    const selected = catalog.find(model => model.id === catalogId);
+    expect(selected?.modes).toEqual(["text-to-image", "image-to-image"]);
+
+    const fetchMock = mockQueue(application, { images: [{ url: imageUrl }] }, { endpointId: endpoint });
+    const result = await provider().generateImage({
+      modelId: selected!.id, mode: references.length ? "image-to-image" : "text-to-image",
+      prompt: "Create a product photo", referenceImageUrls: references,
+      width: 1080, height: 1920, seed: 42, guidanceScale: 4, steps: 10, negativePrompt: "noise",
+    });
+    expect(result).toMatchObject({ modelId: endpoint, imageUrls: [imageUrl] });
+    const posts = fetchMock.mock.calls.filter(([, request]) => request?.method === "POST");
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({
+      prompt: "Create a product photo", image_size: { width: 1088, height: 1920 }, num_images: 1,
+      ...(references.length > 0 && { image_urls: references }),
+    });
+  });
+
+  it("rejects an unsupported output count before submitting", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(provider().generateImage({
+      modelId: catalogId, mode: "text-to-image", prompt: "product", count: 11,
+    })).rejects.toMatchObject({ code: "BAD_PARAMETER" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 17])("rejects %i references for an edit before making a paid request", async count => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(provider().generateImage({
+      modelId: catalogId, mode: "image-to-image", prompt: "product", referenceImageUrls: Array(count).fill(imageUrl),
+    })).rejects.toMatchObject({ code: "BAD_REFERENCE" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
