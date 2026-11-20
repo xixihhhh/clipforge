@@ -1040,7 +1040,7 @@ export default function AssetsPage() {
 
       <main className="mx-auto max-w-4xl px-6 py-8">
             {assets[0]?.referenceCut && referencePath && (
-              <ReferenceEditor projectId={id} scriptId={scriptId} versions={versions} source={referencePath} modelName={modelTarget?.model}
+              <ReferenceEditor key={id} projectId={id} scriptId={scriptId} versions={versions} source={referencePath} modelName={modelTarget?.model}
                 assets={assets} products={productImages} reload={reloadAssets} busy={isBatchGenerating || isGridGenerating || isFilmGenerating || assets.some((a) => a.status === "generating")}
                 generate={async (shotId, referenceFrame) => { const media = await generateOne(shotId, { skipMotion: true, referenceFrame }); if (media) await reloadAssets(); return Boolean(media); }} />
             )}

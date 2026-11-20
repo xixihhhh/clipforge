@@ -30,12 +30,19 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
 
 export function ReferenceEditor(props: EditorProps) {
   const en = useLocale() === "en";
-  const [selected, setSelected] = useState(0);
+  const positionKey = `clipforge.referencePosition.${props.projectId}`;
+  const [selected, setSelected] = useState(() => {
+    try { return Number(sessionStorage.getItem(positionKey)) || 0; } catch { return 0; }
+  });
+  function selectShot(id: number) {
+    setSelected(id);
+    try { sessionStorage.setItem(positionKey, String(id)); } catch { /* Shot selection also works without browser storage. */ }
+  }
   const shot = props.assets.find((s) => s.shotId === selected) ?? props.assets[0];
   if (!shot?.referenceCut) return null;
   return <section className="my-5 space-y-3 rounded-lg border bg-card p-4">
     <h3 className="font-semibold">{en ? "Reference cut editor" : "逐镜复刻"}</h3>
-    <ShotEditor key={JSON.stringify([props.scriptId, shot.shotId, shot.referenceCut, shot.description, shot.assetId])} {...props} shot={shot} en={en} selectShot={setSelected} />
+    <ShotEditor key={JSON.stringify([props.scriptId, shot.shotId, shot.referenceCut, shot.description, shot.assetId])} {...props} shot={shot} en={en} selectShot={selectShot} />
   </section>;
 }
 
