@@ -1,3 +1,5 @@
+import { writableShot, ShotConflict } from "@/lib/shot-ownership";
+import { recoverReplica, replicaForProject, submitReplica } from "@/lib/replicate-job";
 import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 import { ProviderError } from "@/lib/providers/base";
@@ -28,6 +30,15 @@ export async function POST(req: NextRequest) {
   try {
     const provider = createProvider({ name: providerName, apiKey, baseUrl });
 
+    if (body.purpose === "replicate") {
+      if (!projectId || !/^[a-zA-Z0-9-]+$/.test(projectId)) return apiError(req, "复刻需要项目", "A project is required", 400);
+      const existing = replicaForProject(projectId);
+      if (existing) {
+        if (existing.provider !== providerName) return apiError(req, "请使用原任务平台", "Select the original provider", 409);
+        return NextResponse.json(await recoverReplica(existing, provider));
+      }
+    }
+    const owner = projectId && shotId != null ? writableShot(projectId, body.scriptId, shotId) : null;
     const firstFrameUrl = await toRemoteUsableImage(imageUrl);
     // Keyframe chaining: pin the clip's last frame to the next
     // shot's keyframe so the transition is generated inside the clip (seamless on hard concat)
@@ -88,6 +99,8 @@ export async function POST(req: NextRequest) {
       ...options,
     };
 
+    if (body.purpose === "replicate") return NextResponse.json(await submitReplica(projectId, provider, videoOptions));
+    if (owner) writableShot(projectId, owner, shotId);
     // legacy single-phase path for providers without two-phase task support
     if (!provider.submitVideoTask || !provider.waitForTask) {
       const result = await provider.generateVideo(videoOptions);
@@ -103,6 +116,7 @@ export async function POST(req: NextRequest) {
     const rowId = await recordAiTask({
       projectId,
       shotId,
+      scriptId: owner,
       provider: providerName,
       model: modelId,
       mediaType: "video",
@@ -129,6 +143,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         taskId,
         videoUrls,
+        recoveryRecorded: !!rowId,
         modelId,
         duration: videoOptions.duration,
         processingTime: Date.now() - startTime,
@@ -158,8 +173,9 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("生视频失败:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : errText(req, "生视频失败", "Video generation failed") },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : errText(req, "生视频失败", "Video generation failed"),
+        ...(body.purpose === "replicate" && { terminal: error instanceof ProviderError && error.code === "TASK_FAILED", projectId }) },
+      { status: error instanceof ShotConflict ? 409 : 500 }
     );
   }
 }

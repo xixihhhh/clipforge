@@ -318,21 +318,21 @@ export function semanticAssetFromRecord(record: { id: string; shotId: number; ty
 
 export interface VersionTree {
   scripts: Array<{ id: string; version: number; selected: boolean; createdAt?: Date | null }>;
-  generations: Array<{ id: string; kind: "asset" | "task" | "composition"; shotId?: number | null; label: string; status: string; createdAt?: Date | null }>;
+  generations: Array<{ id: string; kind: "asset" | "task" | "composition"; scriptId?: string | null; shotId?: number | null; label: string; status: string; createdAt?: Date | null }>;
 }
 
 export function buildVersionTree(input: {
   scripts: Array<{ id: string; version: number; selected?: boolean | null; createdAt?: Date | null }>;
-  assets: Array<{ id: string; shotId: number; model?: string | null; type: string; status: string; createdAt?: Date | null }>;
-  tasks: Array<{ id: string; shotId?: number | null; model: string; status: string; createdAt?: Date | null }>;
-  compositions: Array<{ id: string; label?: string | null; status: string; createdAt?: Date | null }>;
+  assets: Array<{ id: string; scriptId?: string | null; shotId: number; model?: string | null; type: string; status: string; createdAt?: Date | null }>;
+  tasks: Array<{ id: string; scriptId?: string | null; shotId?: number | null; model: string; status: string; createdAt?: Date | null }>;
+  compositions: Array<{ id: string; scriptId?: string | null; label?: string | null; status: string; createdAt?: Date | null }>;
 }): VersionTree {
   return {
     scripts: [...input.scripts].sort((a, b) => b.version - a.version).map((s) => ({ ...s, selected: Boolean(s.selected) })),
     generations: [
-      ...input.assets.map((a) => ({ id: a.id, kind: "asset" as const, shotId: a.shotId, label: a.model || a.type, status: a.status, createdAt: a.createdAt })),
-      ...input.tasks.map((t) => ({ id: t.id, kind: "task" as const, shotId: t.shotId, label: t.model, status: t.status, createdAt: t.createdAt })),
-      ...input.compositions.map((c) => ({ id: c.id, kind: "composition" as const, label: c.label || "composition", status: c.status, createdAt: c.createdAt })),
+      ...input.assets.map((a) => ({ id: a.id, ...(a.scriptId && { scriptId: a.scriptId }), kind: "asset" as const, shotId: a.shotId, label: a.model || a.type, status: a.status, createdAt: a.createdAt })),
+      ...input.tasks.map((t) => ({ id: t.id, ...(t.scriptId && { scriptId: t.scriptId }), kind: "task" as const, shotId: t.shotId, label: t.model, status: t.status, createdAt: t.createdAt })),
+      ...input.compositions.map((c) => ({ id: c.id, ...(c.scriptId && { scriptId: c.scriptId }), kind: "composition" as const, label: c.label || "composition", status: c.status, createdAt: c.createdAt })),
     ].sort((a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0)),
   };
 }

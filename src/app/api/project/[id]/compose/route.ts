@@ -149,7 +149,7 @@ export async function POST(
     const productImages = (project.productImages ?? []) as string[];
 
     const scriptRows = await db.select().from(scriptsTable).where(eq(scriptsTable.projectId, id));
-    const selected = scriptRows.find((s) => s.selected) ?? scriptRows[0];
+    const selected = body.scriptId ? scriptRows.find(row => row.id === body.scriptId) : scriptRows.find((s) => s.selected) ?? scriptRows[0];
     if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
       return NextResponse.json({ error: "尚未生成脚本，无法合成" }, { status: 400 });
     }
@@ -181,7 +181,7 @@ export async function POST(
     }
 
     // 已生成的素材（assets 表，按 shotId 索引）
-    const assetRows = await db.select().from(assetsTable).where(and(eq(assetsTable.projectId, id), eq(assetsTable.selected, true)));
+    const assetRows = await db.select().from(assetsTable).where(and(eq(assetsTable.projectId, id), eq(assetsTable.scriptId, selected.id), eq(assetsTable.selected, true)));
     const assetByShot = new Map<number, string>();
     for (const a of assetRows) {
       if (a.filePath) assetByShot.set(a.shotId, a.filePath);
@@ -339,7 +339,7 @@ export async function POST(
     // 立即建合成记录(composing)并返回；重活(TTS+FFmpeg)后台异步跑，前端轮询 GET 获取结果
     const [comp] = await db
       .insert(compositions)
-      .values({ projectId: id, resolution: outputCfg.resolution, aspectRatio: outputCfg.aspectRatio, aigcBadge, ...(label && { label }), status: "composing" })
+      .values({ projectId: id, scriptId: selected.id, resolution: outputCfg.resolution, aspectRatio: outputCfg.aspectRatio, aigcBadge, ...(label && { label }), status: "composing" })
       .returning();
     await db.update(projects).set({ status: "composing", updatedAt: new Date() }).where(eq(projects.id, id));
 

@@ -1,3 +1,4 @@
+import { scriptForProject } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { join } from "path";
@@ -31,25 +32,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!proj) return apiError(req, "项目不存在", "Project not found", 404);
 
   // Active asset per shot = what composition actually uses; older takes remain reviewable.
+  const [comp] = await db
+    .select({ bgmPath: compositions.bgmPath, scriptId: compositions.scriptId })
+    .from(compositions)
+    // latest *successful* composition — a failed retry on top must not hide the real BGM provenance
+    .where(and(eq(compositions.projectId, id), eq(compositions.status, "done")))
+    .orderBy(desc(compositions.createdAt))
+    .limit(1);
+  const owner = scriptForProject(id, comp?.scriptId);
   const rows = await db
     .select()
     .from(assetsTable)
     .where(and(eq(assetsTable.projectId, id), eq(assetsTable.status, "done"), eq(assetsTable.selected, true)))
     .orderBy(desc(assetsTable.createdAt));
-  const current = rows;
+  const current = rows.filter(row => row.scriptId === owner?.id);
   if (current.length === 0) {
     return apiError(req, "该项目还没有素材，先自动配画面或上传素材", "This project has no assets yet; auto-fill or upload materials first", 404);
   }
 
   // BGM provenance: free-bgm drops a .credit.json sidecar next to the downloaded track
   let bgm: BgmCredit | null = null;
-  const [comp] = await db
-    .select({ bgmPath: compositions.bgmPath })
-    .from(compositions)
-    // latest *successful* composition — a failed retry on top must not hide the real BGM provenance
-    .where(and(eq(compositions.projectId, id), eq(compositions.status, "done")))
-    .orderBy(desc(compositions.createdAt))
-    .limit(1);
   if (comp?.bgmPath) {
     const bgmAbs = existsSync(comp.bgmPath) ? comp.bgmPath : join(getDataDir(), comp.bgmPath);
     try {

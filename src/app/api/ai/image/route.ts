@@ -1,3 +1,4 @@
+import { writableShot, ShotConflict } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 import { toRemoteUsableImage } from "@/lib/remote-image";
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
       ? (await Promise.all((imageUrls as string[]).map(toRemoteUsableImage))).filter((u): u is string => !!u)
       : undefined;
 
+    if (body.projectId && body.shotId != null) writableShot(body.projectId, body.scriptId, body.shotId);
     const result = await provider.generateImage({
       modelId: model,
       mode: mode || "text-to-image",
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
     console.error("生图失败:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : errText(req, "生图失败", "Image generation failed") },
-      { status: 500 }
+      { status: error instanceof ShotConflict ? 409 : 500 }
     );
   }
 }

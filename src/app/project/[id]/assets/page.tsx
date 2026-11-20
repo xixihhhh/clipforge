@@ -76,6 +76,9 @@ interface ImageModelTarget {
 
 // persisted cloud AI task row (from /api/ai/tasks, issue #16 recovery flow)
 interface PendingAiTask {
+  scriptId?: string | null;
+  purpose?: string | null;
+  resultUrls?: string[];
   id: string;
   shotId: number | null;
   provider: string;
@@ -133,6 +136,10 @@ export default function AssetsPage() {
   const [taskMsg, setTaskMsg] = useState<string | null>(null);
   // per-shot camera editing (preset picker + inline free text): edits persist into the
   // selected script's shots via the scripts PATCH, so the next (re)generation uses them
+  const [reuseRows, setReuseRows] = useState<{id: string; filePath: string; shotId: number; scriptId: string | null; scriptTitle?: string}[]>([]);
+  const [reuseError, setReuseError] = useState("");
+  const [reuseId, setReuseId] = useState("");
+  const [reuseShot, setReuseShot] = useState("");
   const [scriptId, setScriptId] = useState<string>("");
   const [editingCameraShot, setEditingCameraShot] = useState<number | null>(null);
   const [cameraDraft, setCameraDraft] = useState("");
@@ -189,7 +196,7 @@ export default function AssetsPage() {
         const [projectRes, scriptsRes, assetsRes] = await Promise.all([
           fetch(`/api/project/${id}`),
           fetch(`/api/project/${id}/scripts`),
-          fetch(`/api/project/${id}/assets`),
+          fetch(`/api/project/${id}/assets?allScripts=1`),
         ]);
 
         const project = projectRes.ok ? await projectRes.json() : null;
@@ -225,9 +232,11 @@ export default function AssetsPage() {
         // remember which script row the view came from — camera edits PATCH back into it
         setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
         setScriptId(typeof selected.id === "string" ? selected.id : "");
+        lastFrameByShot.current.clear();
+        setReuseRows((Array.isArray(savedAssets) ? savedAssets : []).filter(row => row.scriptId !== selected.id && row.filePath && row.status === "done").map(row => ({ ...row, scriptTitle: scripts.find((script: {id:string}) => script.id === row.scriptId)?.title })));
 
         // selected script shots + persisted assets → view rows (shared pure function used by "refresh after filling visuals")
-        const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets : [], imgs);
+        const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets.filter(row => row.scriptId === selected.id) : [], imgs);
         for (const row of rows) if (row.lastFrameUrl) lastFrameByShot.current.set(row.shotId, row.lastFrameUrl);
         setAssets(rows);
       } catch (e) {
@@ -246,7 +255,7 @@ export default function AssetsPage() {
     const [projectRes, scriptsRes, assetsRes] = await Promise.all([
       fetch(`/api/project/${id}`),
       fetch(`/api/project/${id}/scripts`),
-      fetch(`/api/project/${id}/assets`),
+      fetch(`/api/project/${id}/assets?allScripts=1`),
     ]);
     const project = projectRes.ok ? await projectRes.json() : null;
     const scripts = scriptsRes.ok ? await scriptsRes.json() : [];
@@ -258,7 +267,9 @@ export default function AssetsPage() {
     if (selected && Array.isArray(selected.shots)) {
       setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
       setScriptId(typeof selected.id === "string" ? selected.id : "");
-      const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets : [], imgs);
+        lastFrameByShot.current.clear();
+        setReuseRows((Array.isArray(savedAssets) ? savedAssets : []).filter(row => row.scriptId !== selected.id && row.filePath && row.status === "done").map(row => ({ ...row, scriptTitle: scripts.find((script: {id:string}) => script.id === row.scriptId)?.title })));
+      const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets.filter(row => row.scriptId === selected.id) : [], imgs);
       for (const row of rows) if (row.lastFrameUrl) lastFrameByShot.current.set(row.shotId, row.lastFrameUrl);
       setAssets(rows);
     }
@@ -336,7 +347,7 @@ export default function AssetsPage() {
   const applyLocalMaterial = async (material: PublicLocalMaterial, shotId: number) => {
     const res = await fetch(`/api/project/${id}/assets`, {
       method: "POST", headers: { "Content-Type": "application/json", "Accept-Language": locale },
-      body: JSON.stringify({ shotId, sourceUrl: material.url, type: "user_upload", provider: "local", prompt: [material.originalName, ...material.tags].join(" ") }),
+      body: JSON.stringify({ scriptId, shotId, sourceUrl: material.url, type: "user_upload", provider: "local", prompt: [material.originalName, ...material.tags].join(" ") }),
     });
     if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.error || t("uploadFailed")); }
     await reloadAssets();
@@ -364,7 +375,7 @@ export default function AssetsPage() {
         const up = await fetch("/api/upload", { method: "POST", body: fd, signal: controller.signal });
         const data = await up.json().catch(() => ({}));
         if (!up.ok || !data.paths?.[0]) throw new Error(data.error || t("uploadFailed"));
-        const res = await fetch(`/api/project/${id}/assets`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shotId, sourceUrl: data.paths[0], type: "user_upload" }) });
+        const res = await fetch(`/api/project/${id}/assets`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scriptId, shotId, sourceUrl: data.paths[0], type: "user_upload" }) });
         if (!res.ok) throw new Error(t("uploadFailed"));
         await reloadAssets();
       }
@@ -388,7 +399,7 @@ export default function AssetsPage() {
         // free sources are primarily Openverse images (video sources require a Pexels/Pixabay key, to be integrated in settings later)
         // llmConfig opt-in: semantic rerank picks the best-matching footage per shot (heuristic fallback inside the route)
         body: JSON.stringify({
-          source: localOnly ? "local" : "all",
+          scriptId, source: localOnly ? "local" : "all",
           mediaType: localOnly ? "auto" : "image",
           ...(!localOnly && llm.baseUrl && llm.model ? { llmConfig: { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model } } : {}),
         }),
@@ -413,7 +424,7 @@ export default function AssetsPage() {
     } finally {
       setIsFillingStock(false);
     }
-  }, [id, isFillingStock, reloadAssets, t, llm.baseUrl, llm.apiKey, llm.model]);
+  }, [scriptId, id, isFillingStock, reloadAssets, t, llm.baseUrl, llm.apiKey, llm.model]);
 
   // load cloud tasks whose results were never retrieved (issue #16) so the user can
   // recover a paid task instead of resubmitting (and paying again)
@@ -422,11 +433,11 @@ export default function AssetsPage() {
       const res = await fetch(`/api/ai/tasks?projectId=${id}&active=1`);
       if (!res.ok) return;
       const rows = await res.json();
-      if (Array.isArray(rows)) setPendingTasks(rows);
+      if (Array.isArray(rows)) setPendingTasks(rows.filter((row: PendingAiTask) => !row.scriptId || row.scriptId === scriptId));
     } catch {
       // recovery UI is best-effort; never block the page on it
     }
-  }, [id]);
+  }, [id, scriptId]);
 
   useEffect(() => {
     reloadPendingTasks();
@@ -436,16 +447,17 @@ export default function AssetsPage() {
   // keyframeUrl = the static first frame the i2v ran from: persisted as thumbnailPath so the
   // keyframe survives the upsert — it powers the per-shot motion re-run and keyframe chaining
   const saveVideoAsset = useCallback(
-    async (shotId: number, url: string, prompt: string | undefined, provider: string, model: string, keyframeUrl?: string, generationPlan?: GenerationControlSummary | null) => {
+    async (shotId: number, url: string, prompt: string | undefined, provider: string, model: string, keyframeUrl?: string, generationPlan?: GenerationControlSummary | null, providerTaskId?: string) => {
       const saveRes = await fetch(`/api/project/${id}/assets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shotId, type: "ai_generate", sourceUrl: url, prompt, provider, model,
+          scriptId, providerTaskId, shotId, type: "ai_generate", sourceUrl: url, prompt, provider, model,
           ...(keyframeUrl && { thumbnailPath: keyframeUrl }),
           ...(generationPlan && { generationPlan }),
         }),
       });
+      if (!saveRes.ok) throw new Error((await saveRes.json()).error || t("taskResumeFailed"));
       let savedUrl = url;
       let savedLastFrame: string | undefined;
       if (saveRes.ok) {
@@ -474,12 +486,24 @@ export default function AssetsPage() {
         )
       );
     },
-    [id]
+    [id, scriptId, t]
   );
 
   // resume a persisted cloud task: query (and wait for) its status, then save the result
   const resumeTask = useCallback(
     async (task: PendingAiTask) => {
+      if (!task.scriptId && task.shotId != null) {
+        if (!scriptId || !window.confirm(locale === "zh" ? "将此历史任务绑定到当前脚本的同号分镜，再恢复结果？" : "Assign this legacy task to the matching shot in the current script before recovering?")) return;
+        const response = await fetch("/api/ai/tasks", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowId: task.id, projectId: id, scriptId }) });
+        if (!response.ok) { setTaskMsg((await response.json()).error); return; }
+        task = await response.json();
+      }
+      const attachReplica = task.purpose === "replicate" && !task.taskId;
+      const taskId = attachReplica
+        ? window.prompt(locale === "zh" ? "填写在原模型平台核对过的复刻任务 ID，以恢复已有任务。" : "Enter the existing task ID verified in your provider history.")?.trim()
+        : task.taskId;
+      if (!taskId) return;
       const prov = providers[task.provider];
       if (!prov?.apiKey) {
         setTaskMsg(t("errorNoVideoModel"));
@@ -492,15 +516,19 @@ export default function AssetsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            provider: task.provider,
+            purpose: task.purpose, provider: task.provider,
             apiKey: prov.apiKey,
             baseUrl: prov.baseUrl,
-            taskId: task.taskId,
+            taskId, attachReplica, projectId: id,
             wait: true,
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || t("taskResumeFailed"));
+        if (data.compositionId && task.purpose === "replicate") {
+          window.location.assign(`/project/${id}/export`);
+          return;
+        }
         if (data.status === "completed" && data.videoUrls?.[0]) {
           if (task.controlPlan && "kind" in task.controlPlan && task.controlPlan.kind === "repair") {
             const finalizeRes = await fetch(`/api/project/${id}/repair`, {
@@ -515,7 +543,7 @@ export default function AssetsPage() {
             const asset = assets.find((a) => a.shotId === task.shotId);
             // best-effort keyframe provenance: the task was submitted from the shot's static frame
             const keyframe = asset && !asset.isVideo ? asset.thumbnailUrl : asset?.keyframeUrl;
-            await saveVideoAsset(task.shotId, data.videoUrls[0], asset?.prompt, task.provider, task.model, keyframe, task.controlPlan);
+            await saveVideoAsset(task.shotId, data.videoUrls[0], asset?.prompt, task.provider, task.model, keyframe, task.controlPlan, task.scriptId ? task.taskId : undefined);
           }
           setTaskMsg(t("taskResumeDone"));
         } else if (data.status === "failed" || data.status === "cancelled") {
@@ -534,7 +562,7 @@ export default function AssetsPage() {
         });
       }
     },
-    [providers, assets, saveVideoAsset, reloadAssets, reloadPendingTasks, id, t]
+    [providers, assets, scriptId, locale, saveVideoAsset, reloadAssets, reloadPendingTasks, id, t]
   );
 
   // convert to motion shot: use the already-generated image for this shot as the first frame, call the image-to-video model, and save the result as the shot's asset (video).
@@ -676,6 +704,7 @@ export default function AssetsPage() {
             // issue #16: identify the task server-side so the paid task ID is persisted
             // against this project/shot and stays recoverable after timeout or restart
             projectId: id,
+            scriptId,
             shotId,
             // user-defined video parameters (aspect ratio / resolution / duration / frame rate / motion / seed / negative prompt)
             options: videoOptions,
@@ -697,7 +726,7 @@ export default function AssetsPage() {
         if (!url) throw new Error(t("errorEmptyResult"));
         // save as this shot's asset (video will be downloaded locally); compose processes it as a video clip (including native audio track detection).
         // Persist the motion prompt actually sent AND the source keyframe (provenance + re-run/chaining)
-        await saveVideoAsset(shotId, url, finalPrompt, videoModelTarget.provider, data.modelId || videoModelTarget.model, effectiveFirstFrame, controlSummary);
+        await saveVideoAsset(shotId, url, finalPrompt, videoModelTarget.provider, data.modelId || videoModelTarget.model, effectiveFirstFrame, controlSummary, data.taskId && data.recoveryRecorded ? data.taskId : undefined);
       } catch (e) {
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, error: e instanceof Error ? e.message : t("errorImageToVideoFailed") } : a))
@@ -710,7 +739,7 @@ export default function AssetsPage() {
         });
       }
     },
-    [assets, videoModelTarget, id, videoParams, motionIntensity, motionRealism, chainMode, projectCategory, projectCreativeIntent, projectVisualBible, visualLook, productSafe, productImages, presenterLib, presenterSheet, saveVideoAsset, reloadPendingTasks, t, locale]
+    [assets, videoModelTarget, id, scriptId, videoParams, motionIntensity, motionRealism, chainMode, projectCategory, projectCreativeIntent, projectVisualBible, visualLook, productSafe, productImages, presenterLib, presenterSheet, saveVideoAsset, reloadPendingTasks, t, locale]
   );
 
   // actually generate a single asset. Returns the saved static keyframe URL (undefined on failure) so
@@ -732,7 +761,7 @@ export default function AssetsPage() {
           fetch(`/api/project/${id}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ shotId, type: "product_image", sourceUrl: productImages[0] }),
+            body: JSON.stringify({ scriptId, shotId, type: "product_image", sourceUrl: productImages[0] }),
           }).catch(() => {});
           // auto motion: use the product image as the first frame and run image-to-video (bring the real product to life); falls back to a static image on failure
           if (!opts?.skipMotion && autoMotion && videoModelTarget) await generateMotion(shotId, productImages[0]);
@@ -799,6 +828,7 @@ export default function AssetsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            projectId: id, scriptId, shotId,
             provider: modelTarget.provider,
             model: genModel,
             apiKey: modelTarget.apiKey,
@@ -820,25 +850,18 @@ export default function AssetsPage() {
         if (!url) throw new Error(t("errorEmptyResult"));
         // persist to database (remote images will be downloaded locally) so the composer can read the real AI asset
         let savedUrl = url;
-        try {
-          const saveRes = await fetch(`/api/project/${id}/assets`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              shotId, type: "ai_generate", sourceUrl: url,
-              prompt: genPrompt, provider: modelTarget.provider, model: genModel,
-            }),
-          });
-          if (saveRes.ok) {
-            const saved = await saveRes.json();
-            if (saved.filePath) savedUrl = saved.filePath;
-          } else if (asset.referenceCut) {
-            throw new Error((await saveRes.json()).error || t("errorGenerateFailed"));
-          }
-        } catch (error) {
-          if (asset.referenceCut) throw error;
-          // persist failure doesn't affect the preview (the composer will fall back to the product image as a safety net)
-        }
+        const saveRes = await fetch(`/api/project/${id}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scriptId, shotId, type: "ai_generate", sourceUrl: url,
+            prompt: genPrompt, provider: modelTarget.provider, model: genModel,
+          }),
+        });
+        if (saveRes.ok) {
+          const saved = await saveRes.json();
+          if (saved.filePath) savedUrl = saved.filePath;
+        } else throw new Error((await saveRes.json()).error || t("taskResumeFailed"));
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl } : a))
         );
@@ -854,7 +877,7 @@ export default function AssetsPage() {
         return undefined;
       }
     },
-    [assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, projectCreativeIntent, projectVisualBible, visualLook, generateMotion, locale, t]
+    [id, scriptId, assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, projectCreativeIntent, projectVisualBible, visualLook, generateMotion, locale, t]
   );
 
   // storyboard grid: ONE image generation renders every shot as a 3x3 grid cell (person /
@@ -1354,6 +1377,26 @@ export default function AssetsPage() {
 
         {/* cloud paid-task recovery (issue #16): submitted tasks whose results were never
             retrieved — offer resume instead of a duplicate (billed) resubmit */}
+        {reuseRows.length > 0 && scriptId && assets.length > 0 && <details className="my-4">
+          <summary>{locale === "zh" ? "复用其他脚本或旧项目素材" : "Reuse a take from another script or a legacy project"}</summary>
+          <select aria-label={locale === "zh" ? "来源素材" : "Source take"} value={reuseId} onChange={e => setReuseId(e.target.value)}>
+            <option value="">{locale === "zh" ? "选择来源素材" : "Select source"}</option>
+            {reuseRows.map(row => <option key={row.id} value={row.id}>{row.scriptTitle || row.scriptId?.slice(0,8) || (locale === "zh" ? "历史素材" : "Legacy")} · #{row.shotId} · {row.filePath.split("/").pop()}</option>)}
+          </select>
+          <select aria-label={locale === "zh" ? "目标分镜" : "Destination shot"} value={reuseShot} onChange={e => setReuseShot(e.target.value)}>
+            <option value="">{locale === "zh" ? "选择目标分镜" : "Select destination"}</option>
+            {assets.map(row => <option key={row.shotId} value={row.shotId}>#{row.shotId} {row.description}</option>)}
+          </select>
+          <button disabled={!reuseId || !reuseShot} onClick={async () => {
+            try {
+              const response = await fetch(`/api/project/${id}/assets`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reuse: true, assetId: reuseId, scriptId, shotId: Number(reuseShot) }) });
+              if (!response.ok) throw new Error((await response.json()).error);
+              await reloadAssets(); setReuseId(""); setReuseShot(""); setReuseError("");
+            } catch (error) { setReuseError(error instanceof Error ? error.message : t("taskResumeFailed")); }
+          }}>{locale === "zh" ? "将素材用于选中分镜" : "Use take for this shot"}</button>
+          {reuseError && <p role="alert">{reuseError}</p>}
+        </details>}
         {pendingTasks.length > 0 && (
           <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
             <div className="flex items-start gap-3">

@@ -100,6 +100,7 @@ async function runStockFillStage(input: StartPipelineInput): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        scriptId: input.scriptId,
         source: "all",
         mediaType: "auto",
         ...(input.llmConfig?.baseUrl && input.llmConfig.model ? { llmConfig: input.llmConfig } : {}),
@@ -115,7 +116,7 @@ async function runComposeStage(input: StartPipelineInput, runId: string): Promis
   const res = await fetch(`${input.origin}/api/project/${input.projectId}/compose`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ freeTts: { enabled: true } }),
+    body: JSON.stringify({ scriptId: input.scriptId, freeTts: { enabled: true } }),
   });
   const data = (await res.json().catch(() => ({}))) as { compositionId?: string; error?: string };
   if (!res.ok) throw new Error(data.error || "合成启动失败 / compose failed to start");

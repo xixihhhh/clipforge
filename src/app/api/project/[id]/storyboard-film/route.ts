@@ -154,7 +154,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // every shot needs a keyframe IMAGE (grid cells or per-shot stills) to cite as @ImageN
-    const assetRows = await db.select().from(assets).where(and(eq(assets.projectId, id), eq(assets.selected, true)));
+    const assetRows = await db.select().from(assets).where(and(eq(assets.projectId, id), eq(assets.scriptId, scriptId), eq(assets.selected, true)));
     const byShot = new Map(assetRows.map((a) => [a.shotId, a]));
     const keyframes: string[] = [];
     const missing: number[] = [];
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // legacy single-phase path for providers without two-phase task support
     if (!provider.submitVideoTask || !provider.waitForTask) {
       const result = await provider.generateVideo(videoOptions);
-      const saved = await persistFilm(id, result.videoUrls?.[0], choice.model);
+      const saved = await persistFilm(id, scriptId, result.videoUrls?.[0], choice.model);
       return NextResponse.json({ ...saved, taskId: result.taskId, modelId: result.modelId, seconds: duration, dialogueWarnings });
     }
 
@@ -239,6 +239,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { taskId, modelId } = await provider.submitVideoTask(videoOptions);
     const rowId = await recordAiTask({
       projectId: id,
+      scriptId,
       provider: providerName,
       model: modelId,
       mediaType: "video",
@@ -260,7 +261,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         );
       }
       await updateAiTask(rowId, { status: "completed", resultUrls: [videoUrl], error: null });
-      const saved = await persistFilm(id, videoUrl, modelId);
+      const saved = await persistFilm(id, scriptId, videoUrl, modelId);
       return NextResponse.json({ ...saved, taskId, modelId, seconds: duration, dialogueWarnings });
     } catch (error) {
       const failed = error instanceof ProviderError && error.code === "TASK_FAILED";
@@ -305,7 +306,7 @@ async function unitPriceUsd(modelId: string, baseUrl?: string): Promise<number |
 }
 
 /** Download the generated film into the project's output dir and register it as a composition. */
-async function persistFilm(projectId: string, videoUrl: string | undefined, model: string) {
+async function persistFilm(projectId: string, scriptId: string, videoUrl: string | undefined, model: string) {
   if (!videoUrl) throw new Error("生成完成但未返回视频地址");
   const resp = await fetch(videoUrl);
   if (!resp.ok) throw new Error(`下载成片失败: ${resp.status}`);
@@ -322,6 +323,7 @@ async function persistFilm(projectId: string, videoUrl: string | undefined, mode
     .insert(compositions)
     .values({
       projectId,
+      scriptId,
       outputPath,
       resolution: "720p",
       aspectRatio: "9:16",

@@ -1,3 +1,4 @@
+import { referenceLocked, writableShot, sameShot, ShotConflict } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // reference images (order matters — the prompt cites them by position):
     // [character sheet?, product photo?]; local /api/files paths travel as Base64
+    if (shots.some(referenceLocked)) throw new ShotConflict("请先解锁参考镜头再重做整组分镜 / Unlock the reference shots before rebuilding the grid");
     const refInputs = [characterSheetUrl, productImageUrl].filter((u): u is string => !!u);
     const referenceImageUrls = (await Promise.all(refInputs.map(toRemoteUsableImage))).filter(
       (u): u is string => !!u
@@ -148,9 +150,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ]);
       const filePath = `/api/files/${id}/${fileName}`;
       // Keep older takes for review/rollback while making this fresh grid cell active.
-      await db.update(assets).set({ selected: false }).where(and(eq(assets.projectId, id), eq(assets.shotId, shots[i].shotId)));
-      await db.insert(assets).values({
-        projectId: id,
+      db.transaction(tx => {
+        writableShot(id, scriptId, shots[i].shotId, tx);
+        tx.update(assets).set({ selected: false }).where(sameShot(id, scriptId, shots[i].shotId)).run();
+        tx.insert(assets).values({
+        projectId: id, scriptId,
         shotId: shots[i].shotId,
         type: "ai_generated",
         filePath,
@@ -159,6 +163,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         prompt: `[storyboard-grid 第${i + 1}格] ${shots[i].description ?? ""}`.trim(),
         selected: true,
         status: "done",
+        }).run();
       });
       saved.push({ shotId: shots[i].shotId, filePath });
     }
@@ -168,7 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.error("九宫格分镜生成失败:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : errText(req, "九宫格分镜生成失败", "Storyboard grid failed") },
-      { status: 500 }
+      { status: error instanceof ShotConflict ? 409 : 500 }
     );
   }
 }

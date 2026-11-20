@@ -1,3 +1,4 @@
+import { scriptForProject } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { join } from "path";
@@ -5,7 +6,7 @@ import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { getDb } from "@/lib/db";
 import { getDataDir } from "@/lib/paths";
-import { projects, scripts as scriptsTable, assets as assetsTable, compositions, generationReviews } from "@/lib/db/schema";
+import { projects, assets as assetsTable, compositions, generationReviews } from "@/lib/db/schema";
 import { runQc, expectedDimensions, type QcReport } from "@/lib/video-composer/qc";
 import { buildCreditsManifest, type BgmCredit, type CreditsManifest } from "@/lib/asset-credits";
 import { checkPublishReadiness } from "@/lib/publish-readiness";
@@ -64,20 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .limit(1);
 
     // 1) script readiness — prefer the selected script (what actually got composed), else the latest version
-    const [selected] = await db
-      .select()
-      .from(scriptsTable)
-      .where(and(eq(scriptsTable.projectId, id), eq(scriptsTable.selected, true)))
-      .orderBy(desc(scriptsTable.version))
-      .limit(1);
-    const [latest] = selected
-      ? [selected]
-      : await db
-          .select()
-          .from(scriptsTable)
-          .where(eq(scriptsTable.projectId, id))
-          .orderBy(desc(scriptsTable.version))
-          .limit(1);
+    const latest = scriptForProject(id, comp?.scriptId);
     let readinessItem = gateItemFromReadiness(null, null);
     if (latest && Array.isArray(latest.shots) && latest.shots.length > 0) {
       const shots = latest.shots as Shot[];
@@ -111,7 +99,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from(assetsTable)
       .where(and(eq(assetsTable.projectId, id), eq(assetsTable.status, "done"), eq(assetsTable.selected, true)))
       .orderBy(desc(assetsTable.createdAt));
-    const current = rows;
+    const current = rows.filter(row => row.scriptId === latest?.id);
     const reviewRows = await db.select().from(generationReviews).where(eq(generationReviews.projectId, id)).orderBy(desc(generationReviews.createdAt));
     const latestReviewByAsset = new Map<string, typeof generationReviews.$inferSelect>();
     for (const review of reviewRows) if (!latestReviewByAsset.has(review.assetId)) latestReviewByAsset.set(review.assetId, review);
