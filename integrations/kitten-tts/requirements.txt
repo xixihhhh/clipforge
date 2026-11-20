@@ -1,0 +1,7 @@
+espeakng-loader==0.2.4
+huggingface-hub==2.4.0
+num2words==0.5.14
+numpy==2.5.5
+onnxruntime==1.32.0
+phonemizer==3.6.0
+soundfile==0.14.0

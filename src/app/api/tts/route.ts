@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSpeech, type TTSConfig } from "@/lib/tts";
+import { hasTTSConfig } from "@/lib/tts-presets";
 import { apiError, errText } from "@/lib/api-error";
 
 // TTS voice preview: return mp3 audio bytes for the frontend to preview a voice
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
     if (!text) {
       return apiError(req, "缺少配音文本", "Missing voiceover text");
     }
-    if (!ttsConfig?.baseUrl || !ttsConfig?.apiKey || !ttsConfig?.model || !ttsConfig?.voice) {
+    if (!ttsConfig || !hasTTSConfig(ttsConfig)) {
       return apiError(
         req,
         "请先在设置中配置 TTS（baseUrl、apiKey、model、voice）",

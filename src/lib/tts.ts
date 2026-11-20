@@ -11,7 +11,7 @@
  * All providers produce mp3 bytes (Buffer); callers (compose/preview) need not handle provider differences.
  */
 
-import type { TTSProvider } from "./tts-presets";
+import { KITTEN_TTS_URL, type TTSProvider } from "./tts-presets";
 import { CircuitBreaker } from "@/lib/circuit-breaker";
 import { ttsCacheKey, readTtsCache, writeTtsCache } from "@/lib/tts-cache";
 import { stripPauseMarks } from "@/lib/voice-markup";
@@ -204,13 +204,15 @@ async function audioToBuffer(input: string): Promise<Buffer> {
 // ==================== OpenAI 兼容 /audio/speech ====================
 
 async function generateSpeechOpenAI(text: string, config: TTSConfig): Promise<Buffer> {
-  const base = config.baseUrl.replace(/\/$/, "");
+  const local = config.provider === "kitten";
+  const base = local ? KITTEN_TTS_URL : config.baseUrl.replace(/\/$/, "");
   const resp = await fetch(`${base}/audio/speech`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${config.apiKey}`,
+      ...(!local && { Authorization: `Bearer ${config.apiKey}` }),
       "Content-Type": "application/json",
     },
+    ...(local && { redirect: "error" as const }),
     body: JSON.stringify({
       model: config.model,
       input: text,

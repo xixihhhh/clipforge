@@ -288,7 +288,7 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // send the fully resolved config (including per-platform reused Key / default baseUrl / model)
-        body: JSON.stringify({ text: t("ttsSample"), ttsConfig: resolveTTSConfig(tts, providers) }),
+        body: JSON.stringify({ text: tts.provider === "kitten" ? (tts.voice === "de" ? "Diese Flasche kostet neunzehn Euro." : "Cette gourde coûte dix-neuf euros.") : t("ttsSample"), ttsConfig: resolveTTSConfig(tts, providers) }),
       });
       if (!res.ok) throw new Error();
       const blob = await res.blob();
@@ -323,7 +323,15 @@ export default function SettingsPage() {
   const ttsReady = isPaidTTSReady(tts, providers);
   const onChangeTTSProvider = (provider: TTSProvider) => {
     const meta = getTTSProviderMeta(provider);
-    setTTS({ ...tts, provider, baseUrl: meta.baseUrl, model: meta.defaultModel, voice: meta.defaultVoice });
+    if (provider === (tts.provider ?? "openai")) return;
+    if (provider !== "kitten" && tts.beforeKitten && (tts.beforeKitten.provider ?? "openai") === provider) {
+      setTTS({ ...tts, ...tts.beforeKitten, beforeKitten: undefined });
+      return;
+    }
+    const beforeKitten = provider === "kitten"
+      ? { provider: tts.provider, baseUrl: tts.baseUrl, model: tts.model, voice: tts.voice }
+      : undefined;
+    setTTS({ ...tts, provider, baseUrl: meta.baseUrl, model: meta.defaultModel, voice: meta.defaultVoice, beforeKitten });
   };
 
   // save feedback state
@@ -808,6 +816,11 @@ export default function SettingsPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {ttsMeta.value === "kitten" && (
+                          <a className="text-xs text-primary underline" href="https://github.com/xixihhhh/clipforge/tree/main/integrations/kitten-tts" target="_blank" rel="noreferrer">
+                            {t("kittenSetup")}
+                          </a>
+                        )}
                         {ttsMeta.hint && <p className="text-[11px] text-muted-foreground/80">{ttsMeta.hint}</p>}
                       </div>
 
@@ -855,7 +868,7 @@ export default function SettingsPage() {
                               <Label className="text-xs text-muted-foreground">{t("apiKeyLabel")}</Label>
                               <PasswordInput value={tts.apiKey} onChange={(apiKey) => setTTS({ ...tts, apiKey })} placeholder={t("ttsApiKeyPlaceholderShort")} />
                             </div>
-                          ) : (
+                          ) : ttsMeta.keySource !== "local" && (
                             <div className="text-xs rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                               {providers[ttsMeta.keySource]?.apiKey ? (
                                 <span className="text-emerald-500">{t("ttsKeyReused")}</span>
@@ -910,6 +923,7 @@ export default function SettingsPage() {
                         <Button variant="outline" size="sm" onClick={testTTS} disabled={!ttsReady || ttsTestStatus === "testing"} className={`text-xs ${ttsTestStatus === "error" ? "text-destructive" : ""}`}>
                           {ttsTestStatus === "testing" ? t("ttsTesting") : ttsTestStatus === "error" ? t("ttsTestError") : t("ttsTestButton")}
                         </Button>
+                        {ttsTestStatus === "error" && ttsMeta.value === "kitten" && <span className="ml-2 text-xs text-destructive">{t("kittenUnavailable")}</span>}
                         {!ttsReady && <span className="ml-2 text-[11px] text-muted-foreground">{t("ttsFillKeyFirst")}</span>}
                       </div>
                     </div>

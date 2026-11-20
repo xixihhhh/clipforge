@@ -161,11 +161,13 @@ export default function VideoPage() {
     : FREE_TTS_VOICES;
   // 免费配音试听状态
   const [previewingVoice, setPreviewingVoice] = useState(false);
+  const [freePreviewFailed, setFreePreviewFailed] = useState(false);
 
   // 试听免费音色：合成一小段并播放
   const previewFreeVoice = async () => {
     if (previewingVoice) return;
     setPreviewingVoice(true);
+    setFreePreviewFailed(false);
     try {
       const dubSample = dubLanguage && clips.find((clip) => clip.voiceover)?.voiceover?.slice(0, 120);
       const res = await fetch("/api/tts/free", {
@@ -180,7 +182,7 @@ export default function VideoPage() {
       audio.onended = () => URL.revokeObjectURL(url);
       await audio.play();
     } catch {
-      /* 试听失败静默（不阻断主流程） */
+      setFreePreviewFailed(true);
     } finally {
       setPreviewingVoice(false);
     }
@@ -773,7 +775,7 @@ export default function VideoPage() {
                 )}
                 {config.ttsEnabled && paidTtsReady && !dubVoice && (
                   <p className="text-[11px] text-muted-foreground">
-                    {t("ttsPaidHint", { provider: getTTSProviderMeta(tts.provider).label })}
+                    {tts.provider === "kitten" ? t("kittenVoiceHint", { voice: tts.voice }) : t("ttsPaidHint", { provider: getTTSProviderMeta(tts.provider).label })}
                   </p>
                 )}
                 {config.ttsEnabled && !paidTtsReady && (
@@ -803,6 +805,7 @@ export default function VideoPage() {
                     >
                       {previewingVoice ? t("ttsPreviewing") : t("ttsPreviewCta")}
                     </button>
+                    {freePreviewFailed && <p role="alert" className="text-xs text-destructive">{t("freePreviewUnavailable")}</p>}
                   </div>
                 )}
               </CardContent>

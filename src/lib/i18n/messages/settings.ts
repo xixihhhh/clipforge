@@ -84,10 +84,12 @@ export const settings: NamespaceMessages = {
       "提示：连接测试走服务端，不受浏览器跨域限制；若失败，多为 baseUrl/Key/模型名填写有误。",
 
     // TTS 配音
+    kittenSetup: "安装并启动本机法语 / 德语配音服务",
+    kittenUnavailable: "请检查本机 KittenTTS 服务、FFmpeg 和已下载的音色资源。",
     ttsSample: "这款产品真的太好用了，赶紧下单试试吧！",
     ttsTitle: "配音 TTS",
     ttsSubtitle:
-      "开启后合成会为每个分镜生成口播配音（支持 OpenAI 兼容 / Atlas Cloud / MiniMax / fal.ai）",
+      "为镜头生成口播，可选择本机 KittenTTS 或在线配音服务。",
     ttsProviderLabel: "配音平台",
     ttsProviderFallback: "OpenAI 兼容",
     ttsPresetHint: "快捷预设（点击填入 baseUrl 和模型，还需填 API Key）：",
@@ -281,10 +283,12 @@ export const settings: NamespaceMessages = {
       "Tip: the connection test runs server-side, so it isn't blocked by browser CORS. Failures usually mean a wrong baseUrl, key, or model name.",
 
     // TTS voiceover
+    kittenSetup: "Set up the local French / German voice service",
+    kittenUnavailable: "Check the local KittenTTS server, FFmpeg and the downloaded voice files.",
     ttsSample: "This product is amazing — order yours now and give it a try!",
     ttsTitle: "Voiceover (TTS)",
     ttsSubtitle:
-      "When enabled, composition generates a spoken voiceover for each shot (supports OpenAI-compatible / Atlas Cloud / MiniMax / fal.ai)",
+      "Generate shot narration with local KittenTTS or an online voice service.",
     ttsProviderLabel: "Voiceover platform",
     ttsProviderFallback: "OpenAI-compatible",
     ttsPresetHint: "Quick presets (click to fill baseUrl and model — you still need an API key):",

@@ -8,7 +8,7 @@
  * and offer voice suggestions accordingly.
  */
 
-export type TTSProvider = "openai" | "atlas" | "minimax" | "falai";
+export type TTSProvider = "openai" | "atlas" | "minimax" | "falai" | "kitten";
 
 export interface TTSVoiceOption {
   value: string;
@@ -33,7 +33,7 @@ export interface TTSProviderMeta {
    * - "tts": use the apiKey stored in the TTS config itself (OpenAI-compatible / MiniMax)
    * - others: reuse the apiKey of the matching provider in the "AI Platform" store (atlas-cloud / fal-ai)
    */
-  keySource: "tts" | "atlas-cloud" | "fal-ai";
+  keySource: "tts" | "atlas-cloud" | "fal-ai" | "local";
   /** Whether a GroupId is required (needed for the MiniMax domestic endpoint api.minimax.chat) */
   needsGroupId?: boolean;
   /** Whether to expose a baseUrl input field (OpenAI-compatible and MiniMax support switching regional endpoints) */
@@ -48,6 +48,8 @@ export const OPENAI_TTS_PRESETS = [
   { label: "OpenAI tts-1", baseUrl: "https://api.openai.com/v1", model: "tts-1", voice: "alloy" },
   { label: "火山方舟", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-tts", voice: "zh_female_cancan" },
 ];
+
+export const KITTEN_TTS_URL = "http://127.0.0.1:9882/v1";
 
 export const TTS_PROVIDERS: TTSProviderMeta[] = [
   {
@@ -129,6 +131,16 @@ export const TTS_PROVIDERS: TTSProviderMeta[] = [
     keySource: "fal-ai",
     hint: "复用「AI 平台」里 fal.ai 的 Key（FAL_KEY）。",
   },
+  {
+    value: "kitten",
+    label: "KittenTTS 2 Mini (CPU)",
+    baseUrl: KITTEN_TTS_URL,
+    defaultModel: "kitten-tts-2-mini",
+    models: [],
+    defaultVoice: "fr",
+    voices: [{ value: "fr", label: "Français" }, { value: "de", label: "Deutsch" }],
+    keySource: "local",
+  },
 ];
 
 export const DEFAULT_TTS_PROVIDER: TTSProvider = "openai";
@@ -172,7 +184,7 @@ export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: Pro
   // baseUrl: for editable platforms use the user-provided value (fall back to default if blank); otherwise force the platform default
   const baseUrl = meta.editableBaseUrl ? (tts?.baseUrl || meta.baseUrl) : meta.baseUrl;
   // apiKey: reuse the AI platform key or use the TTS-specific key
-  const apiKey = meta.keySource === "tts" ? (tts?.apiKey || "") : (providers?.[meta.keySource]?.apiKey || "");
+  const apiKey = meta.keySource === "local" ? "" : meta.keySource === "tts" ? (tts?.apiKey || "") : (providers?.[meta.keySource]?.apiKey || "");
   return {
     provider: meta.value,
     baseUrl,
@@ -188,5 +200,14 @@ export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: Pro
 export function isPaidTTSReady(tts: TTSSettingLike | undefined, providers: ProvidersLike): boolean {
   if (!tts?.enabled) return false;
   const c = resolveTTSConfig(tts, providers);
-  return Boolean(c.apiKey && c.baseUrl && c.model && c.voice);
+  return hasTTSConfig(c);
+}
+
+/** The Kitten adapter accepts local requests without credentials. Other providers retain their key requirement. */
+export function hasTTSConfig(config?: TTSSettingLike): boolean {
+  if (!config?.baseUrl || !config.model || !config.voice) return false;
+  if (config.provider === "kitten") {
+    return config.baseUrl === KITTEN_TTS_URL && config.model === "kitten-tts-2-mini" && (config.voice === "fr" || config.voice === "de");
+  }
+  return Boolean(config.apiKey);
 }

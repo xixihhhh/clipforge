@@ -4,6 +4,8 @@ import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
 import { join } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
+import { apiError } from "@/lib/api-error";
+import { hasTTSConfig } from "@/lib/tts-presets";
 import { generateSpeech, estimateSpeechSeconds, type TTSConfig } from "@/lib/tts";
 import { stripPauseMarks } from "@/lib/voice-markup";
 import { shotEmotion, EMOTION_TTS } from "@/lib/emotion-acting";
@@ -186,9 +188,17 @@ export async function POST(
 
     // 可选 TTS 配音配置（前端从设置带入）
     const ttsConfig: TTSConfig | undefined =
-      body.ttsConfig?.baseUrl && body.ttsConfig?.apiKey && body.ttsConfig?.model && body.ttsConfig?.voice
+      hasTTSConfig(body.ttsConfig)
         ? body.ttsConfig
         : undefined;
+    if (body.ttsConfig?.provider === "kitten" && !ttsConfig) {
+      return apiError(req, "请在设置中选择本机 KittenTTS 及法语或德语音色。", "Select local KittenTTS and a French or German voice in Settings.");
+    }
+    if (ttsConfig?.provider === "kitten" && shots.some((shot) =>
+      shot.dubLanguage && shot.dubLanguage.toLowerCase().split("-")[0] !== ttsConfig.voice
+    )) {
+      return apiError(req, "请在设置中选择与译制脚本相同语言的 KittenTTS 音色（法语或德语）。", "Select a KittenTTS voice matching the dubbed script in Settings (French or German).");
+    }
     // 免费配音兜底（微软 Edge keyless TTS，无需 Key）：未配付费 TTS 时让「一句话主题成片」也能出声
     const freeTts = body.freeTts as { enabled?: boolean; voice?: string; rate?: string } | undefined;
     const useFreeTts = !ttsConfig && freeTts?.enabled === true;
@@ -266,6 +276,7 @@ export async function POST(
           try {
             audio = await generateSpeech(text, { ...ttsConfig, ...expressive });
           } catch (e) {
+            if (ttsConfig.provider === "kitten") throw e;
             console.warn(`分镜 ${shotId} 付费配音失败，回退免费 Edge 配音:`, e);
             composeWarnings.push({ code: "tts_fallback_free", shotId });
             const d = await generateSpeechFreeDetailed(text, freeOpts);
@@ -281,6 +292,7 @@ export async function POST(
         await writeFile(file, audio);
         return { file, words };
       } catch (e) {
+        if (ttsConfig?.provider === "kitten") throw e;
         console.warn(`分镜 ${shotId} 配音生成失败（已跳过）:`, e);
         composeWarnings.push({ code: "tts_failed", shotId });
         return undefined;
