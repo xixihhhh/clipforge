@@ -2,7 +2,6 @@
   --panel:var(--card);
   --cell:var(--secondary);
   --line:var(--border);
-  --selected:#3464ac;
   --mono:ui-monospace,"SFMono-Regular",Consolas,monospace;
   color:var(--foreground);
   background:var(--panel);
@@ -22,8 +21,8 @@
 .duplicate,.shotTitle button,.transport button {display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;font-size:12px;cursor:pointer;color:var(--foreground)}
 .duplicate:hover,.shotTitle button:hover,.transport button:hover {background:var(--cell)}
 .duplicate svg,.shotTitle svg,.trackHead svg,.status svg {width:15px;height:15px;flex-shrink:0}
-.toolbar .compose {background:#305caa;color:white;border:1px solid #547dc1;border-radius:4px;min-height:34px;padding-inline:12px}
-.toolbar .compose:hover {background:#254e95}
+.toolbar .compose {background:var(--primary);color:white;border:1px solid var(--primary);border-radius:4px;min-height:34px;padding-inline:12px}
+.toolbar .compose:hover {filter:brightness(1.1)}
 .workspace {display:grid;grid-template-columns:minmax(0,1fr) minmax(216px,23%);min-width:0}
 .edit {min-width:0;background:var(--background)}
 .monitors {display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
@@ -65,7 +64,7 @@
 .properties textarea {width:100%;min-height:65px;resize:vertical;line-height:1.5}
 .properties:disabled {opacity:.65}
 .properties button {border-radius:3px}
-.modelSettings {color:var(--primary);font-size:12px;text-decoration:underline;text-underline-offset:3px}
+.modelSettings {color:var(--link);font-size:12px;text-decoration:underline;text-underline-offset:3px}
 .spanControls {display:grid;gap:8px}
 .status {gap:7px;min-height:30px;padding:5px 14px;border-top:1px solid var(--line);color:var(--muted-foreground);font-size:12px}
 @media(max-width:1080px) {
