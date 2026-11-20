@@ -759,8 +759,7 @@ export default function AssetsPage() {
         (productSafe || Boolean(opts?.referenceFrame)) && !!productRef && PRODUCT_SHOT_TYPES.has(asset.type);
       const genModel = useProductSafe ? toEditVariant(modelTarget.model) : modelTarget.model;
       const genMode = useProductSafe ? "image-to-image" : "text-to-image";
-      if (opts?.referenceFrame && !(modelTarget.provider === "atlas" || modelTarget.provider === "atlascloud" ||
-          modelTarget.provider === "atlas-cloud" || modelTarget.provider === "volcengine" ||
+      if (opts?.referenceFrame && !(modelTarget.provider === "atlas-cloud" || modelTarget.provider === "volcengine" ||
           (modelTarget.provider === "openai" && genModel.startsWith("gpt-image")) ||
           (modelTarget.provider === "fal-ai" && (genModel.includes("/edit") || genModel.includes("/image-to-image") || genModel.includes("/flare/"))))) {
         setAssets((prev) => prev.map((a) => a.shotId === shotId ? { ...a, error: locale === "en" ? "Choose an image model with multi-reference editing." : "请先选择支持多图编辑的图像模型。" } : a));

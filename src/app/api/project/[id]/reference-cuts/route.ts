@@ -14,7 +14,8 @@ type Context = { params: Promise<{ id: string }> };
 // The analysis is server-produced. Use the stored edit points on creation and on retries.
 export async function POST(req: Request, { params }: Context) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return apiError(req, "无效请求", "Invalid request", 400);
   const name = /^\/api\/files\/replicate\/(ref-[a-z0-9-]+\.(?:mp4|mov|webm))$/.exec(body.reference ?? "")?.[1];
   if (!name) return apiError(req, "请上传并分析参考片", "Analyze a reference video first", 400);
   let cuts: ReplicateShot[];
@@ -50,10 +51,12 @@ export async function POST(req: Request, { params }: Context) {
 
 export async function PATCH(req: Request, { params }: Context) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return apiError(req, "无效请求", "Invalid request", 400);
   if (typeof body.scriptId !== "string") return apiError(req, "缺少脚本", "Missing script", 400);
   let mediaDuration = 0;
   if (body.action === "span") {
+    if (typeof body.assetId !== "string") return apiError(req, "缺少视频素材", "Missing video take", 400);
     const selected = getDb().select().from(assets).where(and(eq(assets.id, body.assetId),
       eq(assets.scriptId, body.scriptId), eq(assets.projectId, id), eq(assets.selected, true))).get();
     const path = selected?.filePath && resolveUploadFilePath(selected.filePath);
