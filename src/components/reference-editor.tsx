@@ -115,6 +115,6 @@ function ShotEditor({ projectId, scriptId, versions, source, assets, products, b
         <Button size="sm" variant="outline" onClick={() => void run(() => update({ action: "span", assetId: shot.assetId, lastShotId: until }))}>{en ? "Apply video range" : "应用视频区间"}</Button>
       </div>}
     </fieldset>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {(shot.error || error) && <p role="alert" className="text-sm text-destructive">{shot.error || error}</p>}
   </fieldset>;
 }
