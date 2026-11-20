@@ -87,3 +87,22 @@
   .properties {grid-template-columns:1fr}
   .strip button {min-width:55px}
 }
+.program {min-width:0;background:#16181b}
+.programControls {display:flex;align-items:center;gap:7px;padding:0 10px;color:#cdd3da;height:30px}
+.programControls input {min-width:30px;flex:1;accent-color:#7ea8ea;height:16px;cursor:pointer}
+.programControls button {display:grid;place-items:center;width:28px;height:28px}
+.programControls svg {width:14px}
+.programControls span {font-size:10px;white-space:nowrap}
+.monitors > .monitor {background:#16181b}
+.sourceDeck {min-width:0;background:#16181b}
+.sourceDeck .transport,.programControls {height:36px;background:#16181b;color:#d5dbe3;border:0}
+.sourceDeck .transport {gap:2px;padding:0 5px}
+.sourceDeck .transport :is(button,select) {color:#d5dbe3}
+.sourceDeck .transport button:hover {background:#30353b}
+.sourceDeck .transport .select {background:#23272d;border-color:#414851;max-width:125px}
+@media(max-width:600px) {
+  .sourceDeck .transport {gap:0}
+  .sourceDeck .transport button {width:22px;min-height:28px}
+  .sourceDeck .transport .select {max-width:75px;padding-inline:2px}
+  .programControls {gap:3px;padding:0 3px}
+}

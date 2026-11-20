@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { LuArrowRight, LuChevronLeft, LuChevronRight, LuClapperboard, LuCopy, LuFilm, LuLockKeyhole, LuPanelsTopLeft, LuPause, LuPlay, LuSlidersHorizontal, LuLockKeyholeOpen } from "react-icons/lu";
 import styles from "./reference-editor.module.css";
 import type { AssetItem } from "@/lib/assets-view";
@@ -28,9 +28,70 @@ function timecode(seconds: number) {
   return [Math.floor(frame / 108000), Math.floor(frame / 1800) % 60, Math.floor(frame / 30) % 60, frame % 30]
     .map((v) => String(v).padStart(2, "0")).join(":");
 }
-function Frame({ label, clock, children }: { label: string; clock: string; children: ReactNode }) {
-  return <figure className={styles.monitor}><figcaption><span>{label}</span><time>{clock}</time></figcaption>
+function Frame({ label, clock, clockRef, children }: { label: string; clock: string; clockRef?: RefObject<HTMLTimeElement | null>; children: ReactNode }) {
+  return <figure className={styles.monitor}><figcaption><span>{label}</span><time ref={clockRef}>{clock}</time></figcaption>
     <div className={styles.screen}>{children}</div></figure>;
+}
+
+/** Silent cut preview. The timeline clock belongs to the version, independent of the source viewer. */
+function ProgramMonitor({ assets, start, version, en }: {assets: AssetItem[]; start: number; version: string; en: boolean}) {
+  const end = assets[assets.length - 1].referenceCut!.end;
+  const [position, setPosition] = useState(start);
+  const [playing, setPlaying] = useState(false);
+  const positionRef = useRef(start);
+  const player = useRef<HTMLVideoElement>(null);
+  function seek(t: number) {
+    const next = Math.max(0, Math.min(end, t));
+    positionRef.current = next;
+    setPosition(next);
+  }
+  useEffect(() => {
+    if (!playing) return;
+    const origin = performance.now() - positionRef.current * 1000;
+    let tick: number;
+    function step() {
+      const t = Math.min(end, (performance.now() - origin) / 1000);
+      const next = Math.floor(t * 30) / 30;
+      if (t >= end) { positionRef.current = end; setPosition(end); setPlaying(false); return; }
+      if (next !== positionRef.current) { positionRef.current = next; setPosition(next); }
+      tick = requestAnimationFrame(step);
+    }
+    tick = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(tick);
+  }, [end, playing]);
+  const shown = assets.find((item) => item.referenceCut!.end > position) ?? assets[assets.length-1];
+  const cut = shown.referenceCut!;
+  const url = shown.mediaUrl || cut.productImage;
+  const offset = cut.segment && cut.segment.path === url ? cut.segment.offset : 0;
+  // Seek on shot changes and when scrubbing. Let the video element decode normally during playback.
+  useEffect(() => {
+    const video = player.current;
+    if (!video) return;
+    const sync = () => {
+      video.currentTime = Math.min(video.duration || Infinity, offset + Math.max(0, positionRef.current - cut.start));
+      if (playing) void video.play().catch(() => {}); else video.pause();
+    };
+    if (video.readyState >= 1) sync(); else video.addEventListener("loadedmetadata", sync, {once: true});
+    return () => video.removeEventListener("loadedmetadata", sync);
+  }, [playing, shown.shotId, cut.start, offset, url]);
+  return <div className={styles.program}>
+    <Frame label={en ? `Program · version ${version}` : `节目监看 · ${version} 版`} clock={timecode(position)}>{url && (shown.isVideo
+      ? <video ref={player} src={url} muted playsInline preload="auto" />
+      // eslint-disable-next-line @next/next/no-img-element
+      : <img src={url} alt={en ? "Current product" : "当前商品画面"} />)}</Frame>
+    <div className={styles.programControls}>
+      <button type="button" aria-label={playing ? (en ? "Pause rough cut" : "暂停粗剪") : (en ? "Play rough cut" : "播放本版粗剪")} onClick={() => {
+        if (!playing && position >= end) seek(0);
+        setPlaying(!playing);
+      }}>{playing ? <LuPause /> : <LuPlay />}</button>
+      <input type="range" aria-label={en ? "Rough cut playhead" : "粗剪播放头"} min={0} max={end} step={1/30} value={position} onChange={(e) => {
+        const next = Number(e.target.value);
+        setPlaying(false); seek(next);
+        if (player.current && next >= cut.start && next < cut.end) player.current.currentTime = offset + next - cut.start;
+      }} />
+      <span>{en ? "Silent cut" : "静音粗剪"}</span>
+    </div>
+  </div>;
 }
 
 export function ReferenceEditor(props: EditorProps) {
@@ -65,14 +126,15 @@ function ShotEditor({ projectId, scriptId, versions, source, modelName, assets, 
   const frame = useRef<HTMLVideoElement>(null);
   const [frameReady, setFrameReady] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const clockRef = useRef<HTMLTimeElement>(null);
   const [sourceTime, setSourceTime] = useState((cut.start + cut.end) / 2);
-  const [programTime, setProgramTime] = useState(cut.start);
   useEffect(() => {
     const player = frame.current;
     if (!playing || !player) return;
     let tick: number;
     function checkEnd() {
       if (!player || player.paused) return;
+      if (clockRef.current) clockRef.current.textContent = timecode(player.currentTime);
       if (player.currentTime >= cut.end) {
         player.pause();
         player.currentTime = Math.max(cut.start, cut.end - 1 / 30);
@@ -104,8 +166,6 @@ function ShotEditor({ projectId, scriptId, versions, source, modelName, assets, 
   const [error, setError] = useState("");
   const changed = description.trim() !== shot.description || product !== cut.productImage;
   const base = `/api/project/${projectId}`;
-  const media = shot.mediaUrl || cut.productImage;
-  const programOffset = cut.segment && cut.segment.path === media ? cut.segment.offset : 0;
   async function request(path: string, body: object) {
     const res = await fetch(base + path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
@@ -148,17 +208,8 @@ function ShotEditor({ projectId, scriptId, versions, source, modelName, assets, 
     <div className={styles.workspace}>
       <div className={styles.edit}>
         <div className={styles.monitors}>
-          <Frame label={en ? "Source · reference" : "源监看 · 参考片"} clock={timecode(sourceTime)}><video ref={frame} onSeeking={() => setFrameReady(false)} onSeeked={(e) => { setFrameReady(true); setSourceTime(e.currentTarget.currentTime); }} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={(e) => setSourceTime(e.currentTarget.currentTime)} aria-label={en ? "Reference frame" : "原片参考帧"} src={source} preload="auto" muted playsInline onLoadedMetadata={(e) => { e.currentTarget.currentTime = (cut.start + cut.end) / 2; }} /></Frame>
-          <Frame label={en ? `Program · version ${versionName}` : `节目监看 · ${versionName} 版`} clock={timecode(programTime)}>{media && (shot.isVideo
-            ? <video src={media} muted controls playsInline onLoadedMetadata={(e) => { e.currentTarget.currentTime = programOffset; }} onTimeUpdate={(e) => {
-              const player = e.currentTarget;
-              const relative = player.currentTime - programOffset;
-              setProgramTime(cut.start + Math.max(0, Math.min(shot.duration, relative)));
-              if (!player.paused && relative >= shot.duration) { player.pause(); player.currentTime = programOffset; }
-            }} />
-            // eslint-disable-next-line @next/next/no-img-element
-            : <img src={media} alt={en ? "Current product" : "当前商品画面"} />)}</Frame>
-        </div>
+          <div className={styles.sourceDeck}>
+          <Frame label={en ? "Source · reference" : "源监看 · 参考片"} clock={timecode(sourceTime)} clockRef={clockRef}><video ref={frame} onSeeking={() => setFrameReady(false)} onSeeked={(e) => { setFrameReady(true); setSourceTime(e.currentTarget.currentTime); }} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={(e) => { if (e.currentTarget.paused) setSourceTime(e.currentTarget.currentTime); }} aria-label={en ? "Reference frame" : "原片参考帧"} src={source} preload="auto" muted playsInline onLoadedMetadata={(e) => { e.currentTarget.currentTime = (cut.start + cut.end) / 2; }} /></Frame>
         <div className={styles.transport}>
           <button type="button" aria-label={en ? "Previous shot" : "上一镜"} disabled={index===0} onClick={() => move(index-1)}><LuChevronLeft /></button>
           <button type="button" aria-label={playing ? (en ? "Pause reference" : "暂停参考片") : (en ? "Play this reference shot" : "播放当前参考镜头")} onClick={() => {
@@ -171,6 +222,9 @@ function ShotEditor({ projectId, scriptId, versions, source, modelName, assets, 
             {assets.map((s) => <option key={s.shotId} value={s.shotId}>#{s.shotId} · {seconds(s.referenceCut!.start)}–{seconds(s.referenceCut!.end)} s{s.referenceCut!.locked ? (en ? " · Locked" : " · 已锁定") : ""}</option>)}
           </select></label>
           <button type="button" aria-label={en ? "Next shot" : "下一镜"} disabled={index===assets.length-1} onClick={() => move(index+1)}><LuChevronRight /></button>
+        </div>
+          </div>
+          <ProgramMonitor assets={assets} start={cut.start} version={versionName} en={en} />
         </div>
         <div className={styles.track}>
           <div className={styles.trackHead}><span><LuFilm aria-hidden />{en ? "Shot timeline" : "镜头时间线"}</span><span>{assets.length} {en ? "shots" : "镜"} · 30 fps · {timecode(duration)}</span></div>
