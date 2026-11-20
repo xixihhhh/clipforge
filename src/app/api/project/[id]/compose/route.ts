@@ -1,3 +1,4 @@
+import { errText } from "@/lib/api-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
@@ -354,7 +355,7 @@ export async function POST(
     const missing: number[] = [];
     for (const shot of shots) {
       // 素材优先级：该分镜已生成素材 → 商品原图兜底
-      const ref = assetByShot.get(shot.shotId) ?? productImages[0];
+      const ref = assetByShot.get(shot.shotId) ?? shot.referenceCut?.productImage ?? productImages[0];
       let local = toLocalPath(ref);
       if (!local) {
         missing.push(shot.shotId);
@@ -413,18 +414,31 @@ export async function POST(
         if (mediaDur > 0) sourceDuration = mediaDur;
       }
 
+      if (shot.referenceCut) {
+        // Round absolute cut positions on the output's 30 fps clock, so rounding errors never accumulate.
+        duration = (Math.round(shot.referenceCut.end * 30) - Math.round(shot.referenceCut.start * 30)) / 30;
+        if (duration <= 0) throw new Error(errText(req, `第 ${shot.shotId} 镜不足一帧（输出为 30 fps）`, `Reference shot ${shot.shotId} is shorter than a frame at 30 fps`));
+        if (voiceSec && voiceSec > duration + 1 / 30) {
+          throw new Error(errText(req, `第 ${shot.shotId} 镜的旁白超过参考镜头时长，请缩短旁白再合成`, `Shorten the narration for reference shot ${shot.shotId} to fit its edit interval`));
+        }
+      }
+      const segment = shot.referenceCut?.segment;
+      const sourceStart = segment && segment.path === ref ? segment.offset : undefined;
       const clip: ClipInput = {
+        ...(sourceStart !== undefined && { sourceStart }),
         type: isVideo ? "video" : "image",
         filePath: local,
         duration,
-        transition: shot.transition || "ai_start_end",
+        transition: shot.referenceCut ? "direct_concat" : shot.transition || "ai_start_end",
         ...(isVideo ? { hasAudio: nativeAudio } : { motion: defaultMotion(shot) }),
-        ...(sourceDuration && { sourceDuration }),
+        ...(!shot.referenceCut && sourceDuration && { sourceDuration }),
         ...(audioPath && { audioPath }),
       };
       rendered.push({ shot, clip, duration, voiceSec, ...(vo?.words ? { words: vo.words } : {}) });
     }
 
+    if (missing.length && shots.some((shot) => shot.referenceCut)) throw new Error(errText(req,
+      `参考时间线缺少镜头素材：${missing.join(", ")}`, `Missing media for reference shots: ${missing.join(", ")}`));
     if (rendered.length === 0) throw new Error("没有可用素材");
 
     // acrossfade for ffmpeg_fade transitions consumes the previous clip's last FADE_DURATION:

@@ -39,6 +39,7 @@ import {
   sanitizeVideoControlSummary,
 } from "@/lib/video-control-plan";
 import type { GenerationControlSummary } from "@/lib/video-repair-plan";
+import { ReferenceEditor } from "@/components/reference-editor";
 import { useT, useLocale } from "@/lib/i18n";
 import { LocalMaterialLibrary } from "./_components/local-material-library";
 import { classifyMaterial, MATERIAL_ACCEPT, type PublicLocalMaterial } from "@/lib/material-library";
@@ -100,6 +101,8 @@ export default function AssetsPage() {
   const uiMode = useSettingsStore((st) => st.uiMode);
 
   const [assets, setAssets] = useState<AssetItem[]>([]);
+  const [referencePath, setReferencePath] = useState("");
+  const [versions, setVersions] = useState<{ id: string; version: number }[]>([]);
   const [productImages, setProductImages] = useState<string[]>([]);
   // product fidelity: when AI generates shots featuring the product, use the original product photo as a reference for redrawing to prevent AI from altering the product (critical for commerce)
   const [productSafe, setProductSafe] = useState(true);
@@ -198,6 +201,7 @@ export default function AssetsPage() {
         if (project) {
           setProjectName(project.name ?? project.productName ?? "");
           setProductImages(imgs);
+          setReferencePath(project.sourceVideoUrl ?? "");
           setContentType(typeof project.contentType === "string" ? project.contentType : "");
           setProjectCategory(typeof project.productCategory === "string" ? project.productCategory : "");
           setProjectCreativeIntent(sanitizeCreativeIntent(project.creativeIntent));
@@ -219,6 +223,7 @@ export default function AssetsPage() {
           return;
         }
         // remember which script row the view came from — camera edits PATCH back into it
+        setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
         setScriptId(typeof selected.id === "string" ? selected.id : "");
 
         // selected script shots + persisted assets → view rows (shared pure function used by "refresh after filling visuals")
@@ -251,6 +256,7 @@ export default function AssetsPage() {
       ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
       : null;
     if (selected && Array.isArray(selected.shots)) {
+      setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
       setScriptId(typeof selected.id === "string" ? selected.id : "");
       const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets : [], imgs);
       for (const row of rows) if (row.lastFrameUrl) lastFrameByShot.current.set(row.shotId, row.lastFrameUrl);
@@ -538,6 +544,7 @@ export default function AssetsPage() {
   const generateMotion = useCallback(
     async (shotId: number, firstFrameOverride?: string, lastFrameOverride?: string | null, retake?: RetakeSymptom) => {
       const asset = assets.find((a) => a.shotId === shotId);
+      if (asset?.referenceCut?.locked) return;
       // prefer the freshly passed URL for the first frame: during auto-chaining React state hasn't updated yet, so the thumbnailUrl in the closure is stale
       const firstFrame = firstFrameOverride || asset?.thumbnailUrl;
       if (!firstFrame) return;
@@ -607,7 +614,7 @@ export default function AssetsPage() {
         ? presenterLib.find((character) => character.id === asset.characterId)?.referenceImages?.[0] ?? presenterSheet
         : undefined;
       const productReference = productSafe && (asset?.visualSource === "product_image" || PRODUCT_SHOT_TYPES.has(asset?.type ?? ""))
-        ? productImages[0]
+        ? (asset?.referenceCut?.productImage ?? productImages[0])
         : undefined;
       const controlPlan = buildVideoControlPlan({
         provider: videoModelTarget.provider,
@@ -709,9 +716,10 @@ export default function AssetsPage() {
   // actually generate a single asset. Returns the saved static keyframe URL (undefined on failure) so
   // the batch flow can run a second keyframe-chained motion pass without re-reading stale React state.
   const generateOne = useCallback(
-    async (shotId: number, opts?: { skipMotion?: boolean }): Promise<string | undefined> => {
+    async (shotId: number, opts?: { skipMotion?: boolean; referenceFrame?: string }): Promise<string | undefined> => {
       const asset = assets.find((a) => a.shotId === shotId);
-      if (!asset) return undefined;
+      if (!asset || asset.referenceCut?.locked) return undefined;
+      const productRef = asset.referenceCut?.productImage ?? productImages[0];
 
       // product image shot: use the product photo directly, no AI call needed (persisted for the composer to read)
       if (asset.visualSource === "product_image") {
@@ -748,10 +756,19 @@ export default function AssetsPage() {
 
       // product fidelity: AI shot featuring product + product image available + toggle on → redraw with product image (image-to-image, locks in the product subject)
       const useProductSafe =
-        productSafe && !!productImages[0] && PRODUCT_SHOT_TYPES.has(asset.type);
+        (productSafe || Boolean(opts?.referenceFrame)) && !!productRef && PRODUCT_SHOT_TYPES.has(asset.type);
       const genModel = useProductSafe ? toEditVariant(modelTarget.model) : modelTarget.model;
       const genMode = useProductSafe ? "image-to-image" : "text-to-image";
-      const basePrompt = asset.prompt || asset.description;
+      if (opts?.referenceFrame && !(modelTarget.provider === "atlas" || modelTarget.provider === "atlascloud" ||
+          modelTarget.provider === "atlas-cloud" || modelTarget.provider === "volcengine" ||
+          (modelTarget.provider === "openai" && genModel.startsWith("gpt-image")) ||
+          (modelTarget.provider === "fal-ai" && (genModel.includes("/edit") || genModel.includes("/image-to-image") || genModel.includes("/flare/"))))) {
+        setAssets((prev) => prev.map((a) => a.shotId === shotId ? { ...a, error: locale === "en" ? "Choose an image model with multi-reference editing." : "请先选择支持多图编辑的图像模型。" } : a));
+        return undefined;
+      }
+      const basePrompt = opts?.referenceFrame
+        ? `${asset.prompt || asset.description}。图1是要展示的商品，保持外形、包装和文字。图2只参考景别、构图与光位，不复制其中的人物、商品、文字或标识。`
+        : asset.prompt || asset.description;
       // cast shots: pin the anti-"AI face" realism constraint onto the keyframe too,
       // so the person is ordinary-looking from the very first frame the i2v runs on
       const castSuffix = asset.characterId ? `。${realFaceLine(basePrompt)}` : "";
@@ -789,7 +806,7 @@ export default function AssetsPage() {
             baseUrl: modelTarget.baseUrl,
             mode: genMode,
             prompt: genPrompt,
-            ...(useProductSafe && { imageUrl: productImages[0] }),
+            ...(opts?.referenceFrame ? { imageUrls: [productRef, opts.referenceFrame] } : useProductSafe ? { imageUrl: productRef } : {}),
             // user-defined image parameters (aspect ratio → dimensions / count / steps / guidance / seed / negative prompt)
             options: (() => {
               const options = buildImageOptions(imageParams);
@@ -816,8 +833,11 @@ export default function AssetsPage() {
           if (saveRes.ok) {
             const saved = await saveRes.json();
             if (saved.filePath) savedUrl = saved.filePath;
+          } else if (asset.referenceCut) {
+            throw new Error((await saveRes.json()).error || t("errorGenerateFailed"));
           }
-        } catch {
+        } catch (error) {
+          if (asset.referenceCut) throw error;
           // persist failure doesn't affect the preview (the composer will fall back to the product image as a safety net)
         }
         setAssets((prev) =>
@@ -835,7 +855,7 @@ export default function AssetsPage() {
         return undefined;
       }
     },
-    [assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, projectCreativeIntent, projectVisualBible, visualLook, generateMotion, t]
+    [assets, modelTarget, productImages, productSafe, imageParams, autoMotion, videoModelTarget, projectCreativeIntent, projectVisualBible, visualLook, generateMotion, locale, t]
   );
 
   // storyboard grid: ONE image generation renders every shot as a 3x3 grid cell (person /
@@ -940,7 +960,7 @@ export default function AssetsPage() {
   // With auto-motion on, this runs TWO passes: (1) every static keyframe, (2) keyframe-chained i2v per shot —
   // chaining needs the NEXT shot's keyframe to exist, which a single interleaved pass can't provide.
   const generateAll = useCallback(async () => {
-    const pending = assets.filter((a) => a.status === "pending" || a.status === "failed");
+    const pending = assets.filter((a) => !a.referenceCut?.locked && (a.status === "pending" || a.status === "failed"));
     if (pending.length === 0) return;
     setIsBatchGenerating(true);
     const chained = autoMotion && !!videoModelTarget;
@@ -957,7 +977,7 @@ export default function AssetsPage() {
         savedByShot.get(a.shotId) ?? (a.status === "done" && !a.isVideo ? a.thumbnailUrl : undefined);
       for (let i = 0; i < assets.length; i++) {
         const row = assets[i];
-        if (row.isVideo) continue; // already a motion/stock video — don't re-bill
+        if (row.referenceCut?.locked || row.isVideo) continue; // already a motion/stock video — don't re-bill
         // tail mode: sequential continuation — the previous shot's real tail frame (captured at
         // save time in this very loop) beats the shot's own keyframe as the first frame
         const tailFrame = chainMode === "tail" && i > 0 ? assets[i - 1].lastFrameUrl ?? lastFrameByShot.current.get(assets[i - 1].shotId) : undefined;
@@ -1429,6 +1449,11 @@ export default function AssetsPage() {
               )}
             </div>
 
+            {assets[0]?.referenceCut && referencePath && (
+              <ReferenceEditor projectId={id} scriptId={scriptId} versions={versions} source={referencePath}
+                assets={assets} products={productImages} reload={reloadAssets} busy={isBatchGenerating || isGridGenerating || isFilmGenerating || assets.some((a) => a.status === "generating")}
+                generate={async (shotId, referenceFrame) => { const media = await generateOne(shotId, { skipMotion: true, referenceFrame }); if (media) await reloadAssets(); return Boolean(media); }} />
+            )}
             {/* asset list */}
             <div className="space-y-4">
               {assets.map((asset) => {
@@ -1441,7 +1466,7 @@ export default function AssetsPage() {
                 });
                 return (
                   <Card key={asset.shotId} className="glass-card overflow-hidden">
-                    <CardContent className="p-0">
+                    <CardContent className="p-0"><fieldset disabled={Boolean(asset.referenceCut?.locked)} className="min-w-0 disabled:opacity-65">
                       <div className="flex">
                         {/* left-side index */}
                         <div className="flex flex-col items-center justify-center w-16 py-4 border-r border-border/50 shrink-0">
@@ -1705,7 +1730,7 @@ export default function AssetsPage() {
                           {/* error text lives in the middle column next to the shot content; not repeated here */}
                         </div>
                       </div>
-                    </CardContent>
+                    </fieldset></CardContent>
                   </Card>
                 );
               })}

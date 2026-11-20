@@ -401,6 +401,8 @@ export interface ScriptCharacter {
 }
 
 export interface Shot {
+  /** Original edit interval; independent of the duration supported by a generation model. */
+  referenceCut?: { start: number; end: number; locked: boolean; productImage?: string; segment?: { path: string; offset: number } };
   shotId: number;
   type: "hook" | "pain_point" | "product_reveal" | "demo" | "social_proof" | "cta";
   duration: number; // Seconds

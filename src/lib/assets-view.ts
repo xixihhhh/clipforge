@@ -6,6 +6,8 @@ import type { GenerationControlSummary } from "@/lib/video-repair-plan";
  * Pure data, no React dependency — shared between initial asset-page load and post-fill refresh (unit-testable).
  */
 export interface AssetItem {
+  referenceCut?: Shot["referenceCut"];
+  mediaUrl?: string;
   assetId?: string;
   shotId: number;
   type: Shot["type"];
@@ -90,10 +92,13 @@ export function buildAssetRows(
 
   return shots.map((s) => {
     const saved = savedByShot.get(s.shotId);
+    const reference = s.referenceCut ? { referenceCut: s.referenceCut } : {};
     if (saved?.filePath && saved.status === "done") {
       // Video asset: use the static preview image as thumbnail (rendering an mp4 as <img> breaks), and mark isVideo to correctly hide the "animate" entry point
       const isVideo = VIDEO_EXT.test(saved.filePath);
       return {
+        ...reference,
+        mediaUrl: saved.filePath,
         assetId: saved.id,
         shotId: s.shotId,
         type: s.type,
@@ -115,6 +120,7 @@ export function buildAssetRows(
       };
     }
     return {
+      ...reference,
       shotId: s.shotId,
       type: s.type,
       duration: s.duration,
@@ -125,7 +131,7 @@ export function buildAssetRows(
       voiceover: s.voiceover || undefined,
       visualSource: s.visualSource,
       status: s.visualSource === "product_image" ? "done" : saved?.status === "failed" || saved?.status === "generating" ? saved.status : "pending",
-      thumbnailUrl: s.visualSource === "product_image" ? firstProduct : undefined,
+      thumbnailUrl: s.referenceCut?.productImage ?? (s.visualSource === "product_image" ? firstProduct : undefined),
     };
   });
 }

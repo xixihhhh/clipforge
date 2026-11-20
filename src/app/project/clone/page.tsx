@@ -68,6 +68,7 @@ export default function ClonePage() {
 
   // generation state
   const [isGenerating, setIsGenerating] = useState(false);
+  const [openingEditor, setOpeningEditor] = useState(false);
   const [genError, setGenError] = useState("");
 
   // model-tier one-shot replication state (Seedance reference-to-video)
@@ -195,11 +196,12 @@ export default function ClonePage() {
       throw new Error(e.error || t("errorCloneFailed"));
     }
     const { paths } = await uploadRes.json();
-    await fetch(`/api/project/${project.id}`, {
+    const updated = await fetch(`/api/project/${project.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productImages: paths }),
     });
+    if (!updated.ok) throw new Error(t("errorCloneFailed"));
     return { projectId: project.id, paths };
   }, [productName, productFeatures, productImages, videoUrl, t]);
 
@@ -278,7 +280,7 @@ export default function ClonePage() {
 
       // rhythm skeleton: total duration follows the reference when analyzed (15-40s clamp)
       const targetDuration = refAnalysis
-        ? Math.min(40, Math.max(15, Math.round(refAnalysis.duration)))
+        ? Math.max(1, Math.round(refAnalysis.duration))
         : 40;
       const scriptRes = await fetch("/api/llm/script", {
         method: "POST",
@@ -311,6 +313,25 @@ export default function ClonePage() {
       setIsGenerating(false);
     }
   }, [isGenerating, llm, productName, productFeatures, refAnalysis, createCloneProject, router, t]);
+
+  async function openCutEditor() {
+    if (!refAnalysis || openingEditor) return;
+    setOpeningEditor(true);
+    setGenError("");
+    try {
+      const { projectId } = await createCloneProject();
+      const res = await fetch(`/api/project/${projectId}/reference-cuts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: refAnalysis.path }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("errorCloneFailed"));
+      router.push(`/project/${projectId}/assets`);
+    } catch (error) {
+      setGenError(error instanceof Error ? error.message : t("errorCloneFailed"));
+      setOpeningEditor(false);
+    }
+  }
 
   /** handle file selection / upload */
   const handleFiles = useCallback(
@@ -789,6 +810,11 @@ export default function ClonePage() {
 
         {/* bottom action buttons */}
         <div className="flex flex-col items-center pb-10 gap-3">
+          {refAnalysis && (
+            <Button size="lg" disabled={openingEditor || isGenerating || isReplicating || !productName.trim() || !productImages.length} onClick={openCutEditor}>
+              {t("editOriginalCuts", { n: refAnalysis.shots.length })}
+            </Button>
+          )}
           {genError && (
             <p className="text-sm text-destructive">{genError}</p>
           )}

@@ -3,6 +3,7 @@ import type { NamespaceMessages } from "../config";
 // clone 命名空间：爆款复刻页文案
 export const clone: NamespaceMessages = {
   zh: {
+    editOriginalCuts: "按原片 {n} 个镜头逐镜制作",
     heroTitle: "爆款复刻",
     heroSubtitle: "贴爆款视频链接做参考，载入高转化带货结构，用你的商品重新生成脚本",
     // 从首页热点雷达跳转过来的同款横幅
@@ -75,6 +76,7 @@ export const clone: NamespaceMessages = {
     modelTierViewExport: "去导出页查看 →",
   },
   en: {
+    editOriginalCuts: "Edit all {n} reference shots",
     heroTitle: "Clone a hit",
     heroSubtitle: "Paste a trending video as reference, load a high-converting commerce structure, and regenerate the script with your product",
     // 从首页热点雷达跳转过来的同款横幅
