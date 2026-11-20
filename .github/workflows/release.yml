@@ -88,6 +88,10 @@ jobs:
           zip -r ../clipforge-skill.zip clipforge-video
           zip -r ../clipforge-script-judges.zip script-judges
 
+      - name: 打包可选的 KittenTTS 本地配音适配器
+        working-directory: integrations
+        run: zip ../clipforge-kitten-tts.zip kitten-tts/README.md kitten-tts/requirements.txt kitten-tts/server.py
+
       - name: 打包 MCP 安装包
         working-directory: mcp
         run: npm pack --ignore-scripts --pack-destination ..
@@ -99,6 +103,7 @@ jobs:
             clipforge-skill.zip
             clipforge-script-judges.zip
             clipforge-mcp-*.tgz
+            clipforge-kitten-tts.zip
           fail_on_unmatched_files: true
           draft: true
         env:
