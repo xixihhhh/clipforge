@@ -181,7 +181,7 @@ export default function ClonePage() {
         productDescription: productFeatures,
         productImages: [],
         sourceType: "clone",
-        ...(videoUrl.trim() && { sourceVideoUrl: videoUrl.trim() }),
+        ...((refAnalysis?.path || videoUrl.trim()) && { sourceVideoUrl: refAnalysis?.path || videoUrl.trim() }),
       }),
     });
     if (!projRes.ok) throw new Error(t("errorProjectCreate"));
@@ -203,7 +203,7 @@ export default function ClonePage() {
     });
     if (!updated.ok) throw new Error(t("errorCloneFailed"));
     return { projectId: project.id, paths };
-  }, [productName, productFeatures, productImages, videoUrl, t]);
+  }, [productName, productFeatures, productImages, refAnalysis?.path, videoUrl, t]);
 
   /**
    * Model-tier one-shot replication (Seedance 2.0 reference-to-video): the analyzed
