@@ -48,6 +48,8 @@ interface FalResultResponse {
 // Persisted settings use bare model IDs across providers. Keep the historical fal
 // selection distinct from Atlas's /edit selection; translate only on new submits.
 const legacyGptImageEditId = 'openai/gpt-image-2/image-to-image'
+const flareTextId = 'openai/gpt-image-2.6/flare/text-to-image'
+const flareEditId = 'openai/gpt-image-2.6/flare/edit'
 
 function modelRejection(error: unknown): string | undefined {
   if (!(error instanceof ProviderError) || error.statusCode !== 422 || !error.responseBody) return
@@ -87,7 +89,18 @@ export class FalAIProvider extends BaseProvider {
    * Generate an image
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
-    const modelId = options.modelId === legacyGptImageEditId ? 'openai/gpt-image-2/edit' : options.modelId
+    let modelId = options.modelId === legacyGptImageEditId ? 'openai/gpt-image-2/edit' : options.modelId
+    const isFlare = modelId === flareTextId || modelId === flareEditId
+    const referenceCount = options.referenceImageUrls?.length || (options.referenceImageUrl ? 1 : 0)
+    if (isFlare && options.count !== undefined && (!Number.isInteger(options.count) || options.count < 1 || options.count > 10)) {
+      throw new ProviderError('GPT Image 2.6 Flare 每次支持生成 1 至 10 张图片', 'BAD_PARAMETER', this.name)
+    }
+    if (isFlare && (referenceCount || options.mode === 'image-to-image' || modelId === flareEditId)) {
+      if (!referenceCount || referenceCount > 16) {
+        throw new ProviderError('GPT Image 2.6 Flare 图片编辑需要 1 至 16 张参考图', 'BAD_REFERENCE', this.name)
+      }
+      modelId = flareEditId
+    }
     const w = options.width ?? 0
     const h = options.height ?? 0
     // GPT Image series does not accept negative_prompt / guidance / steps
@@ -120,7 +133,7 @@ export class FalAIProvider extends BaseProvider {
       num_images: options.count ?? 1,
       guidance_scale: isGptImage ? undefined : options.guidanceScale,
       num_inference_steps: isGptImage ? undefined : options.steps,
-      seed: options.seed,
+      seed: isFlare ? undefined : options.seed,
       // edit/image-to-image: multi-image endpoints use image_urls array; regular image-to-image uses image_url
       ...((options.referenceImageUrls?.length || options.referenceImageUrl) && isEdit && {
         image_urls: options.referenceImageUrls?.length
@@ -273,7 +286,7 @@ export class FalAIProvider extends BaseProvider {
       {
         id: 'openai/gpt-image-2',
         name: 'GPT Image 2',
-        description: 'OpenAI 最新图像模型，强提示词遵循、构图与细节保真（带货商品主图首选）',
+        description: '强提示词遵循、构图与细节保真（带货商品主图首选）',
         modes: ['text-to-image'],
         mediaType: 'image',
         provider: this.name,
@@ -283,6 +296,14 @@ export class FalAIProvider extends BaseProvider {
         name: 'GPT Image 2 Edit',
         description: 'GPT Image 2 编辑，精确局部重绘/扩图，适合商品保真',
         modes: ['image-to-image'],
+        mediaType: 'image',
+        provider: this.name,
+      },
+      {
+        id: flareTextId,
+        name: 'GPT Image 2.6 Flare (fal.ai)',
+        description: '生成商品主图，或用商品照片与主播参考图编辑分镜',
+        modes: ['text-to-image', 'image-to-image'],
         mediaType: 'image',
         provider: this.name,
       },
