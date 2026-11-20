@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
+import styles from "./clone-workspace.module.css";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -394,16 +395,16 @@ export default function ClonePage() {
 
   return (
     <div className="min-h-screen grid-bg">
-      <main className="mx-auto max-w-4xl px-6 py-10">
+      <main className={styles.main}>
         {/* page title */}
-        <div className="mb-10 text-center">
+        <header className={styles.heading}>
           <h1 className="text-3xl font-bold tracking-tight mb-3">
-            <span className="brand-gradient-text">{t("heroTitle")}</span>
+            {t("heroTitle")}
           </h1>
-          <p className="text-muted-foreground text-base max-w-lg mx-auto">
+          <p className="text-muted-foreground text-sm">
             {t("heroSubtitle")}
           </p>
-        </div>
+        </header>
 
         {/* trend handoff banner: guide the user from "saw a trend" to "found a reference to remix" */}
         {trendFrom && (
@@ -430,15 +431,10 @@ export default function ClonePage() {
           </div>
         )}
 
+        <div className={styles.columns}>
         {/* Step 1 - enter viral video URL */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full brand-gradient text-sm font-bold text-white">
-              1
-            </div>
-            <h2 className="text-lg font-semibold">{t("step1Title")}</h2>
-          </div>
-
+        <section className={styles.source}>
+          <h2 className={styles.panelTitle}>{t("step1Title")}</h2>
           <Card className="glass-card card-hover">
             <CardContent className="p-6 space-y-5">
               {/* reference video file upload — the REAL analysis path (scene-cut skeleton) */}
@@ -540,12 +536,15 @@ export default function ClonePage() {
                       : t("structureHint")}
                   </p>
 
+                  {refAnalysis && (
+                    <video className={styles.sourcePreview} src={refAnalysis.path} controls playsInline preload="metadata" aria-label={t("realStructureTitle")} />
+                  )}
                   {/* storyboard card list */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={styles.cutList}>
                     {storyboards.map((card) => (
                       <div
                         key={card.id}
-                        className="rounded-lg border border-border/60 bg-background/40 p-4 space-y-2"
+                        className={styles.cutRow}
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">
@@ -558,9 +557,7 @@ export default function ClonePage() {
                             {card.duration}
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          {card.description}
-                        </p>
+                        {refAnalysis ? <time>{Number(refAnalysis.shots[card.id-1].start.toFixed(3))} s</time> : <p className="text-xs text-muted-foreground">{card.description}</p>}
                       </div>
                     ))}
                   </div>
@@ -568,29 +565,10 @@ export default function ClonePage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </section>
 
-        {/* Step 2 - upload your product */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-5">
-            <div
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                hasAnalysis
-                  ? "brand-gradient"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              2
-            </div>
-            <h2
-              className={`text-lg font-semibold ${
-                hasAnalysis ? "" : "text-muted-foreground"
-              }`}
-            >
-              {t("step2Title")}
-            </h2>
-          </div>
-
+        <section className={styles.product}>
+          <h2 className={styles.panelTitle}>{t("step2Title")}</h2>
           <Card
             className={`glass-card card-hover ${
               !hasAnalysis ? "opacity-50 pointer-events-none" : ""
@@ -754,6 +732,8 @@ export default function ClonePage() {
             </fieldset>
             </CardContent>
           </Card>
+        </section>
+
         </div>
 
         {/* model-tier one-shot replication (Seedance reference-to-video, ≤15s references) */}
@@ -762,7 +742,7 @@ export default function ClonePage() {
             <Card className="glass-card">
               <CardContent className="p-6 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">⚡ {t("modelTierTitle")}</h3>
+                  <h3 className="text-sm font-semibold">{t("modelTierTitle")}</h3>
                   {!refAnalysis.modelTierEligible && (
                     <Badge variant="outline" className="text-xs text-amber-600">
                       {t("modelTierTooLong", { max: REPLICATE_MAX_REF_SEC })}
@@ -814,7 +794,7 @@ export default function ClonePage() {
         )}
 
         {/* bottom action buttons */}
-        <div className="flex flex-col items-center pb-10 gap-3">
+        <div className={styles.actions}>
           {refAnalysis && (
             <Button size="lg" disabled={openingEditor || isGenerating || isReplicating || !productName.trim() || !productImages.length} onClick={openCutEditor}>
               {t("editOriginalCuts", { n: refAnalysis.shots.length })}

@@ -1,0 +1,89 @@
+.workstation {
+  --panel:var(--card);
+  --cell:var(--secondary);
+  --line:var(--border);
+  --selected:#3464ac;
+  --mono:ui-monospace,"SFMono-Regular",Consolas,monospace;
+  color:var(--foreground);
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:5px;
+  overflow:hidden;
+}
+.body,.properties {border:0;margin:0;padding:0;min-width:0}
+.toolbar,.transport,.trackHead,.shotTitle,.status,.monitor figcaption,.version {display:flex;align-items:center}
+.toolbar {min-height:58px;padding:10px 16px;gap:14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.toolbar h2 {font-size:18px;line-height:1.25;font-weight:650;letter-spacing:-.035em;margin:0 auto 0 0;display:flex;align-items:center;gap:10px}
+.toolbar h2 svg {width:19px;color:var(--muted-foreground)}
+.version {gap:6px;color:var(--muted-foreground);font-size:12px}
+.select,.properties textarea {background:var(--background);color:var(--foreground);border:1px solid var(--line);border-radius:3px;font-size:13px;padding:5px 7px}
+.select {min-height:30px}
+.workstation :is(button,a,select,textarea):focus-visible {outline:2px solid #729fec;outline-offset:2px}
+.duplicate,.shotTitle button,.transport button {display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;font-size:12px;cursor:pointer;color:var(--foreground)}
+.duplicate:hover,.shotTitle button:hover,.transport button:hover {background:var(--cell)}
+.duplicate svg,.shotTitle svg,.trackHead svg,.status svg {width:15px;height:15px;flex-shrink:0}
+.toolbar .compose {background:#305caa;color:white;border:1px solid #547dc1;border-radius:4px;min-height:34px;padding-inline:12px}
+.toolbar .compose:hover {background:#254e95}
+.workspace {display:grid;grid-template-columns:minmax(0,1fr) minmax(216px,23%);min-width:0}
+.edit {min-width:0;background:var(--background)}
+.monitors {display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.monitor {min-width:0;margin:0;background:#0b0c0e;color:#e8ebef}
+.monitor figcaption {justify-content:space-between;background:#202327;color:#dce0e5;gap:8px;padding:9px 12px;font-size:12px}
+.monitor time,.trackHead span:last-child,.timing dd,.stamp,.transport .select {font-family:var(--mono);font-variant-numeric:tabular-nums}
+.monitor time {color:#b6bdc5;font-size:11px}
+.screen {height:clamp(218px,29vw,365px);display:grid;place-items:center;overflow:hidden;background:#101113}
+.screen :is(img,video) {display:block;width:100%;height:100%;min-height:0;object-fit:contain}
+.transport {gap:8px;justify-content:center;padding:5px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.transport button {width:32px;border-radius:3px}
+.transport button:disabled,.shotTitle button:disabled {opacity:.32;cursor:default}
+.transport .select {font-size:12px}
+.track {padding:14px 14px 16px;min-width:0}
+.trackHead {justify-content:space-between;gap:10px;padding-bottom:10px;font-size:13px}
+.trackHead span:first-child {display:flex;align-items:center;gap:7px;font-weight:600}
+.trackHead span:last-child {color:var(--muted-foreground);font-size:11px}
+.strip {display:flex;align-items:stretch;gap:3px;overflow-x:auto;padding:2px 2px 5px;scrollbar-width:thin}
+.strip button {flex-basis:0;min-width:58px;text-align:left;cursor:pointer;border:0;background:transparent;padding:0}
+.stamp {display:block;color:var(--muted-foreground);font-size:10px;line-height:17px;border-left:1px solid var(--line);padding-left:3px}
+.filmCell {position:relative;isolation:isolate;display:block;overflow:hidden;height:48px;border:1px solid #454b54;border-radius:2px;background:#252932}
+.filmCell img {display:block;width:100%;height:100%;object-fit:cover;opacity:.79}
+.filmCell span {position:absolute;bottom:2px;left:3px;padding:0 3px;background:#111820d9;color:white;font:11px/16px var(--mono)}
+.filmCell svg {position:absolute;right:3px;top:3px;width:14px;height:14px;color:white;background:#111820}
+.strip button[aria-pressed="true"] .filmCell {outline:2px solid #76a9ff;outline-offset:-2px}
+.strip button[aria-pressed="true"] .filmCell img {opacity:1}
+.strip button[aria-pressed="true"] .stamp {color:var(--foreground);border-left:2px solid #76a9ff;font-weight:650}
+.inspector {border-left:1px solid var(--line);padding:0 15px 16px;min-width:0}
+.inspector h3 {display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;min-height:36px;border-bottom:1px solid var(--line);margin:0 -15px;padding:0 15px}
+.inspector h3 svg {width:14px}
+.shotTitle {justify-content:space-between;margin:14px 0 10px}
+.shotTitle strong {font-weight:640;font-size:15px}
+.shotTitle button {padding:0 5px;border:1px solid var(--line);border-radius:3px}
+.timing {display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line);margin:0 0 14px}
+.timing dt,.properties label {color:var(--muted-foreground);font-size:12px}
+.timing dd {color:var(--foreground);font-size:12px;margin:4px 0 0}
+.properties {display:grid;gap:12px}
+.properties label {display:grid;gap:5px}
+.properties textarea {width:100%;min-height:65px;resize:vertical;line-height:1.5}
+.properties:disabled {opacity:.65}
+.properties button {border-radius:3px}
+.modelSettings {color:var(--primary);font-size:12px;text-decoration:underline;text-underline-offset:3px}
+.spanControls {display:grid;gap:8px}
+.status {gap:7px;min-height:30px;padding:5px 14px;border-top:1px solid var(--line);color:var(--muted-foreground);font-size:12px}
+@media(max-width:1080px) {
+  .workspace {grid-template-columns:1fr}
+  .inspector {border-left:0;border-top:1px solid var(--line)}
+  .properties {grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:end}
+  .timing {display:flex;gap:18px}
+  .timing div {display:flex;gap:8px;align-items:center}
+  .timing dd {margin:0}
+  .screen {height:clamp(180px,32vw,340px)}
+}
+@media(max-width:600px) {
+  .toolbar {gap:8px;padding:10px}.toolbar h2 {font-size:16px}
+  .toolbar .compose {margin-left:auto}
+  .monitor figcaption {align-items:flex-start;flex-direction:column;gap:2px;font-size:11px;padding:6px 8px}
+  .screen {height:clamp(165px,47vw,245px)}
+  .track {padding:10px 8px}.trackHead {align-items:flex-start}
+  .trackHead span:last-child {font-size:10px}
+  .properties {grid-template-columns:1fr}
+  .strip button {min-width:55px}
+}

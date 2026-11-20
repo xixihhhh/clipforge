@@ -187,6 +187,7 @@ export default function AssetsPage() {
   // when no image model is configured (modelTarget is null), offer key-free users a free stock fill entry point
   const offerStockFill = !loading && shouldOfferStockFill(assets, contentType, modelTarget !== null);
   // only show the "configure a model" warning when there are still AI shots that need generating (no warning once everything is ready, to avoid contradicting the "all done" state)
+  const Tools = isReference ? "details" : "div";
   const showModelWarning = !isReference && !loading && needsImageModelWarning(assets, modelTarget !== null);
 
   // load real data: project info + selected script shots + resolve the provider for the default image model
@@ -1038,13 +1039,15 @@ export default function AssetsPage() {
         onChange={onUploadFileChange}
       />
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className={isReference ? "mx-auto max-w-[1520px] px-3 py-4 sm:px-5 xl:px-7" : "mx-auto max-w-4xl px-6 py-8"}>
             {assets[0]?.referenceCut && referencePath && (
               <ReferenceEditor key={id} projectId={id} scriptId={scriptId} versions={versions} source={referencePath} modelName={modelTarget?.model}
                 assets={assets} products={productImages} reload={reloadAssets} busy={isBatchGenerating || isGridGenerating || isFilmGenerating || assets.some((a) => a.status === "generating")}
                 generate={async (shotId, referenceFrame) => { const media = await generateOne(shotId, { skipMotion: true, referenceFrame }); if (media) await reloadAssets(); return Boolean(media); }} />
             )}
 
+        <Tools className={isReference ? "mt-5 border-y border-border py-3" : undefined}>
+          {isReference && <summary className="cursor-pointer text-sm font-medium">{locale === "en" ? "Media library and batch tools" : "素材库与批量工具"}</summary>}
         <ModelCatalogStatus statuses={catalog.statuses} pending={catalog.pending} onRetry={catalog.retry} />
         {/* Action bar: title + generation ACTIONS only. Creative settings live in the
             director panel below so this row stays a stable, scannable set of verbs. */}
@@ -1052,7 +1055,7 @@ export default function AssetsPage() {
           <div>
             <h2 className="text-lg font-semibold">{t("title")}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {loading ? tc("loading") : t("assetsReady", { done: doneCount, total: assets.length })}
+              {loading ? tc("loading") : isReference ? (locale === "en" ? `${assets.filter(a => a.thumbnailUrl || a.referenceCut?.productImage).length} of ${assets.length} shots have media` : `${assets.filter(a => a.thumbnailUrl || a.referenceCut?.productImage).length}/${assets.length} 镜已有可合成画面`) : t("assetsReady", { done: doneCount, total: assets.length })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1800,6 +1803,7 @@ export default function AssetsPage() {
             </div>
           </>
         )}
+        </Tools>
       </main>
     </div>
   );
