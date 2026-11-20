@@ -105,3 +105,10 @@
   .sourceDeck .transport .select {max-width:75px;padding-inline:2px}
   .programControls {gap:3px;padding:0 3px}
 }
+@media(max-width:600px) {
+  .sourceDeck .transport {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:28px 28px;height:60px;padding:1px 5px;gap:1px}
+  .sourceDeck .transport button {width:100%;min-height:26px}
+  .sourceDeck .transport label {grid-column:1/-1;grid-row:2;min-width:0}
+  .sourceDeck .transport .select {width:100%;max-width:none;min-height:25px}
+  .programControls {height:60px;flex-wrap:wrap;align-content:center}
+}

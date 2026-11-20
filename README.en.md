@@ -26,6 +26,10 @@
 
 **Reference cut editor** · Preserve source cuts, compare each reference frame to a product shot, and fork an editable A/B version. [0.11.0 guide](docs/releases/v0.11.0.md)
 
+[Reference edit workstation](docs/releases/v0.11.1.md)
+
+![Reference edit workstation with source and program monitors, shot timeline and inspector](docs/releases/images/v0.11.1-reference-editor.png)
+
 ## ✨ Why ClipForge
 
 | Exclusive | In one line |

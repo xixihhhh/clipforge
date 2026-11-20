@@ -26,6 +26,10 @@
 
 **逐镜复刻** · 传入参考片和商品图后，可按原片切点逐镜对照、锁镜、替换商品图和复制 A/B 版本。[0.11.0 使用说明](docs/releases/v0.11.0.md)
 
+[双监看剪辑台](docs/releases/v0.11.1.md)
+
+![逐镜复刻：左侧参考监看、右侧本版画面、下方时间线与镜头检查器](docs/releases/images/v0.11.1-reference-editor.png)
+
 ## ✨ 为什么选 ClipForge
 
 | 独家能力 | 一句话 |
