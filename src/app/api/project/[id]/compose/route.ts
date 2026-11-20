@@ -100,6 +100,8 @@ export async function GET(
   }
 }
 
+class ReferenceExportError extends Error {}
+
 /** 把 /api/files/{pid}/{file} 形式的访问路径还原为本地磁盘绝对路径 */
 function toLocalPath(fileRef: string | undefined): string | undefined {
   if (!fileRef) return undefined;
@@ -368,7 +370,7 @@ export async function POST(
       // as .mp4) would fail the whole single-pass filter_complex with an inscrutable error — swap
       // it for the product image instead of feeding it to ffmpeg, and log which shot degraded.
       if (isVideo && (await probeDuration(local)) <= 0) {
-        if (shot.referenceCut) throw new Error(errText(req, `第 ${shot.shotId} 镜的视频无法解码，请替换该素材`, `Cannot decode the video in reference shot ${shot.shotId}. Replace this take.`));
+        if (shot.referenceCut) throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜的视频无法解码，请替换该素材`, `Cannot decode the video in reference shot ${shot.shotId}. Replace this take.`));
         const fallback = toLocalPath(productImages[0]);
         console.warn(`[compose] 分镜 ${shot.shotId} 的视频素材无法解码（${local}），已降级为商品图兜底`);
         if (fallback && fallback !== local) {
@@ -418,9 +420,9 @@ export async function POST(
       if (shot.referenceCut) {
         // Round absolute cut positions on the output's 30 fps clock, so rounding errors never accumulate.
         duration = (Math.round(shot.referenceCut.end * 30) - Math.round(shot.referenceCut.start * 30)) / 30;
-        if (duration <= 0) throw new Error(errText(req, `第 ${shot.shotId} 镜不足一帧（输出为 30 fps）`, `Reference shot ${shot.shotId} is shorter than a frame at 30 fps`));
+        if (duration <= 0) throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜不足一帧（输出为 30 fps）`, `Reference shot ${shot.shotId} is shorter than a frame at 30 fps`));
         if (voiceSec && voiceSec > duration + 1 / 30) {
-          throw new Error(errText(req, `第 ${shot.shotId} 镜的旁白超过参考镜头时长，请缩短旁白再合成`, `Shorten the narration for reference shot ${shot.shotId} to fit its edit interval`));
+          throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜的旁白超过参考镜头时长，请缩短旁白再合成`, `Shorten the narration for reference shot ${shot.shotId} to fit its edit interval`));
         }
       }
       const segment = shot.referenceCut?.segment;
@@ -438,7 +440,7 @@ export async function POST(
       rendered.push({ shot, clip, duration, voiceSec, ...(vo?.words ? { words: vo.words } : {}) });
     }
 
-    if (missing.length && shots.some((shot) => shot.referenceCut)) throw new Error(errText(req,
+    if (missing.length && shots.some((shot) => shot.referenceCut)) throw new ReferenceExportError(errText(req,
       `参考时间线缺少镜头素材：${missing.join(", ")}`, `Missing media for reference shots: ${missing.join(", ")}`));
     if (rendered.length === 0) throw new Error("没有可用素材");
 
@@ -626,7 +628,7 @@ export async function POST(
         await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));
       } catch (e) {
         console.error("后台合成失败:", e);
-        await db.update(compositions).set({ status: "failed" }).where(eq(compositions.id, comp.id)).catch(() => {});
+        await db.update(compositions).set({ status: "failed", failureReason: e instanceof ReferenceExportError ? e.message : null }).where(eq(compositions.id, comp.id)).catch(() => {});
         await db.update(projects).set({ status: "video", updatedAt: new Date() }).where(eq(projects.id, id)).catch(() => {});
       }
     })();

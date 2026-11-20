@@ -547,13 +547,13 @@ export default function VideoPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("errorComposeFailed"));
+      if (!res.ok || !data.compositionId) throw new Error(data.error || t("errorComposeFailed"));
 
       // 轮询合成状态，直到 done / failed（后台任务，避免长视频请求超时）
       const url: string = await new Promise((resolve, reject) => {
         const poll = setInterval(async () => {
           try {
-            const r = await fetch(`/api/project/${id}/compose`);
+            const r = await fetch(`/api/project/${id}/compose?compositionId=${encodeURIComponent(data.compositionId)}`);
             const d = await r.json();
             const c = d.composition;
             if (!c) return;
@@ -562,7 +562,7 @@ export default function VideoPage() {
               resolve(c.url);
             } else if (c.status === "failed") {
               clearInterval(poll);
-              reject(new Error(t("errorComposeAssets")));
+              reject(new Error(c.failureReason || t("errorComposeAssets")));
             }
           } catch {
             // 单次轮询失败忽略，继续重试

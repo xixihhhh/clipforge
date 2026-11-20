@@ -94,11 +94,12 @@ export async function PATCH(req: Request, { params }: Context) {
         return apiError(req, "素材或镜头范围无效", "Invalid video or shot range", 409);
       }
       const span = shots.slice(from, to + 1);
-      if (span.some((s) => s.referenceCut!.locked) || span[span.length - 1].referenceCut!.end - cut.start > mediaDuration + 0.001) {
+      const offset = cut.segment?.path === source.filePath ? cut.segment.offset : 0;
+      if (span.some((s) => s.referenceCut!.locked) || offset + span[span.length - 1].referenceCut!.end - cut.start > mediaDuration + 0.001) {
         return apiError(req, "所选范围包含锁定镜头或超过素材时长", "The range contains a locked shot or exceeds the video duration", 409);
       }
       for (const s of span) {
-        s.referenceCut!.segment = { path: source.filePath, offset: s.referenceCut!.start - cut.start };
+        s.referenceCut!.segment = { path: source.filePath, offset: offset + s.referenceCut!.start - cut.start };
         if (s.shotId === shot.shotId) continue;
         tx.update(assets).set({selected: false}).where(and(eq(assets.projectId, id), eq(assets.scriptId, row.id), eq(assets.shotId, s.shotId))).run();
         tx.insert(assets).values({ ...source, id: crypto.randomUUID(), shotId: s.shotId, createdAt: new Date() }).run();

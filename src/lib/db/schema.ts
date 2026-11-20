@@ -184,6 +184,7 @@ export const compositions = sqliteTable("compositions", {
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   scriptId: text("script_id").references(() => scripts.id, { onDelete: "set null" }),
   outputPath: text("output_path"),
+  failureReason: text("failure_reason"),
   // First-frame poster extracted right after a successful render (absolute path next to the
   // output file). Local extraction — never a third-party URL that can expire. Backfilled
   // lazily by /api/works for rows rendered before this column existed.

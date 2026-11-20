@@ -38,6 +38,7 @@ describe("publicMediaSource", () => {
     const composition: Parameters<typeof publicMediaComposition>[0] = {
       id: "composition-1",
       scriptId: null,
+      failureReason: null,
       projectId: "project-1",
       outputPath: "/private/clipforge/output.mp4",
       thumbnailPath: "/private/clipforge/thumb.jpg",
