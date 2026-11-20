@@ -805,7 +805,8 @@ export default function ClonePage() {
           )}
           <Button
             size="lg"
-            className="brand-gradient text-white px-10 text-base font-semibold"
+            variant={refAnalysis ? "outline" : "default"}
+            className="px-5 font-semibold"
             disabled={!canGenerate || isGenerating}
             onClick={handleGenerate}
           >
