@@ -473,6 +473,8 @@ Director mode adds a four-step bar to every project: **Script → Assets → Vid
 | **Style pack** | Export the whole look (subtitles / music / quality / CTA) as shareable JSON, or import someone else's |
 | **Variant matrix** | Same assets, cross **hook × caption style × music mood** into several labeled videos for A/B testing — **re-composes only, no new AI generation, no generation cost** |
 
+French and German narration can run on your CPU. See the [local KittenTTS setup](integrations/kitten-tts/README.md#local-setup-english).
+
 Then hit **Start compose**, and at 100% click **Next: export video**.
 
 ### 8.4 Export page

@@ -46,6 +46,8 @@ export interface TTSSetting {
   speed?: number;
   /** MiniMax 国内端点的 GroupId（可选） */
   groupId?: string;
+  /** Restore the previous endpoint when returning from local narration. Credentials stay in their original fields. */
+  beforeKitten?: Pick<TTSSetting, "provider" | "baseUrl" | "model" | "voice">;
 }
 
 export interface SettingsState {
