@@ -83,6 +83,7 @@ export interface SettingsState {
   visualLook: string;
   // UI complexity mode: "simple" keeps only the happy path (beginner default),
   // "pro" reveals the director panel, per-shot camera tools, template workshop etc.
+  theme: "dark" | "light";
   uiMode: "simple" | "pro";
   // 面向创作目标的当前生产方案（原子更新下方 provider-agnostic 参数）
   activeProductionProfile: ProductionProfileId;
@@ -111,6 +112,7 @@ export interface SettingsState {
   setMotionRealism: (tier: MotionRealismTier) => void;
   setChainMode: (mode: "pin" | "tail" | "off") => void;
   setVisualLook: (look: string) => void;
+  setTheme: (theme: "dark" | "light") => void;
   setUiMode: (mode: "simple" | "pro") => void;
   applyProductionProfile: (profile: ProductionProfileId) => void;
   /** 一个 Atlas Key 一键接入：脚本+看图+生图+生视频+配音全配好（不覆盖用户已选模型/已开的配音） */
@@ -213,6 +215,7 @@ export const useSettingsStore = create<SettingsState>()(
       motionRealism: "auto",
       chainMode: "pin",
       visualLook: "none",
+      theme: "dark",
       uiMode: "simple",
       activeProductionProfile: "balanced",
       locale: DEFAULT_LOCALE,
@@ -243,6 +246,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMotionRealism: (tier) => set({ motionRealism: tier }),
       setChainMode: (mode) => set({ chainMode: mode }),
       setVisualLook: (look) => set({ visualLook: look }),
+      setTheme: (theme) => set({ theme }),
       setUiMode: (mode) => set({ uiMode: mode }),
       applyProductionProfile: (profile) =>
         set((state) => productionProfilePatch(profile, state)),

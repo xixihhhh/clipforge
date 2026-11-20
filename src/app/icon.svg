@@ -1,18 +1,11 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="cfg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="0.55" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#a78bfa"/>
-    </linearGradient>
-  </defs>
   <!-- App tile -->
-  <rect width="512" height="512" rx="116" fill="url(#cfg)"/>
+  <rect width="512" height="512" rx="116" fill="#3159c8"/>
   <!-- Play glyph = video -->
   <path d="M196 158 L196 354 L366 256 Z" fill="#fff" stroke="#fff" stroke-width="40" stroke-linejoin="round" stroke-linecap="round"/>
   <!-- Diagonal slice through the play = the "clip" cut -->
   <g transform="rotate(22 268 256)">
-    <rect x="252" y="60" width="30" height="392" rx="15" fill="url(#cfg)"/>
+    <rect x="252" y="60" width="30" height="392" rx="15" fill="#3159c8"/>
   </g>
   <!-- AI spark, top-right -->
   <path d="M392 84 C397 126 408.5 137.5 450 142.5 C408.5 147.5 397 159 392 201 C387 159 375.5 147.5 334 142.5 C375.5 137.5 387 126 392 84 Z" fill="#fff"/>
