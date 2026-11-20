@@ -143,6 +143,7 @@ async function executeRepair(projectId: string, body: RepairRequest) {
       imageDataUrl(await readFile(endResult)),
       ...extraImages,
     ];
+    writableShot(projectId, context.asset.scriptId, preview.summary.shotId);
     const { taskId, modelId } = await provider.submitVideoTask({
       modelId: preview.summary.model,
       mode: "video-to-video",

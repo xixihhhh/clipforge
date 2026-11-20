@@ -6,18 +6,25 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { eq } from "drizzle-orm";
+import { ProviderError } from "@/lib/providers/base";
+import { rename } from "node:fs/promises";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import * as schema from "@/lib/db/schema";
 import { POST as postAsset, PATCH as selectTake, GET as getAssets } from "@/app/api/project/[id]/assets/route";
+import { appendScriptVariants } from "@/lib/script-variants";
 import { listAiTasks, recordAiTask, updateAiTask } from "@/lib/ai-tasks";
-import { replicaForProject, recoverReplica, submitReplica } from "@/lib/replicate-job";
+import { attachReplicaTask, replicaForProject, recoverReplica, submitReplica } from "@/lib/replicate-job";
 import type { AIProvider, VideoOptions } from "@/lib/providers/types";
 
 let root: string;
 let sqlite: Database.Database;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 vi.mock("@/lib/db", () => ({ getDb: () => db }));
+vi.mock("node:fs/promises", async importOriginal => {
+  const fs = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...fs, rename: vi.fn(fs.rename) };
+});
 vi.mock("@/lib/media-probe", () => ({ probeMedia: async () => ({duration:3,width:720,height:1280}) }));
 const context = {params:Promise.resolve({id:"p"})};
 const request = (data: unknown) => new NextRequest("http://localhost/api/test", {method:"POST",body:JSON.stringify(data)});
@@ -108,6 +115,11 @@ it("does not resubmit when the provider acknowledgement is lost",async()=>{
   sqlite.close();openDB();
   await expect(submitReplica("p",provider,options)).rejects.toThrow(/待确认/);
   expect(submitVideoTask).toHaveBeenCalledTimes(1);
+  expect(() => attachReplicaTask("p","other","existing")).toThrow();
+  const bound = attachReplicaTask("p","fake","existing");
+  expect(bound.taskId).toBe("existing");
+  expect(() => attachReplicaTask("p","fake","different")).toThrow();
+  expect(submitVideoTask).toHaveBeenCalledTimes(1);
 });
 
 it.each([403,410])("refreshes a cached result URL after HTTP %i using the original provider task",async status=>{
@@ -121,4 +133,38 @@ it.each([403,410])("refreshes a cached result URL after HTTP %i using the origin
   expect(submitVideoTask).not.toHaveBeenCalled();
   expect(waitForTask).toHaveBeenCalledWith("original",expect.anything());
   expect(await listAiTasks("p",true)).toHaveLength(0);
+});
+
+it("keeps a validated racing Windows destination and completes the original job",async()=>{
+  const fs=await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  vi.mocked(rename).mockImplementationOnce(async (from,to)=>{
+    await fs.copyFile(from,to);
+    throw Object.assign(new Error("destination is in use"), { code:"EPERM" });
+  });
+  vi.stubGlobal("fetch",vi.fn(async()=>new Response("complete video")));
+  const provider={name:"fake",submitVideoTask:vi.fn().mockResolvedValue({taskId:"t",modelId:"m"}),
+    waitForTask:vi.fn().mockResolvedValue({status:"completed",result:{videoUrls:["https://example.invalid/video"]}})} as unknown as AIProvider;
+  await expect(submitReplica("p",provider,options)).resolves.toMatchObject({status:"completed"});
+  expect(db.select().from(schema.compositions).all()).toHaveLength(1);
+  expect(provider.submitVideoTask).toHaveBeenCalledTimes(1);
+});
+
+it("requires an explicit new project after a definite rejection and keeps the failed task for audit",async()=>{
+  const submitVideoTask=vi.fn().mockRejectedValue(new ProviderError("invalid prompt","API_ERROR","fake",422));
+  const provider={name:"fake",submitVideoTask,waitForTask:vi.fn()} as unknown as AIProvider;
+  await expect(submitReplica("p",provider,options)).rejects.toMatchObject({code:"TASK_FAILED"});
+  expect(replicaForProject("p")?.status).toBe("failed");
+  await expect(submitReplica("p",provider,options)).rejects.toMatchObject({code:"TASK_FAILED"});
+  expect(submitVideoTask).toHaveBeenCalledTimes(1);
+});
+
+it("regeneration retains prior owners; translation explicitly reuses the original footage", async()=>{
+  const old=await (await save({scriptId:"A"})).json();
+  const [newVariant]=appendScriptVariants("p",[{styleType:"scene",shots:[shot]}]);
+  expect((await read("A"))[0].id).toBe(old.id);
+  expect(await read(newVariant.id)).toHaveLength(0);
+  const [dub]=appendScriptVariants("p",[{styleType:"custom",shots:[shot]}],"A");
+  expect((await read(dub.id))[0]).toMatchObject({scriptId:dub.id,filePath:old.filePath});
+  expect((await read(dub.id))[0].id).not.toBe(old.id);
+  expect(db.select().from(schema.scripts).where(eq(schema.scripts.selected,true)).all().map(row=>row.id)).toEqual([dub.id]);
 });

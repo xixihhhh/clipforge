@@ -1,3 +1,4 @@
+import { appendScriptVariants } from "@/lib/script-variants";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { readFile } from "fs/promises";
@@ -7,7 +8,7 @@ import { styleNameMap, type ScriptStyleType } from "@/lib/script-engine/prompts"
 import { hookPatternName, HOOK_PATTERNS } from "@/lib/script-engine/hook-patterns";
 import type { ProductCategory } from "@/lib/script-engine/templates";
 import { getDb } from "@/lib/db";
-import { scripts as scriptsTable, projects, publishMetrics } from "@/lib/db/schema";
+import { projects, publishMetrics } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
 import { llmErrorPair } from "@/lib/llm-error";
@@ -222,14 +223,8 @@ export async function POST(req: NextRequest) {
         );
       }
       try {
-        // Delete existing scripts for this project first (overwrite on regenerate)
-        await db.delete(scriptsTable).where(eq(scriptsTable.projectId, projectId));
-        const rows = await db
-          .insert(scriptsTable)
-          .values(
-            scripts.map((s, i) => ({
-              projectId,
-              version: 1,
+        // Regeneration appends a new version so existing assets and in-flight tasks keep their owners.
+        const rows = appendScriptVariants(projectId, scripts.map((s) => ({
               styleType: (VALID_SCRIPT_STYLE.has(s.styleType) ? s.styleType : "custom") as
                 | "pain_point" | "scene" | "comparison" | "story"
                 | "drama" | "reversal" | "interview" | "unboxing" | "product_pov" | "talking_head"
@@ -239,10 +234,7 @@ export async function POST(req: NextRequest) {
               shots: s.shots,
               // dialogue-script cast (drama style) — read back at compose time for multi-voice TTS
               ...(s.characters?.length && { characters: s.characters }),
-              selected: i === 0, // select the first script set by default
-            }))
-          )
-          .returning();
+            })));
         savedScripts = rows.map((r) => ({
           id: r.id,
           title: r.title ?? "",

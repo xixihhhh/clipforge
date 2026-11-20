@@ -42,7 +42,7 @@ async function persistGridImage(projectId: string, sourceUrl: string): Promise<{
   } else {
     throw new Error("不支持的图片来源");
   }
-  const fileName = `storyboard-grid-${Date.now()}.${ext}`;
+  const fileName = `storyboard-grid-${crypto.randomUUID()}.${ext}`;
   const absPath = join(dir, fileName);
   await writeFile(absPath, buf);
   return { absPath, publicPath: `/api/files/${projectId}/${fileName}` };
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       productImage: !!productImageUrl,
     });
     const provider = createProvider({ name: providerName, apiKey, baseUrl: baseUrl ?? "" });
+    for (const shot of shots) writableShot(id, scriptId, shot.shotId);
     const result = await provider.generateImage({
       ...(options ?? {}),
       modelId: model,
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const saved: { shotId: number; filePath: string }[] = [];
     for (let i = 0; i < shots.length; i++) {
       const cell = cells[i];
-      const fileName = `asset-${shots[i].shotId}-${Date.now()}-grid.png`;
+      const fileName = `asset-${shots[i].shotId}-${crypto.randomUUID()}-grid.png`;
       const outPath = join(dir, fileName);
       await execFileAsync(ffmpegBin(), [
         "-y",
@@ -149,25 +150,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         outPath,
       ]);
       const filePath = `/api/files/${id}/${fileName}`;
-      // Keep older takes for review/rollback while making this fresh grid cell active.
-      db.transaction(tx => {
-        writableShot(id, scriptId, shots[i].shotId, tx);
-        tx.update(assets).set({ selected: false }).where(sameShot(id, scriptId, shots[i].shotId)).run();
-        tx.insert(assets).values({
-        projectId: id, scriptId,
-        shotId: shots[i].shotId,
-        type: "ai_generated",
-        filePath,
-        provider: providerName,
-        model,
-        prompt: `[storyboard-grid 第${i + 1}格] ${shots[i].description ?? ""}`.trim(),
-        selected: true,
-        status: "done",
-        }).run();
-      });
       saved.push({ shotId: shots[i].shotId, filePath });
     }
-
+    // A failed crop or a lock applied while generating must not switch half a grid.
+    db.transaction(tx => {
+      for (const [index, cell] of saved.entries()) {
+        writableShot(id, scriptId, cell.shotId, tx);
+        tx.update(assets).set({ selected: false }).where(sameShot(id, scriptId, cell.shotId)).run();
+        tx.insert(assets).values({
+          projectId: id, scriptId, shotId: cell.shotId,
+          type: "ai_generated", filePath: cell.filePath, provider: providerName, model,
+          prompt: `[storyboard-grid 第${index + 1}格] ${shots[index].description ?? ""}`.trim(),
+          selected: true, status: "done",
+        }).run();
+      }
+    });
     return NextResponse.json({ gridPath: publicPath, cells: saved, count: saved.length });
   } catch (error) {
     console.error("九宫格分镜生成失败:", error);

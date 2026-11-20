@@ -63,27 +63,29 @@ export async function PATCH(
     const shotTexts = body.shotTexts as ShotTextPatch[] | undefined;
     if (scriptId && Array.isArray(shotTexts)) {
       const db = getDb();
-      const [row] = await db.select().from(scripts).where(eq(scripts.id, scriptId));
-      if (!row || row.projectId !== id) {
-        return apiError(req, "脚本不存在", "Script not found", 404);
-      }
-      const patchByShot = new Map<number, ShotTextPatch>();
-      for (const p of shotTexts) {
-        if (p && typeof p.shotId === "number") patchByShot.set(p.shotId, p);
-      }
-      if ((row.shots ?? []).some(shot => patchByShot.has(shot.shotId) && referenceLocked(shot))) return apiError(req, "请先解锁参考镜头", "Unlock the reference shot first", 409);
-      const shots = (row.shots ?? []).map((shot) => {
-        const p = patchByShot.get(shot.shotId);
-        if (!p) return shot;
-        return {
-          ...shot,
-          ...(typeof p.voiceover === "string" && { voiceover: p.voiceover.trim() }),
-          ...(typeof p.description === "string" && { description: p.description.trim() }),
-          ...(typeof p.camera === "string" && { camera: p.camera.trim().slice(0, CAMERA_MAX_LEN) }),
-        };
+      return db.transaction(tx => {
+        const row = tx.select().from(scripts).where(eq(scripts.id, scriptId)).get();
+        if (!row || row.projectId !== id) {
+          return apiError(req, "脚本不存在", "Script not found", 404);
+        }
+        const patchByShot = new Map<number, ShotTextPatch>();
+        for (const p of shotTexts) {
+          if (p && typeof p.shotId === "number") patchByShot.set(p.shotId, p);
+        }
+        if ((row.shots ?? []).some(shot => patchByShot.has(shot.shotId) && referenceLocked(shot))) return apiError(req, "请先解锁参考镜头", "Unlock the reference shot first", 409);
+        const shots = (row.shots ?? []).map((shot) => {
+          const p = patchByShot.get(shot.shotId);
+          if (!p) return shot;
+          return {
+            ...shot,
+            ...(typeof p.voiceover === "string" && { voiceover: p.voiceover.trim() }),
+            ...(typeof p.description === "string" && { description: p.description.trim() }),
+            ...(typeof p.camera === "string" && { camera: p.camera.trim().slice(0, CAMERA_MAX_LEN) }),
+          };
+        });
+        const updated = tx.update(scripts).set({ shots }).where(eq(scripts.id, scriptId)).returning().get();
+        return NextResponse.json({ success: true, script: updated });
       });
-      const [updated] = await db.update(scripts).set({ shots }).where(eq(scripts.id, scriptId)).returning();
-      return NextResponse.json({ success: true, script: updated });
     }
 
     // Operation 1: switch the selected variant

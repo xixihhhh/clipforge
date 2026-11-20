@@ -23,12 +23,12 @@ export async function finalizeVideoRepair(input: {
   if (!summary) throw new Error("修复计划已失效，请重新预演");
   const db = getDb();
   const existingRows = await db.select().from(assets).where(eq(assets.projectId, input.projectId));
-  const existing = existingRows.find((row) => row.generationPlan && "kind" in row.generationPlan
+  const source = existingRows.find((row) => row.id === summary.sourceAssetId);
+  const existing = existingRows.find((row) => row.scriptId === source?.scriptId && row.generationPlan && "kind" in row.generationPlan
     && row.generationPlan.kind === "repair"
     && row.generationPlan.operationId === summary.operationId);
   if (existing) return existing;
 
-  const source = existingRows.find((row) => row.id === summary.sourceAssetId);
   if (!source?.filePath || source.status !== "done") throw new Error("原镜头不存在或尚未就绪");
   const sourcePath = resolveUploadFilePath(source.filePath);
   if (!sourcePath || !existsSync(sourcePath)) throw new Error("原镜头文件不存在");

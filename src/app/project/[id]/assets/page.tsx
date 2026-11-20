@@ -140,6 +140,7 @@ export default function AssetsPage() {
   const [reuseError, setReuseError] = useState("");
   const [reuseId, setReuseId] = useState("");
   const [reuseShot, setReuseShot] = useState("");
+  const displayedScript = useRef("");
   const [scriptId, setScriptId] = useState<string>("");
   const [editingCameraShot, setEditingCameraShot] = useState<number | null>(null);
   const [cameraDraft, setCameraDraft] = useState("");
@@ -231,7 +232,8 @@ export default function AssetsPage() {
         }
         // remember which script row the view came from — camera edits PATCH back into it
         setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
-        setScriptId(typeof selected.id === "string" ? selected.id : "");
+        displayedScript.current = selected.id;
+        setScriptId(selected.id);
         lastFrameByShot.current.clear();
         setReuseRows((Array.isArray(savedAssets) ? savedAssets : []).filter(row => row.scriptId !== selected.id && row.filePath && row.status === "done").map(row => ({ ...row, scriptTitle: scripts.find((script: {id:string}) => script.id === row.scriptId)?.title })));
 
@@ -266,7 +268,8 @@ export default function AssetsPage() {
       : null;
     if (selected && Array.isArray(selected.shots)) {
       setVersions(scripts.filter((s: {shots?: Shot[]}) => s.shots?.[0]?.referenceCut));
-      setScriptId(typeof selected.id === "string" ? selected.id : "");
+      displayedScript.current = selected.id;
+      setScriptId(selected.id);
         lastFrameByShot.current.clear();
         setReuseRows((Array.isArray(savedAssets) ? savedAssets : []).filter(row => row.scriptId !== selected.id && row.filePath && row.status === "done").map(row => ({ ...row, scriptTitle: scripts.find((script: {id:string}) => script.id === row.scriptId)?.title })));
       const rows = buildAssetRows(selected.shots as Shot[], Array.isArray(savedAssets) ? savedAssets.filter(row => row.scriptId === selected.id) : [], imgs);
@@ -458,6 +461,7 @@ export default function AssetsPage() {
         }),
       });
       if (!saveRes.ok) throw new Error((await saveRes.json()).error || t("taskResumeFailed"));
+      if (displayedScript.current !== scriptId) return;
       let savedUrl = url;
       let savedLastFrame: string | undefined;
       if (saveRes.ok) {
@@ -752,21 +756,23 @@ export default function AssetsPage() {
 
       // product image shot: use the product photo directly, no AI call needed (persisted for the composer to read)
       if (asset.visualSource === "product_image") {
-        setAssets((prev) =>
-          prev.map((a) =>
-            a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: productImages[0] } : a
-          )
-        );
-        if (productImages[0]) {
-          fetch(`/api/project/${id}/assets`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scriptId, shotId, type: "product_image", sourceUrl: productImages[0] }),
-          }).catch(() => {});
-          // auto motion: use the product image as the first frame and run image-to-video (bring the real product to life); falls back to a static image on failure
-          if (!opts?.skipMotion && autoMotion && videoModelTarget) await generateMotion(shotId, productImages[0]);
+        const photo = productImages[0];
+        if (!photo) return undefined;
+        try {
+          const response = await fetch(`/api/project/${id}/assets`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scriptId, shotId, type: "product_image", sourceUrl: photo }),
+          });
+          if (!response.ok) throw new Error((await response.json()).error || t("taskResumeFailed"));
+          if (displayedScript.current !== scriptId) return undefined;
+          setAssets(prev => prev.map(row => row.shotId === shotId ? { ...row, status: "done", thumbnailUrl: photo } : row));
+          if (!opts?.skipMotion && autoMotion && videoModelTarget) await generateMotion(shotId, photo);
+          return photo;
+        } catch (error) {
+          if (displayedScript.current === scriptId) setAssets(prev => prev.map(row => row.shotId === shotId
+            ? { ...row, error: error instanceof Error ? error.message : t("taskResumeFailed") } : row));
+          return undefined;
         }
-        return productImages[0];
       }
 
       // AI-generated shot: requires a default image model to be configured
@@ -862,6 +868,7 @@ export default function AssetsPage() {
           const saved = await saveRes.json();
           if (saved.filePath) savedUrl = saved.filePath;
         } else throw new Error((await saveRes.json()).error || t("taskResumeFailed"));
+        if (displayedScript.current !== scriptId) return;
         setAssets((prev) =>
           prev.map((a) => (a.shotId === shotId ? { ...a, status: "done", thumbnailUrl: savedUrl } : a))
         );

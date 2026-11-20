@@ -18,7 +18,6 @@ import { broadenQuery, pickBestCandidate, authorKeyOf, fallbackLevelOf, type Fal
 import { validateOrDelete } from "@/lib/media-validate";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
 
 export interface FillShotInput {
   scriptId: string;
