@@ -168,7 +168,7 @@ export function buildVideoOptions(p: VideoGenParams | undefined): Record<string,
 
 /** Map a text-to-image model to its edit / image-to-image variant (product-fidelity redraw with reference images) */
 export function toEditVariant(modelId: string): string {
-  if (modelId === "openai/gpt-image-2") return "openai/gpt-image-2/image-to-image";
+  if (modelId === "openai/gpt-image-2") return "openai/gpt-image-2/edit";
   if (modelId === "fal-ai/gpt-image-1.5") return "fal-ai/gpt-image-1.5/edit";
   // Replicate FLUX text-to-image → Kontext edit model
   if (modelId.startsWith("black-forest-labs/flux") && !modelId.includes("kontext")) {

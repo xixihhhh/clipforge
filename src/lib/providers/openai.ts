@@ -61,8 +61,11 @@ export class OpenAIProvider extends BaseProvider {
    * 有参考图 / image-to-image 走编辑接口，否则走文生图。
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
-    if (options.mode === 'image-to-image' || options.referenceImageUrl) {
-      return this.editImage(options)
+    const references = options.referenceImageUrls?.length
+      ? options.referenceImageUrls
+      : options.referenceImageUrl ? [options.referenceImageUrl] : []
+    if (options.mode === 'image-to-image' || references.length) {
+      return this.editImage(options, references)
     }
     return this.textToImage(options)
   }
@@ -198,17 +201,19 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   /** 图生图（编辑）：POST /images/edits（multipart） */
-  private async editImage(options: ImageOptions): Promise<ImageResult> {
+  private async editImage(options: ImageOptions, references: string[]): Promise<ImageResult> {
     const model = options.modelId
     if (model.startsWith('dall-e-3')) {
       throw new ProviderError('DALL·E 3 不支持图生图（图片编辑），请改用 gpt-image-1', 'NOT_SUPPORTED', this.name)
     }
-    if (!options.referenceImageUrl) {
+    if (!references.length) {
       throw new ProviderError('图生图缺少参考图', 'BAD_REFERENCE', this.name)
     }
 
     const isDalle2 = model.startsWith('dall-e-2')
-    const { blob, filename } = await this.fetchReferenceImage(options.referenceImageUrl)
+    if (isDalle2 && references.length > 1) {
+      throw new ProviderError('DALL·E 2 仅支持一张参考图，请选择支持多图编辑的模型', 'NOT_SUPPORTED', this.name)
+    }
 
     const form = new FormData()
     form.append('model', model)
@@ -216,7 +221,10 @@ export class OpenAIProvider extends BaseProvider {
     form.append('n', String(isDalle2 ? 1 : (options.count ?? 1)))
     form.append('size', this.pickSize(model, options.width, options.height))
     // gpt-image-* 用数组字段 image[]；dall-e-2 用单字段 image
-    form.append(isDalle2 ? 'image' : 'image[]', blob, filename)
+    for (const reference of references) {
+      const { blob, filename } = await this.fetchReferenceImage(reference)
+      form.append(isDalle2 ? 'image' : 'image[]', blob, filename)
+    }
     // 仅 dall-e-2 支持 response_format；gpt-image-* 恒返回 b64_json
     if (isDalle2) form.append('response_format', 'url')
 

@@ -29,6 +29,8 @@ interface FalStatusResponse {
   status: string
   progress?: number
   response_url?: string
+  error?: string
+  error_type?: string
   [key: string]: unknown
 }
 
@@ -42,6 +44,24 @@ interface FalResultResponse {
 }
 
 // ==================== Provider implementation ====================
+
+// Persisted settings use bare model IDs across providers. Keep the historical fal
+// selection distinct from Atlas's /edit selection; translate only on new submits.
+const legacyGptImageEditId = 'openai/gpt-image-2/image-to-image'
+
+function modelRejection(error: unknown): string | undefined {
+  if (!(error instanceof ProviderError) || error.statusCode !== 422 || !error.responseBody) return
+  try {
+    const body = JSON.parse(error.responseBody)
+    if (!Array.isArray(body?.detail)) return
+    const reasons = body.detail.flatMap((entry: { type?: string; msg?: string } | null) =>
+      typeof entry?.type === 'string' && typeof entry.msg === 'string' ? [`${entry.type}: ${entry.msg}`] : []
+    )
+    return reasons.join('; ') || undefined
+  } catch {
+    return undefined
+  }
+}
 
 export class FalAIProvider extends BaseProvider {
   readonly name = 'fal-ai'
@@ -67,16 +87,17 @@ export class FalAIProvider extends BaseProvider {
    * Generate an image
    */
   async generateImage(options: ImageOptions): Promise<ImageResult> {
+    const modelId = options.modelId === legacyGptImageEditId ? 'openai/gpt-image-2/edit' : options.modelId
     const w = options.width ?? 0
     const h = options.height ?? 0
     // GPT Image series does not accept negative_prompt / guidance / steps
-    const isGptImage = options.modelId.includes('gpt-image')
+    const isGptImage = modelId.includes('gpt-image')
     // gpt-image-1.5: image_size only accepts string enum values (1024x1024 / 1536x1024 / 1024x1536)
-    const isGptImage15 = options.modelId.includes('gpt-image-1.5')
+    const isGptImage15 = modelId.includes('gpt-image-1.5')
     // gpt-image-2: image_size accepts {width,height} (must be multiples of 16) or a preset name
-    const isGptImage2 = options.modelId.includes('gpt-image-2')
-    // edit/image-to-image endpoints: gpt-image-1.5/edit and seedream/edit use image_urls; gpt-image-2/image-to-image also supports image_urls
-    const isEdit = options.modelId.includes('/edit') || options.modelId.includes('/image-to-image')
+    const isGptImage2 = modelId.includes('gpt-image-2')
+    // Multi-image edit endpoints, including GPT Image 2 /edit, accept image_urls.
+    const isEdit = modelId.includes('/edit') || modelId.includes('/image-to-image')
 
     const round16 = (n: number) => Math.max(16, Math.round(n / 16) * 16)
     const imageSize = (() => {
@@ -114,7 +135,7 @@ export class FalAIProvider extends BaseProvider {
 
     // submit async task
     const submitResponse = await this.request<FalSubmitResponse>(
-      `/${options.modelId}`,
+      `/${modelId}`,
       { method: 'POST', body }
     )
 
@@ -124,7 +145,7 @@ export class FalAIProvider extends BaseProvider {
       throw new ProviderError('未返回请求ID', 'NO_REQUEST_ID', this.name)
     }
     // getTaskStatus needs the "modelId::requestId" format to locate the query endpoint; assemble it here before polling
-    const taskId = `${options.modelId}::${submitResponse.request_id}`
+    const taskId = `${modelId}::${submitResponse.request_id}`
     const finalStatus = await this.pollTaskStatus(taskId, {
       interval: 2000,
     })
@@ -213,6 +234,10 @@ export class FalAIProvider extends BaseProvider {
 
     const status = this.mapStatus(statusResponse.status)
 
+    if ((status === 'completed' || status === 'failed') && (statusResponse.error || statusResponse.error_type)) {
+      return { taskId, status: 'failed', error: statusResponse.error || statusResponse.error_type }
+    }
+
     const taskStatus: TaskStatus = {
       taskId,
       status,
@@ -221,10 +246,16 @@ export class FalAIProvider extends BaseProvider {
 
     // fetch the result once the task completes
     if (status === 'completed') {
-      const result = await this.request<FalResultResponse>(
-        `/${applicationId}/requests/${requestId}`
-      )
-      taskStatus.result = this.parseResult(taskId, result, modelId)
+      try {
+        const result = await this.request<FalResultResponse>(`/${applicationId}/requests/${requestId}`)
+        taskStatus.result = this.parseResult(taskId, result, modelId)
+      } catch (error) {
+        // fal returns model rejections from the result GET after reporting COMPLETED.
+        // A failed lookup without a structured model error must remain recoverable.
+        const reason = modelRejection(error)
+        if (reason) return { taskId, status: 'failed', error: reason }
+        throw error
+      }
     }
 
     return taskStatus
@@ -248,7 +279,7 @@ export class FalAIProvider extends BaseProvider {
         provider: this.name,
       },
       {
-        id: 'openai/gpt-image-2/image-to-image',
+        id: legacyGptImageEditId,
         name: 'GPT Image 2 Edit',
         description: 'GPT Image 2 编辑，精确局部重绘/扩图，适合商品保真',
         modes: ['image-to-image'],
