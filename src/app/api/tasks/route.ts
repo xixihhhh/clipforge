@@ -4,7 +4,7 @@ import { reconcileTranscriptRenders } from "@/lib/transcript-render-runner";
 import { getDb } from "@/lib/db";
 import { aiTasks, batchJobItems, batchJobs, compositions, mediaEdits, pipelineRuns, projects } from "@/lib/db/schema";
 import { isPipelineRunActive } from "@/lib/pipeline-runner";
-import { ACTIVE_AI_TASK_STATUSES } from "@/lib/ai-tasks";
+import { outstandingAiTasks } from "@/lib/ai-tasks";
 import { listLatestPipelineRuns } from "@/lib/pipeline-history";
 
 /**
@@ -81,7 +81,7 @@ export async function GET() {
     }
 
     // 云端任务状态未知时提供恢复入口；提交状态不代表已结算扣费。
-    const paid = await db.select().from(aiTasks).where(inArray(aiTasks.status, ACTIVE_AI_TASK_STATUSES));
+    const paid = await db.select().from(aiTasks).where(outstandingAiTasks());
     for (const tsk of paid) {
       (tsk.status === "unknown" ? attention : active).push({
         kind: tsk.status === "unknown" ? "paid_unknown" : "paid",

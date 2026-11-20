@@ -54,6 +54,7 @@ export async function finalizeVideoRepair(input: {
     const generatedThumbnail = await extractFirstFrame(outputPath);
     return await saveAssetCandidate({
       projectId: input.projectId,
+      scriptId: source.scriptId,
       shotId: summary.shotId,
       type: "ai_generated",
       filePath: `/api/files/${input.projectId}/${outputFileName}`,

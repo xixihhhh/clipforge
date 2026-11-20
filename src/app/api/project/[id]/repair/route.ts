@@ -1,3 +1,4 @@
+import { writableShot } from "@/lib/shot-ownership";
 import { existsSync } from "fs";
 import { mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
@@ -58,12 +59,13 @@ async function loadRepairContext(projectId: string, assetId: string, reviewId: s
     db.select().from(assets).where(eq(assets.projectId, projectId)),
   ]);
   if (!asset?.filePath || asset.status !== "done" || !VIDEO_EXT.test(asset.filePath)) throw new Error("请选择已完成的视频候选");
+  writableShot(projectId, asset.scriptId, asset.shotId);
   if (!review || review.assetId !== asset.id) throw new Error("评估记录与候选不匹配，请刷新后重试");
   const sourcePath = resolveUploadFilePath(asset.filePath);
   if (!sourcePath || !existsSync(sourcePath)) throw new Error("原镜头文件不存在");
   const metadata = await probeMedia(sourcePath);
   if (metadata.duration <= 0) throw new Error("无法读取原镜头时长");
-  return { asset, review, projectAssets, sourcePath, metadata };
+  return { asset, review, projectAssets: projectAssets.filter(row => row.scriptId === asset.scriptId), sourcePath, metadata };
 }
 
 async function compilePreview(projectId: string, body: RepairRequest, forceOperationId?: string): Promise<{
@@ -154,6 +156,7 @@ async function executeRepair(projectId: string, body: RepairRequest) {
     });
     const rowId = await recordAiTask({
       projectId,
+      scriptId: context.asset.scriptId,
       shotId: preview.summary.shotId,
       provider: preview.summary.provider,
       model: modelId,

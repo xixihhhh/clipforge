@@ -1,9 +1,10 @@
+import { writableShot, sameShot } from "@/lib/shot-ownership";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assets } from "@/lib/db/schema";
+import { assets, aiTasks } from "@/lib/db/schema";
 import { validateOrDelete } from "@/lib/media-validate";
 import { getDataDir } from "@/lib/paths";
 import { MAX_DOWNLOAD_BYTES } from "@/lib/providers/stock-types";
@@ -69,6 +70,8 @@ export async function persistAssetSource(projectId: string, sourceUrl: string, s
 
 export interface SaveAssetCandidateInput {
   projectId: string;
+  scriptId?: string | null;
+  providerTaskId?: string;
   shotId: number;
   filePath: string;
   type?: "ai_generated" | "product_image" | "user_upload" | "stock_footage";
@@ -92,9 +95,18 @@ export async function saveAssetCandidate(input: SaveAssetCandidateInput) {
   }
   const generationPlan = input.generationPlan ? sanitizeGenerationControlSummary(input.generationPlan) : null;
   const rows = db.transaction((transaction) => {
-    transaction.update(assets).set({ selected: false }).where(and(eq(assets.projectId, input.projectId), eq(assets.shotId, input.shotId))).run();
-    return transaction.insert(assets).values({
+    const task = input.providerTaskId && transaction.select().from(aiTasks).where(and(eq(aiTasks.provider, input.provider ?? ""), eq(aiTasks.taskId, input.providerTaskId), eq(aiTasks.projectId, input.projectId))).get();
+    if (input.providerTaskId && !task) throw new Error("未找到此项目的生成任务");
+    if (task && (task.shotId !== input.shotId || task.scriptId !== input.scriptId)) throw new Error("任务不属于此脚本分镜");
+    if (task && task.deliveredAssetId) {
+      const delivered = transaction.select().from(assets).where(eq(assets.id, task.deliveredAssetId)).get();
+      if (delivered) return [delivered];
+    }
+    const scriptId = writableShot(input.projectId, input.scriptId, input.shotId, transaction);
+    transaction.update(assets).set({ selected: false }).where(sameShot(input.projectId, scriptId, input.shotId)).run();
+    const inserted = transaction.insert(assets).values({
       projectId: input.projectId,
+      scriptId,
       shotId: input.shotId,
       type: input.type ?? "ai_generated",
       filePath: input.filePath,
@@ -106,6 +118,8 @@ export async function saveAssetCandidate(input: SaveAssetCandidateInput) {
       selected: true,
       status: "done",
     }).returning().all();
+    if (task) transaction.update(aiTasks).set({ deliveredAssetId: inserted[0].id, awaitingAsset: false, status: "completed" }).where(eq(aiTasks.id, task.id)).run();
+    return inserted;
   });
   return { ...rows[0], ...(lastFrameUrl && { lastFrameUrl }) };
 }

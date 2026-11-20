@@ -219,7 +219,11 @@ export default function ClonePage() {
     setReplicateError("");
     setReplicateResult(null);
     try {
-      const { projectId, paths } = await createCloneProject();
+      const inputKey = JSON.stringify([refVideoFile ? [refVideoFile.name, refVideoFile.size, refVideoFile.lastModified] : refAnalysis.path, productName, productFeatures, productImages.map(image => [image.file.name, image.file.size, image.file.lastModified])]);
+      const previous = sessionStorage.getItem("clipforge-replicate-operation");
+      const savedOperation = previous ? JSON.parse(previous) : null;
+      const { projectId, paths } = savedOperation?.inputKey === inputKey ? savedOperation : await createCloneProject();
+      sessionStorage.setItem("clipforge-replicate-operation", JSON.stringify({ inputKey, projectId, paths }));
       const videoOptions = buildVideoOptions(videoParams);
       videoOptions.duration = Math.min(15, Math.max(4, Math.round(refAnalysis.duration)));
       const res = await fetch("/api/ai/video", {
@@ -230,6 +234,7 @@ export default function ClonePage() {
           model: refModel,
           apiKey: videoModelTarget.apiKey,
           baseUrl: videoModelTarget.baseUrl,
+          purpose: "replicate",
           mode: "video-to-video",
           prompt: buildReplicatePrompt({ productName, sellingPoints: productFeatures, imageCount: paths.length }),
           referenceVideoUrls: [refAnalysis.path],
@@ -239,24 +244,18 @@ export default function ClonePage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("modelTierFailed"));
-      const videoUrlOut = data.videoUrls?.[0];
-      if (!videoUrlOut) throw new Error(t("modelTierFailed"));
-      // persist as a finished composition (provider URLs expire) → export page
-      const saveRes = await fetch(`/api/project/${projectId}/replicate/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: videoUrlOut }),
-      });
-      const saved = await saveRes.json().catch(() => ({}));
-      if (!saveRes.ok) throw new Error(saved.error || t("modelTierFailed"));
-      setReplicateResult({ url: saved.url, projectId });
+      if (!res.ok) {
+        if (data.terminal) sessionStorage.removeItem("clipforge-replicate-operation");
+        throw new Error(data.error || t("modelTierFailed"));
+      }
+      if (!data.compositionId || !data.url) throw new Error(t("modelTierFailed"));
+      setReplicateResult({ url: data.url, projectId });
     } catch (err) {
       setReplicateError(err instanceof Error ? err.message : t("modelTierFailed"));
     } finally {
       setIsReplicating(false);
     }
-  }, [isReplicating, refAnalysis, videoModelTarget, videoParams, productName, productFeatures, createCloneProject, t]);
+  }, [isReplicating, refAnalysis, videoModelTarget, videoParams, productName, productFeatures, productImages, refVideoFile, createCloneProject, t]);
 
   /**
    * Rhythm-tier clone: create the project + generate a script whose shot count and

@@ -1,3 +1,4 @@
+import { referenceLocked } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { scripts } from "@/lib/db/schema";
@@ -70,6 +71,7 @@ export async function PATCH(
       for (const p of shotTexts) {
         if (p && typeof p.shotId === "number") patchByShot.set(p.shotId, p);
       }
+      if ((row.shots ?? []).some(shot => patchByShot.has(shot.shotId) && referenceLocked(shot))) return apiError(req, "请先解锁参考镜头", "Unlock the reference shot first", 409);
       const shots = (row.shots ?? []).map((shot) => {
         const p = patchByShot.get(shot.shotId);
         if (!p) return shot;
@@ -92,12 +94,11 @@ export async function PATCH(
     const db = getDb();
     // Deselect all scripts under this project, then select the target
     const rows = await db.select().from(scripts).where(eq(scripts.projectId, id));
-    for (const r of rows) {
-      await db
-        .update(scripts)
-        .set({ selected: r.id === selectedId })
-        .where(eq(scripts.id, r.id));
-    }
+    if (!rows.some(row => row.id === selectedId)) return apiError(req, "脚本不存在", "Script not found", 404);
+    db.transaction(tx => {
+      tx.update(scripts).set({ selected: false }).where(eq(scripts.projectId, id)).run();
+      tx.update(scripts).set({ selected: true }).where(eq(scripts.id, selectedId)).run();
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to update script:", error);

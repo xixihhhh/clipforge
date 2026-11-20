@@ -40,7 +40,7 @@ beforeEach(() => {
   }));
   db.insert(schema.scripts)
     .values({
-      projectId: "fill-test",
+      id: "fill-script", projectId: "fill-test",
       styleType: "custom",
       selected: true,
       shots,
@@ -50,7 +50,7 @@ beforeEach(() => {
   db.insert(schema.assets)
     .values(
       states.map((status, index) => ({
-        projectId: "fill-test",
+        projectId: "fill-test", scriptId: "fill-script",
         shotId: index + 1,
         type: "user_upload" as const,
         selected: true,
@@ -62,7 +62,7 @@ beforeEach(() => {
   db.insert(schema.assets)
     .values(
       [4, 5].map((shotId) => ({
-        projectId: "fill-test",
+        projectId: "fill-test", scriptId: "fill-script",
         shotId,
         type: "user_upload" as const,
         selected: false,

@@ -1,3 +1,5 @@
+import { scriptForProject, sameShot, writableShot } from "@/lib/shot-ownership";
+import { isNull } from "drizzle-orm";
 import { existsSync } from "fs";
 import { mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
@@ -67,8 +69,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const db = getDb();
     const [project] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).limit(1);
     if (!project) return apiError(req, "项目不存在", "Project not found", 404);
+    const selected = scriptForProject(id, req.nextUrl.searchParams.get("scriptId"));
     const [assetRows, reviewRows] = await Promise.all([
-      db.select().from(assets).where(and(eq(assets.projectId, id), eq(assets.status, "done"), eq(assets.type, "ai_generated"))).orderBy(desc(assets.createdAt)),
+      db.select().from(assets).where(and(eq(assets.projectId, id), selected ? eq(assets.scriptId, selected.id) : isNull(assets.scriptId), eq(assets.status, "done"), eq(assets.type, "ai_generated"))).orderBy(desc(assets.createdAt)),
       db.select().from(generationReviews).where(eq(generationReviews.projectId, id)).orderBy(desc(generationReviews.createdAt)),
     ]);
     const latestByAsset = new Map<string, typeof generationReviews.$inferSelect>();
@@ -136,15 +139,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   ]);
   if (!project) return apiError(req, "项目不存在", "Project not found", 404);
   if (!asset?.filePath || asset.status !== "done") return apiError(req, "素材不存在或尚未就绪", "Asset not found or not ready", 404);
-  const script = scriptRows.find((row) => row.selected) ?? scriptRows[0];
+  const script = scriptRows.find(row => row.id === asset.scriptId);
   const shot = script?.shots?.find((row) => row.shotId === asset.shotId);
-  if (!shot) return apiError(req, "找不到素材对应的分镜", "The asset no longer matches a script shot", 400);
+  if (!script || !shot) return apiError(req, "找不到素材对应的分镜", "The asset no longer matches a script shot", 400);
   const assetPath = resolveUploadFilePath(asset.filePath);
   if (!assetPath || !existsSync(assetPath)) return apiError(req, "素材文件不存在", "Asset file does not exist", 404);
 
   const shotIndex = script.shots?.findIndex((row) => row.shotId === shot.shotId) ?? -1;
   const previousShotId = shotIndex > 0 ? script.shots?.[shotIndex - 1]?.shotId : undefined;
-  const previousAsset = selectedAssets.find((row) => row.shotId === previousShotId);
+  const previousAsset = selectedAssets.find((row) => row.scriptId === asset.scriptId && row.shotId === previousShotId);
   const sourceKeyframe = await usableReference(asset.thumbnailPath);
   const productReference = await usableReference(project.productImages?.[0]);
   const characterId = shot.characterId || project.characterId;
@@ -242,7 +245,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!asset) return apiError(req, "素材不存在", "Asset not found", 404);
     const [updated] = db.transaction((tx) => {
       if (decision === "accepted") {
-        tx.update(assets).set({ selected: false }).where(and(eq(assets.projectId, id), eq(assets.shotId, asset.shotId))).run();
+        const scriptId = writableShot(id, asset.scriptId, asset.shotId, tx);
+        tx.update(assets).set({ selected: false }).where(sameShot(id, scriptId, asset.shotId)).run();
         tx.update(assets).set({ selected: true }).where(eq(assets.id, asset.id)).run();
       }
       return tx.update(generationReviews).set({ humanDecision: decision, updatedAt: new Date() }).where(eq(generationReviews.id, review.id)).returning().all();

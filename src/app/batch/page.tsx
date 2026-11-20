@@ -256,16 +256,21 @@ export default function BatchPage() {
     projectId: string,
     slot?: ReturnType<typeof buildVariationPlan>[number]
   ) => {
+    const scriptResponse = await fetch(`/api/project/${projectId}/scripts`);
+    if (!scriptResponse.ok) throw new Error("项目脚本不可用 / Project script unavailable");
+    const scripts: {id: string; selected: boolean}[] = await scriptResponse.json();
+    const scriptId = (scripts.find(row => row.selected) ?? scripts[0])?.id;
+    if (!scriptId) throw new Error("项目脚本不可用 / Project script unavailable");
     await fetch(`/api/project/${projectId}/stock-fill`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "all", mediaType: "auto" }),
+      body: JSON.stringify({ scriptId, source: "all", mediaType: "auto" }),
     }).catch(() => {}); // visual-fill failure is non-fatal (product images/assets may already exist)
     const composeRes = await fetch(`/api/project/${projectId}/compose`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        freeTts: { enabled: true, ...(slot?.voice ? { voice: slot.voice } : {}) },
+        scriptId, freeTts: { enabled: true, ...(slot?.voice ? { voice: slot.voice } : {}) },
         ...(ctx.productCard && { productCard: true }),
         // variation slot: BGM mood / karaoke captions rotate per item (undefined without the plan)
         ...(slot?.bgm ? { freeBgm: true, ...(slot.bgmMood ? { bgmMood: slot.bgmMood } : {}) } : {}),
