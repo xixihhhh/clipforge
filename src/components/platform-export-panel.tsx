@@ -18,10 +18,10 @@ type Result = { status: "running" | "done" | "error"; url?: string; error?: stri
 const platformKeys = Object.keys(PLATFORM_SPECS);
 const nameKeys: Record<string, string> = { douyin: "platformDouyin", kuaishou: "platformKuaishou", xiaohongshu: "platformXiaohongshu", shipinhao: "platformShipinhao", tiktok: "platformTiktok", reels: "platformReels", shorts: "platformShorts" };
 
-export function PlatformExportPanel({ projectId, compositions }: { projectId: string; compositions: ExportComposition[] }) {
+export function PlatformExportPanel({ projectId, compositions, initialCompositionId }: { projectId: string; compositions: ExportComposition[]; initialCompositionId?: string }) {
   const t = useT("exportPage");
   const locale = useLocale();
-  const [compositionId, setCompositionId] = useState(compositions[0]?.id ?? "");
+  const [compositionId, setCompositionId] = useState(initialCompositionId ?? compositions[0]?.id ?? "");
   const source = compositions.find((item) => item.id === compositionId);
   const [framing, setFraming] = useState<VideoFraming>({ ...DEFAULT_VIDEO_FRAMING });
   const [selected, setSelected] = useState<string[]>(platformKeys);

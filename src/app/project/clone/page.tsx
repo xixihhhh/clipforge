@@ -465,7 +465,7 @@ export default function ClonePage() {
                   >
                     {refVideoFile ? t("refVideoReplace") : t("refVideoBtn")}
                   </Button>
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="min-w-0 break-words text-xs text-muted-foreground">
                     {refVideoFile ? t("refVideoSelected", { name: refVideoFile.name }) : t("refVideoHint")}
                   </span>
                 </div>
@@ -513,7 +513,7 @@ export default function ClonePage() {
                         {t("analyzing")}
                       </span>
                     ) : (
-                      t("analyze")
+                      refVideoFile ? t("analyzeFile") : t("analyze")
                     )}
                   </Button>
                 </div>
@@ -597,16 +597,17 @@ export default function ClonePage() {
             }`}
           >
             <CardContent className="p-6 space-y-6">
+              <fieldset disabled={!hasAnalysis} className="min-w-0 space-y-6">
               {/* product image drag-and-drop upload */}
               <div className="space-y-2">
-                <Label>
+                <Label htmlFor="product-files">
                   {t("productImageLabel")}{" "}
                   <span className="text-muted-foreground font-normal">
                     {t("productImageRange")}
                   </span>
                 </Label>
                 <div
-                  className={`relative rounded-lg border-2 border-dashed transition-colors cursor-pointer ${
+                  className={`relative rounded-lg focus-within:ring-2 focus-within:ring-primary border-2 border-dashed transition-colors cursor-pointer ${
                     isDragging
                       ? "border-primary bg-primary/5"
                       : "border-border/60 hover:border-primary/50"
@@ -614,14 +615,17 @@ export default function ClonePage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={(e) => { if (e.target !== fileInputRef.current && productImages.length < 5) fileInputRef.current?.click(); }}
                 >
                   <input
+                    id="product-files"
+                    aria-label={t("productImageLabel")}
+                    disabled={productImages.length >= 5}
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     multiple
-                    className="hidden"
+                    className="sr-only"
                     onChange={(e) => handleFiles(e.target.files)}
                   />
 
@@ -677,7 +681,8 @@ export default function ClonePage() {
                             {/* delete button */}
                             <button
                               type="button"
-                              className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                              aria-label={t("removeProductPhoto", { name: img.file.name })}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeImage(img.id);
@@ -746,6 +751,7 @@ export default function ClonePage() {
                   onChange={(e) => setProductFeatures(e.target.value)}
                 />
               </div>
+            </fieldset>
             </CardContent>
           </Card>
         </div>

@@ -3,6 +3,8 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { AssetItem } from "@/lib/assets-view";
 import { useLocale } from "@/lib/i18n";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface EditorProps {
@@ -10,6 +12,7 @@ interface EditorProps {
   scriptId: string;
   versions: { id: string; version: number }[];
   source: string;
+  modelName?: string;
   assets: AssetItem[];
   products: string[];
   busy: boolean;
@@ -31,21 +34,33 @@ export function ReferenceEditor(props: EditorProps) {
   const shot = props.assets.find((s) => s.shotId === selected) ?? props.assets[0];
   if (!shot?.referenceCut) return null;
   return <section className="my-5 space-y-3 rounded-lg border bg-card p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{en ? "Reference cut editor" : "逐镜复刻"}</h3>
-      <select className={selectClass} aria-label={en ? "Reference shot" : "参考镜头"} value={shot.shotId} onChange={(e) => setSelected(Number(e.target.value))}>
-        {props.assets.map((s) => <option key={s.shotId} value={s.shotId}>#{s.shotId} · {seconds(s.referenceCut!.start)}–{seconds(s.referenceCut!.end)} s{s.referenceCut?.locked ? " · 🔒" : ""}</option>)}
-      </select>
-    </div>
-    <ShotEditor key={JSON.stringify([props.scriptId, shot.shotId, shot.referenceCut, shot.description, shot.assetId])} {...props} shot={shot} en={en} />
+    <h3 className="font-semibold">{en ? "Reference cut editor" : "逐镜复刻"}</h3>
+    <ShotEditor key={JSON.stringify([props.scriptId, shot.shotId, shot.referenceCut, shot.description, shot.assetId])} {...props} shot={shot} en={en} selectShot={setSelected} />
   </section>;
 }
 
-function ShotEditor({ projectId, scriptId, versions, source, assets, products, busy, reload, generate, shot, en }: EditorProps & { shot: AssetItem; en: boolean }) {
+function ShotEditor({ projectId, scriptId, versions, source, modelName, assets, products, busy, reload, generate, shot, en, selectShot }: EditorProps & { shot: AssetItem; en: boolean; selectShot: (id: number) => void }) {
   const cut = shot.referenceCut!;
   const frame = useRef<HTMLVideoElement>(null);
   const [frameReady, setFrameReady] = useState(false);
-  const [description, setDescription] = useState(shot.description);
-  const [product, setProduct] = useState(cut.productImage ?? products[0]);
+  const router = useRouter();
+  const initialProduct = cut.productImage ?? products[0];
+  const draftKey = `clipforge.referenceDraft.${projectId}.${scriptId}.${shot.shotId}`;
+  const [draft, setDraft] = useState(() => {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+      if (!cut.locked && stored?.base === shot.description && stored.baseProduct === initialProduct &&
+          typeof stored.description === "string" && products.includes(stored.product)) return { description: String(stored.description), product: String(stored.product) };
+    } catch { /* Storage can be unavailable in a private window. */ }
+    return {description: shot.description, product: initialProduct};
+  });
+  const {description, product} = draft;
+  function editDraft(next: typeof draft) {
+    setDraft(next);
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ ...next, base: shot.description, baseProduct: initialProduct })); } catch { /* Saving through the API still works. */ }
+  }
+  const version = versions.find((v) => v.id === scriptId)?.version;
+  const versionName = version && version <= 26 ? String.fromCharCode(64 + version) : String(version ?? "");
   const [until, setUntil] = useState(shot.shotId);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
@@ -64,14 +79,31 @@ function ShotEditor({ projectId, scriptId, versions, source, assets, products, b
     finally { setWorking(false); }
   }
   const update = (changes: object) => request("/reference-cuts", { scriptId, shotId: shot.shotId, ...changes });
+  async function saveChanges() {
+    if (!changed) return;
+    await update({ action: "edit", productImage: product, description });
+    try { sessionStorage.removeItem(draftKey); } catch { /* The persisted revision also invalidates the old draft. */ }
+  }
   return <fieldset disabled={working || busy} className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center gap-2">
+      <label className="text-sm">{en ? "Shot " : "镜头 "}
+        <select className={selectClass} aria-label={en ? "Reference shot" : "参考镜头"} value={shot.shotId} onChange={(e) => {
+          const next = Number(e.target.value);
+          if (!changed) selectShot(next);
+          else void run(async () => { await saveChanges(); selectShot(next); });
+        }}>
+          {assets.map((s) => <option key={s.shotId} value={s.shotId}>#{s.shotId} · {seconds(s.referenceCut!.start)}–{seconds(s.referenceCut!.end)} s{s.referenceCut?.locked ? (en ? " · Locked" : " · 已锁定") : ""}</option>)}
+        </select>
+      </label>
       <label className="text-sm">{en ? "Version " : "版本 "}
-        <select className={selectClass} value={scriptId} onChange={(e) => void run(() => request("/scripts", { selectedScriptId: e.target.value }))}>
+        <select className={selectClass} value={scriptId} onChange={(e) => {
+            const selectedScriptId = e.target.value;
+            void run(async () => { await saveChanges(); await request("/scripts", { selectedScriptId }); });
+          }}>
           {versions.map((v) => <option key={v.id} value={v.id}>{v.version <= 26 ? String.fromCharCode(64 + v.version) : v.version}</option>)}
         </select>
       </label>
-      <Button size="sm" variant="outline" disabled={changed} onClick={() => void run(() => update({ action: "duplicate" }))}>{en ? "Duplicate version" : "复制为新版本"}</Button>
+      <Button size="sm" variant="outline" onClick={() => void run(async () => { await saveChanges(); await update({ action: "duplicate" }); })}>{en ? "Duplicate version" : "复制为新版本"}</Button>
       <Button size="sm" variant="outline" disabled={changed} onClick={() => void run(() => update({ action: "lock", locked: !cut.locked }))}>
         {cut.locked ? (en ? "Unlock shot" : "解锁此镜") : (en ? "Lock shot" : "锁定此镜")}
       </Button>
@@ -86,16 +118,16 @@ function ShotEditor({ projectId, scriptId, versions, source, assets, products, b
     </div>
     <fieldset disabled={cut.locked} className="space-y-2 disabled:opacity-60">
       <label className="block text-sm">{en ? "Shot direction" : "镜头描述"}
-        <input className="mt-1 block w-full rounded border bg-background p-2" maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <input className="mt-1 block w-full rounded border bg-background p-2" maxLength={2000} value={description} onChange={(e) => editDraft({ ...draft, description: e.target.value })} />
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm">{en ? "Product photo " : "商品图 "}
-          <select className={selectClass} value={product} onChange={(e) => setProduct(e.target.value)}>
+          <select className={selectClass} value={product} onChange={(e) => editDraft({ ...draft, product: e.target.value })}>
             {products.map((p, i) => <option key={p} value={p}>#{i + 1}</option>)}
           </select>
         </label>
-        <Button size="sm" disabled={!changed || !description.trim()} onClick={() => void run(() => update({ action: "edit", productImage: product, description }))}>{en ? "Save shot" : "保存此镜"}</Button>
-        <Button size="sm" variant="outline" disabled={changed || !frameReady} onClick={() => void run(async () => {
+        <Button size="sm" disabled={!changed || !description.trim()} onClick={() => void run(saveChanges)}>{en ? "Save shot" : "保存此镜"}</Button>
+        {modelName ? <Button size="sm" variant="outline" disabled={changed || !frameReady} onClick={() => void run(async () => {
           const video = frame.current;
           if (!video || video.readyState < 2 || !video.videoWidth) throw new Error(en ? "Reference frame unavailable" : "参考帧还未就绪");
           const scale = Math.min(1, 768 / Math.max(video.videoWidth, video.videoHeight));
@@ -106,7 +138,8 @@ function ShotEditor({ projectId, scriptId, versions, source, assets, products, b
           if (!context) throw new Error(en ? "Cannot read reference frame" : "无法读取参考帧");
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           if (!await generate(shot.shotId, canvas.toDataURL("image/jpeg", 0.86))) throw new Error(en ? "Generation failed. Check the shot and model settings." : "生成失败，请查看该镜头提示和模型设置。");
-        })}>{en ? "Generate from reference frame" : "按参考帧生成此镜"}</Button>
+        })}>{en ? `Generate shot #${shot.shotId} · ${modelName}` : `生成第 ${shot.shotId} 镜 · ${modelName}`}</Button>
+          : <Link className="text-sm underline" href="/settings">{en ? "Configure AI for this shot" : "配置单镜 AI 生成"}</Link>}
       </div>
       {shot.isVideo && shot.assetId && <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm">{en ? "Use this video through shot " : "将这段视频按原切点铺到镜头 "}
@@ -115,6 +148,12 @@ function ShotEditor({ projectId, scriptId, versions, source, assets, products, b
         <Button size="sm" variant="outline" onClick={() => void run(() => update({ action: "span", assetId: shot.assetId, lastShotId: until }))}>{en ? "Apply video range" : "应用视频区间"}</Button>
       </div>}
     </fieldset>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button size="sm" className="brand-gradient text-white" onClick={() => void run(async () => {
+        await saveChanges(); router.push(`/project/${projectId}/video?scriptId=${encodeURIComponent(scriptId)}`);
+      })}>{changed ? (en ? `Save and compose version ${versionName}` : `保存并合成 ${versionName} 版`) : (en ? `Use version ${versionName} in video` : `用 ${versionName} 版去合成`)}</Button>
+      <span className="text-xs text-muted-foreground" aria-live="polite">{working ? (en ? "Working…" : "处理中…") : changed ? (en ? "Editing · switching shots saves changes" : "正在编辑 · 切镜时自动保存") : (en ? "Use product photos without an AI key" : "用当前商品图合成，无需 AI Key")}</span>
+    </div>
     {(shot.error || error) && <p role="alert" className="text-sm text-destructive">{shot.error || error}</p>}
   </fieldset>;
 }
