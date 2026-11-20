@@ -30,6 +30,8 @@ export class ProviderError extends Error {
    * silently dropping something the user already paid for (issue #16).
    */
   taskId?: string
+  /** Raw HTTP error body for providers with structured model rejection details. */
+  responseBody?: string
 
   constructor(message: string, code: string, provider: string, statusCode?: number) {
     super(message)
@@ -129,12 +131,14 @@ export abstract class BaseProvider implements AIProvider {
             await this.sleep(500 * Math.pow(2, attempt))
             continue
           }
-          throw new ProviderError(
+          const err = new ProviderError(
             `API 请求失败: ${response.status} ${response.statusText} - ${errorBody}`,
             'API_ERROR',
             this.name,
             response.status
           )
+          err.responseBody = errorBody
+          throw err
         }
 
         return (await response.json()) as T

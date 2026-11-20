@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { toEditVariant } from "@/lib/gen-params";
 import { FalAIProvider } from "@/lib/providers/fal-ai";
 
 const requestId = "request-123";
@@ -119,13 +120,13 @@ describe("FalAIProvider queue application routes", () => {
     expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ Authorization: "Key test-key" });
   });
 
-  it("submits an image to its full operation endpoint exactly once", async () => {
-    const modelId = "openai/gpt-image-2/image-to-image";
+  it.each(["openai/gpt-image-2/edit", "openai/gpt-image-2/image-to-image"])("submits %s to fal's edit endpoint exactly once", async (selectedId) => {
+    const modelId = "openai/gpt-image-2/edit";
     const fetchMock = mockQueue("openai/gpt-image-2", { images: [{ url: imageUrl }] }, { endpointId: modelId });
     const referenceImageUrl = "https://assets.example.invalid/source.png";
 
     const result = await provider().generateImage({
-      modelId, mode: "image-to-image", prompt: "replace background", referenceImageUrl,
+      modelId: selectedId, mode: "image-to-image", prompt: "replace background", referenceImageUrl,
     });
 
     expect(result).toMatchObject({ modelId, taskId: `${modelId}::${requestId}`, imageUrls: [imageUrl] });
@@ -173,4 +174,38 @@ describe("FalAIProvider queue application routes", () => {
     await expect(provider().getTaskStatus("missing-separator")).rejects.toMatchObject({ code: "INVALID_TASK_ID" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+});
+
+describe("fal queue terminal errors (#44)", () => {
+  const taskId = "openai/gpt-image-2::job";
+
+  it("returns the model's rejection without repolling or echoing the input", async () => {
+    const fetchMock = vi.fn(async (url: string) => url.endsWith("/status")
+      ? Response.json({ status: "COMPLETED" })
+      : Response.json({ detail: [{ type: "content_policy_violation", msg: "Policy check failed", input: "private prompt" }] }, { status: 422 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(provider().waitForTask(taskId)).rejects.toMatchObject({ code: "TASK_FAILED", taskId,
+      message: expect.stringMatching(/^任务失败: .*content_policy_violation.*Policy check failed$/) });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a failure declared by a COMPLETED status without fetching a result", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ status: "COMPLETED", error: "Generation rejected" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(provider().getTaskStatus(taskId)).resolves.toMatchObject({ status: "failed", error: "Generation rejected" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves recovery when the result lookup fails without a model rejection", async () => {
+    const fetchMock = vi.fn(async (url: string) => url.endsWith("/status")
+      ? Response.json({ status: "COMPLETED" })
+      : Response.json({ detail: "Invalid gateway route" }, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(provider().waitForTask(taskId)).rejects.toMatchObject({ code: "STATUS_UNKNOWN", taskId });
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
+});
+
+it("selects the published fal edit endpoint for product redraws", () => {
+  expect(toEditVariant("openai/gpt-image-2")).toBe("openai/gpt-image-2/edit");
 });
