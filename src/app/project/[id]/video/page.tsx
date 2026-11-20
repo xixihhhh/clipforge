@@ -103,6 +103,8 @@ interface DbShot {
 
 // 分镜素材（仅取缩略图所需字段）
 interface DbAsset {
+  scriptId: string | null;
+  selected: boolean;
   shotId: number;
   filePath: string | null;
   status: string;
@@ -213,7 +215,7 @@ export default function VideoPage() {
         const [projectRes, scriptsRes, assetsRes] = await Promise.all([
           fetch(`/api/project/${id}`),
           fetch(`/api/project/${id}/scripts`),
-          fetch(`/api/project/${id}/assets`),
+          fetch(`/api/project/${id}/assets?allScripts=1`),
         ]);
         const project = projectRes.ok ? await projectRes.json() : null;
         const scripts = scriptsRes.ok ? await scriptsRes.json() : [];
@@ -228,16 +230,16 @@ export default function VideoPage() {
           }
         }
         // 收集每个分镜已生成的画面，作时间线缩略图（已完成且有文件的才算）
+        const selected = Array.isArray(scripts)
+          ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
+          : null;
         const thumbMap: Record<number, string> = {};
         for (const a of (Array.isArray(assets) ? assets : []) as DbAsset[]) {
-          if (a && typeof a.shotId === "number" && a.filePath && a.status === "done" && thumbMap[a.shotId] == null) {
+          if (a && a.selected && selected && a.scriptId === selected.id && typeof a.shotId === "number" && a.filePath && a.status === "done" && thumbMap[a.shotId] == null) {
             thumbMap[a.shotId] = a.filePath;
           }
         }
         setThumbs(thumbMap);
-        const selected = Array.isArray(scripts)
-          ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
-          : null;
         const language = selected?.shots?.[0]?.dubLanguage ?? "";
         setDubLanguage(language);
         setUseConfiguredDubVoice(true);
@@ -247,6 +249,7 @@ export default function VideoPage() {
           setClips([]);
         } else {
           // raw shots feed the variant matrix (hook rewrites need full Shot objects)
+          setScriptId(selected.id);
           setScriptShots(selected.shots as Shot[]);
           setClips(
             (selected.shots as DbShot[]).map((s) => ({
@@ -369,6 +372,7 @@ export default function VideoPage() {
   // —— Variant matrix: same assets,
   // hook copy × caption preset × BGM mood combos rendered as separate labeled outputs
   // for A/B testing. Zero extra AI-generation cost — only compose (FFmpeg + TTS) reruns. ——
+  const [scriptId, setScriptId] = useState("");
   const [scriptShots, setScriptShots] = useState<Shot[]>([]);
   const [projectCategory, setProjectCategory] = useState("");
   const [matrixOpen, setMatrixOpen] = useState(false);
@@ -448,7 +452,8 @@ export default function VideoPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            resolution: config.resolution,
+            scriptId,
+          resolution: config.resolution,
             renderPreset: config.renderPreset,
             aspectRatio: config.aspectRatio,
             label: combo.label,
@@ -518,6 +523,7 @@ export default function VideoPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          scriptId,
           resolution: config.resolution,
           renderPreset: config.renderPreset,
           aspectRatio: config.aspectRatio,
@@ -541,13 +547,13 @@ export default function VideoPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("errorComposeFailed"));
+      if (!res.ok || !data.compositionId) throw new Error(data.error || t("errorComposeFailed"));
 
       // 轮询合成状态，直到 done / failed（后台任务，避免长视频请求超时）
       const url: string = await new Promise((resolve, reject) => {
         const poll = setInterval(async () => {
           try {
-            const r = await fetch(`/api/project/${id}/compose`);
+            const r = await fetch(`/api/project/${id}/compose?compositionId=${encodeURIComponent(data.compositionId)}`);
             const d = await r.json();
             const c = d.composition;
             if (!c) return;
@@ -556,7 +562,7 @@ export default function VideoPage() {
               resolve(c.url);
             } else if (c.status === "failed") {
               clearInterval(poll);
-              reject(new Error(t("errorComposeAssets")));
+              reject(new Error(c.failureReason || t("errorComposeAssets")));
             }
           } catch {
             // 单次轮询失败忽略，继续重试

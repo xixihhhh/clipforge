@@ -1,3 +1,4 @@
+import { errText } from "@/lib/api-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
@@ -99,6 +100,8 @@ export async function GET(
   }
 }
 
+class ReferenceExportError extends Error {}
+
 /** 把 /api/files/{pid}/{file} 形式的访问路径还原为本地磁盘绝对路径 */
 function toLocalPath(fileRef: string | undefined): string | undefined {
   if (!fileRef) return undefined;
@@ -148,7 +151,7 @@ export async function POST(
     const productImages = (project.productImages ?? []) as string[];
 
     const scriptRows = await db.select().from(scriptsTable).where(eq(scriptsTable.projectId, id));
-    const selected = scriptRows.find((s) => s.selected) ?? scriptRows[0];
+    const selected = body.scriptId ? scriptRows.find(row => row.id === body.scriptId) : scriptRows.find((s) => s.selected) ?? scriptRows[0];
     if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
       return NextResponse.json({ error: "尚未生成脚本，无法合成" }, { status: 400 });
     }
@@ -180,7 +183,7 @@ export async function POST(
     }
 
     // 已生成的素材（assets 表，按 shotId 索引）
-    const assetRows = await db.select().from(assetsTable).where(and(eq(assetsTable.projectId, id), eq(assetsTable.selected, true)));
+    const assetRows = await db.select().from(assetsTable).where(and(eq(assetsTable.projectId, id), eq(assetsTable.scriptId, selected.id), eq(assetsTable.selected, true)));
     const assetByShot = new Map<number, string>();
     for (const a of assetRows) {
       if (a.filePath) assetByShot.set(a.shotId, a.filePath);
@@ -300,7 +303,7 @@ export async function POST(
     }
 
     // 廉价预检：至少一个分镜有可用素材（避免返回 202 后才发现没素材）
-    const hasAnyAsset = shots.some((s) => toLocalPath(assetByShot.get(s.shotId) ?? productImages[0]));
+    const hasAnyAsset = shots.some((s) => toLocalPath(assetByShot.get(s.shotId) ?? s.referenceCut?.productImage ?? productImages[0]));
     if (!hasAnyAsset) {
       return NextResponse.json(
         { error: "没有可用素材，请先在素材步骤生成素材或上传商品图" },
@@ -338,7 +341,7 @@ export async function POST(
     // 立即建合成记录(composing)并返回；重活(TTS+FFmpeg)后台异步跑，前端轮询 GET 获取结果
     const [comp] = await db
       .insert(compositions)
-      .values({ projectId: id, resolution: outputCfg.resolution, aspectRatio: outputCfg.aspectRatio, aigcBadge, ...(label && { label }), status: "composing" })
+      .values({ projectId: id, scriptId: selected.id, resolution: outputCfg.resolution, aspectRatio: outputCfg.aspectRatio, aigcBadge, ...(label && { label }), status: "composing" })
       .returning();
     await db.update(projects).set({ status: "composing", updatedAt: new Date() }).where(eq(projects.id, id));
 
@@ -354,7 +357,7 @@ export async function POST(
     const missing: number[] = [];
     for (const shot of shots) {
       // 素材优先级：该分镜已生成素材 → 商品原图兜底
-      const ref = assetByShot.get(shot.shotId) ?? productImages[0];
+      const ref = assetByShot.get(shot.shotId) ?? shot.referenceCut?.productImage ?? productImages[0];
       let local = toLocalPath(ref);
       if (!local) {
         missing.push(shot.shotId);
@@ -367,6 +370,7 @@ export async function POST(
       // as .mp4) would fail the whole single-pass filter_complex with an inscrutable error — swap
       // it for the product image instead of feeding it to ffmpeg, and log which shot degraded.
       if (isVideo && (await probeDuration(local)) <= 0) {
+        if (shot.referenceCut) throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜的视频无法解码，请替换该素材`, `Cannot decode the video in reference shot ${shot.shotId}. Replace this take.`));
         const fallback = toLocalPath(productImages[0]);
         console.warn(`[compose] 分镜 ${shot.shotId} 的视频素材无法解码（${local}），已降级为商品图兜底`);
         if (fallback && fallback !== local) {
@@ -413,18 +417,31 @@ export async function POST(
         if (mediaDur > 0) sourceDuration = mediaDur;
       }
 
+      if (shot.referenceCut) {
+        // Round absolute cut positions on the output's 30 fps clock, so rounding errors never accumulate.
+        duration = (Math.round(shot.referenceCut.end * 30) - Math.round(shot.referenceCut.start * 30)) / 30;
+        if (duration <= 0) throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜不足一帧（输出为 30 fps）`, `Reference shot ${shot.shotId} is shorter than a frame at 30 fps`));
+        if (voiceSec && voiceSec > duration + 1 / 30) {
+          throw new ReferenceExportError(errText(req, `第 ${shot.shotId} 镜的旁白超过参考镜头时长，请缩短旁白再合成`, `Shorten the narration for reference shot ${shot.shotId} to fit its edit interval`));
+        }
+      }
+      const segment = shot.referenceCut?.segment;
+      const sourceStart = segment && segment.path === ref ? segment.offset : undefined;
       const clip: ClipInput = {
+        ...(sourceStart !== undefined && { sourceStart }),
         type: isVideo ? "video" : "image",
         filePath: local,
         duration,
-        transition: shot.transition || "ai_start_end",
+        transition: shot.referenceCut ? "direct_concat" : shot.transition || "ai_start_end",
         ...(isVideo ? { hasAudio: nativeAudio } : { motion: defaultMotion(shot) }),
-        ...(sourceDuration && { sourceDuration }),
+        ...(!shot.referenceCut && sourceDuration && { sourceDuration }),
         ...(audioPath && { audioPath }),
       };
       rendered.push({ shot, clip, duration, voiceSec, ...(vo?.words ? { words: vo.words } : {}) });
     }
 
+    if (missing.length && shots.some((shot) => shot.referenceCut)) throw new ReferenceExportError(errText(req,
+      `参考时间线缺少镜头素材：${missing.join(", ")}`, `Missing media for reference shots: ${missing.join(", ")}`));
     if (rendered.length === 0) throw new Error("没有可用素材");
 
     // acrossfade for ffmpeg_fade transitions consumes the previous clip's last FADE_DURATION:
@@ -611,7 +628,7 @@ export async function POST(
         await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));
       } catch (e) {
         console.error("后台合成失败:", e);
-        await db.update(compositions).set({ status: "failed" }).where(eq(compositions.id, comp.id)).catch(() => {});
+        await db.update(compositions).set({ status: "failed", failureReason: e instanceof ReferenceExportError ? e.message : null }).where(eq(compositions.id, comp.id)).catch(() => {});
         await db.update(projects).set({ status: "video", updatedAt: new Date() }).where(eq(projects.id, id)).catch(() => {});
       }
     })();

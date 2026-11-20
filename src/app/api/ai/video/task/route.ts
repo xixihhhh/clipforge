@@ -1,3 +1,7 @@
+import { getDb } from "@/lib/db";
+import { aiTasks } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+import { attachReplicaTask, recoverReplica } from "@/lib/replicate-job";
 import { NextRequest, NextResponse } from "next/server";
 import { createProvider } from "@/lib/providers";
 import { ProviderError } from "@/lib/providers/base";
@@ -31,6 +35,13 @@ export async function POST(req: NextRequest) {
   try {
     const provider = createProvider({ name: providerName, apiKey, baseUrl });
 
+    if (body.attachReplica === true) {
+      if (typeof body.projectId !== "string" || typeof taskId !== "string") return apiError(req, "无效项目或任务 ID", "Invalid project or task ID", 400);
+      const job = attachReplicaTask(body.projectId, providerName, taskId);
+      return NextResponse.json(await recoverReplica(job, provider));
+    }
+    const replica = getDb().select().from(aiTasks).where(and(eq(aiTasks.purpose, "replicate"), eq(aiTasks.provider, providerName), eq(aiTasks.taskId, taskId))).get();
+    if (replica) return NextResponse.json(await recoverReplica(replica, provider));
     try {
       const status = wait && provider.waitForTask
         ? await provider.waitForTask(taskId, { interval: 5000 })

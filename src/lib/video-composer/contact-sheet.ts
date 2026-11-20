@@ -208,7 +208,7 @@ async function probeVideo(videoPath: string): Promise<{ duration: number; hasAud
  * across frames so their peak lands lower — 0.22 catches them without firing on Ken Burns motion
  * (validated on real composed output; see the render test notes).
  */
-export async function detectSceneTimes(videoPath: string, threshold = 0.22): Promise<number[]> {
+export async function detectSceneTimes(videoPath: string, threshold = 0.22, strict = false): Promise<number[]> {
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
   const run = promisify(execFile);
@@ -221,7 +221,8 @@ export async function detectSceneTimes(videoPath: string, threshold = 0.22): Pro
       { maxBuffer: 16 * 1024 * 1024 }
     );
     return parseSceneTimes(stderr ?? "");
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return [];
   }
 }

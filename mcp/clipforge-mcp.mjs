@@ -338,6 +338,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
+        scriptId: { type: "string", description: "要配片和合成的脚本变体 ID；省略时使用当前选中脚本" },
         projectId: PROJECT_ID_PROP,
         autoFillStock: { type: "boolean", description: "合成前是否先自动从免费素材库配齐缺画面的分镜，默认 true" },
         footage: { type: "string", enum: FOOTAGE_KINDS, description: "自动配画面的类型，默认 auto" },
@@ -751,7 +752,7 @@ async function handleCreateVideo(args) {
   const mediaType = resolveMediaType(args.footage);
   const fill = await api(`/api/project/${projectId}/stock-fill`, {
     method: "POST",
-    body: { source: "all", mediaType, apiKeys: STOCK_KEYS, ...(LLM.baseUrl && LLM.model ? { llmConfig: LLM } : {}) },
+    body: { scriptId, source: "all", mediaType, apiKeys: STOCK_KEYS, ...(LLM.baseUrl && LLM.model ? { llmConfig: LLM } : {}) },
   });
   // if no visuals were matched at all, don't force a compose (it would produce a blank/failed video) — return an actionable hint instead
   if (!fill.filled) {
@@ -766,7 +767,7 @@ async function handleCreateVideo(args) {
   }
 
   // 3) compose (free Edge TTS voiceover + captions; optional voice/aspect ratio/quality)
-  const body = composeBody(args);
+  const body = { ...composeBody(args), scriptId };
   // if no voice is explicitly specified, pick a default based on the topic language (English topic → English voice, to avoid Chinese voice reading English)
   if (!body.freeTts.voice) {
     const v = defaultVoiceForTopic(topic);
@@ -876,14 +877,16 @@ async function handleListProjects() {
 async function handleCompose(args) {
   const projectId = String(args.projectId || "").trim();
   if (!projectId) throw new Error("projectId 不能为空");
+  const scripts = await api(`/api/project/${projectId}/scripts`);
+  const scriptId = args.scriptId ?? scripts.find(row => row.selected)?.id ?? scripts[0]?.id;
   const autoFill = args.autoFillStock !== false;
   if (autoFill) {
     await api(`/api/project/${projectId}/stock-fill`, {
       method: "POST",
-      body: { source: "all", mediaType: resolveMediaType(args.footage), apiKeys: STOCK_KEYS, ...(LLM.baseUrl && LLM.model ? { llmConfig: LLM } : {}) },
+      body: { scriptId, source: "all", mediaType: resolveMediaType(args.footage), apiKeys: STOCK_KEYS, ...(LLM.baseUrl && LLM.model ? { llmConfig: LLM } : {}) },
     }).catch(() => {}); // stock-fill failure does not block compose (project may already have assets)
   }
-  const body = composeBody(args);
+  const body = { ...composeBody(args), scriptId };
   // if no voice is explicitly specified, pick a default based on the project topic language (same logic as create_video) — otherwise Japanese/Korean topics via compose would fall back to the Chinese default voice and mispronounce
   if (!body.freeTts.voice) {
     const proj = await api(`/api/project/${projectId}`).catch(() => null);
@@ -1413,7 +1416,7 @@ const HANDLERS = {
 
 // ---- Start MCP server ----
 const server = new Server(
-  { name: "clipforge", version: "0.1.7" },
+  { name: "clipforge", version: "0.1.8" },
   { capabilities: { tools: {} } },
 );
 

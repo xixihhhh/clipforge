@@ -1,3 +1,4 @@
+import { writableShot, sameShot } from "@/lib/shot-ownership";
 /**
  * Auto-fill stock footage for each shot — fetch one clip/image from a free stock library
  * using the shot's English search keywords, then download and persist it as stock_footage.
@@ -17,9 +18,9 @@ import { broadenQuery, pickBestCandidate, authorKeyOf, fallbackLevelOf, type Fal
 import { validateOrDelete } from "@/lib/media-validate";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
 
 export interface FillShotInput {
+  scriptId: string;
   projectId: string;
   shotId: number;
   /** Search query (typically shot.stockKeywords joined, falls back to description) */
@@ -100,7 +101,8 @@ export async function persistCandidate(
   projectId: string,
   shotId: number,
   query: string,
-  c: ScoredStockCandidate
+  c: ScoredStockCandidate,
+  scriptId: string
 ): Promise<Record<string, unknown>> {
   const stockDir = join(getUploadsDir(), projectId, "stock");
   await mkdir(stockDir, { recursive: true });
@@ -115,9 +117,11 @@ export async function persistCandidate(
 
   const db = getDb();
   const [row] = db.transaction((tx) => {
-    tx.update(assetsTable).set({ selected: false }).where(and(eq(assetsTable.projectId, projectId), eq(assetsTable.shotId, shotId))).run();
+    writableShot(projectId, scriptId, shotId, tx);
+    tx.update(assetsTable).set({ selected: false }).where(sameShot(projectId, scriptId, shotId)).run();
     return tx.insert(assetsTable).values({
       projectId,
+      scriptId,
       shotId,
       type: "stock_footage",
       filePath: publicUrl,
@@ -161,7 +165,7 @@ export async function fillShotStock(input: FillShotInput): Promise<Record<string
       remaining[0];
     let asset: Record<string, unknown>;
     try {
-      asset = await persistCandidate(projectId, shotId, query, c);
+      asset = await persistCandidate(projectId, shotId, query, c, input.scriptId);
     } catch (e) {
       console.warn(`[stock-fill] 镜头 ${shotId} 候选下载/校验失败，换下一候选:`, e);
       remaining.splice(remaining.indexOf(c), 1);

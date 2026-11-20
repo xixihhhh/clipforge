@@ -1,8 +1,9 @@
+import { appendScriptVariants } from "@/lib/script-variants";
 import { NextRequest, NextResponse } from "next/server";
 import { generateTopicScript } from "@/lib/script-engine/generator";
 import type { TopicNarrationStyle } from "@/lib/script-engine/prompts";
 import { getDb } from "@/lib/db";
-import { scripts as scriptsTable, projects } from "@/lib/db/schema";
+import { projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { apiError, errText } from "@/lib/api-error";
 import { llmErrorPair } from "@/lib/llm-error";
@@ -99,24 +100,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: errText(req, `脚本生成失败: ${zh}`, `Script generation failed: ${en}`), projectId }, { status: 500 });
   }
 
-  // persist to DB: delete old scripts → insert new ones → select first by default → update project status to scripting
+  // Append a new set of variants and select its first script.
   let savedScripts = generated;
   try {
-    await db.delete(scriptsTable).where(eq(scriptsTable.projectId, projectId));
-    const rows = await db
-      .insert(scriptsTable)
-      .values(
-        generated.map((s, i) => ({
-          projectId,
-          version: 1,
+    const rows = appendScriptVariants(projectId, generated.map((s) => ({
           styleType: "custom" as const, // topic videos always use custom style type
           title: s.title,
           totalDuration: s.totalDuration,
           shots: s.shots,
-          selected: i === 0,
-        }))
-      )
-      .returning();
+        })));
     savedScripts = rows.map((r) => ({
       id: r.id,
       title: r.title ?? "",

@@ -1,3 +1,4 @@
+import { writableShot, sameShot } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir } from "@/lib/paths";
 import { mkdir } from "fs/promises";
@@ -20,7 +21,7 @@ import { broadenQuery } from "@/lib/stock-matcher";
 import { getDb } from "@/lib/db";
 import { assets as assetsTable } from "@/lib/db/schema";
 import { apiError, errText } from "@/lib/api-error";
-import { and, eq } from "drizzle-orm";
+
 
 /** validate projectId to prevent path traversal (consistent with the upload route) */
 const SAFE_ID = /^[a-zA-Z0-9\-]+$/;
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
   const picked = candidates.slice(0, count);
   const saved: Array<Record<string, unknown>> = [];
   const db = getDb();
-  await db.update(assetsTable).set({ selected: false }).where(and(eq(assetsTable.projectId, projectId), eq(assetsTable.shotId, shotId)));
+  const scriptId = writableShot(projectId, typeof body.scriptId === "string" ? body.scriptId : undefined, shotId);
 
   for (let i = 0; i < picked.length; i++) {
     const c = picked[i];
@@ -164,10 +165,14 @@ export async function POST(req: NextRequest) {
       const { filePath, bytes } = await downloadStockFile(c.downloadUrl, stockDir, base);
       const publicUrl = `/api/files/${projectId}/stock/${basename(filePath)}`;
 
-      const [row] = await db
-        .insert(assetsTable)
+      const active = saved.length === 0;
+      const row = db.transaction(tx => {
+        writableShot(projectId, scriptId, shotId, tx);
+        if (active) tx.update(assetsTable).set({ selected: false }).where(sameShot(projectId, scriptId, shotId)).run();
+        return tx.insert(assetsTable)
         .values({
           projectId,
+          scriptId,
           shotId,
           type: "stock_footage",
           filePath: publicUrl,
@@ -177,10 +182,11 @@ export async function POST(req: NextRequest) {
           sourceUrl: c.pageUrl,
           author: c.author,
           license: c.license,
-          selected: i === 0,
+          selected: active,
           status: "done",
         })
-        .returning();
+        .returning().get();
+      });
 
       saved.push({ ...row, bytes, mediaType: c.mediaType, downloadUrl: c.downloadUrl, attributionText: c.attributionText });
     } catch (e) {

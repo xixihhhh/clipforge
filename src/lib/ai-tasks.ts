@@ -11,7 +11,7 @@
 
 import { getDb } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { GenerationControlSummary } from "@/lib/video-repair-plan";
 
 export type AiTaskStatus = "submitted" | "processing" | "completed" | "failed" | "unknown";
@@ -19,9 +19,13 @@ export type AiTaskStatus = "submitted" | "processing" | "completed" | "failed" |
 /** Statuses that still need attention — shown in the recovery UI, resumable after restart */
 export const ACTIVE_AI_TASK_STATUSES: AiTaskStatus[] = ["submitted", "processing", "unknown"];
 
+export const outstandingAiTasks = () => or(inArray(aiTasks.status, ACTIVE_AI_TASK_STATUSES),
+  and(eq(aiTasks.status, "completed"), eq(aiTasks.awaitingAsset, true)));
+
 export interface RecordAiTaskInput {
   projectId?: string;
   shotId?: number;
+  scriptId?: string | null;
   provider: string;
   model: string;
   mediaType?: "image" | "video";
@@ -39,6 +43,8 @@ export async function recordAiTask(input: RecordAiTaskInput): Promise<string | n
       .insert(aiTasks)
       .values({
         projectId: input.projectId ?? null,
+        scriptId: input.scriptId ?? null,
+        awaitingAsset: !!input.scriptId && input.shotId != null && !(input.controlPlan && "kind" in input.controlPlan && input.controlPlan.kind === "repair"),
         shotId: input.shotId ?? null,
         provider: input.provider,
         model: input.model,
@@ -95,7 +101,7 @@ export async function updateAiTaskByProviderTaskId(
         ...(patch.error !== undefined && { error: patch.error }),
         updatedAt: new Date(),
       })
-      .where(and(eq(aiTasks.provider, provider), eq(aiTasks.taskId, taskId)));
+      .where(and(eq(aiTasks.provider, provider), eq(aiTasks.taskId, taskId), isNull(aiTasks.purpose)));
   } catch (error) {
     console.error("ai_tasks 更新失败:", error);
   }
@@ -105,7 +111,7 @@ export async function updateAiTaskByProviderTaskId(
 export async function listAiTasks(projectId: string, activeOnly: boolean) {
   const db = getDb();
   const where = activeOnly
-    ? and(eq(aiTasks.projectId, projectId), inArray(aiTasks.status, ACTIVE_AI_TASK_STATUSES))
+    ? and(eq(aiTasks.projectId, projectId), outstandingAiTasks())
     : eq(aiTasks.projectId, projectId);
   return db.select().from(aiTasks).where(where);
 }
@@ -113,5 +119,5 @@ export async function listAiTasks(projectId: string, activeOnly: boolean) {
 /** All still-active paid tasks across every project — the global task center's "money at risk" view */
 export async function listActiveAiTasksAllProjects() {
   const db = getDb();
-  return db.select().from(aiTasks).where(inArray(aiTasks.status, ACTIVE_AI_TASK_STATUSES));
+  return db.select().from(aiTasks).where(outstandingAiTasks());
 }

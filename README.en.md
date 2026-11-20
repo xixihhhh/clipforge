@@ -24,6 +24,8 @@
   <a href="https://skills.sh/xixihhhh/clipforge"><img src="https://skills.sh/b/xixihhhh/clipforge" alt="Agent Skill installs" /></a>
 </p>
 
+**Reference cut editor** · Preserve source cuts, compare each reference frame to a product shot, and fork an editable A/B version. [0.11.0 guide](docs/releases/v0.11.0.md)
+
 ## ✨ Why ClipForge
 
 | Exclusive | In one line |

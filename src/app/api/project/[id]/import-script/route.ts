@@ -1,7 +1,8 @@
+import { appendScriptVariants } from "@/lib/script-variants";
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { scripts as scriptsTable, projects } from "@/lib/db/schema";
+import { projects } from "@/lib/db/schema";
 import { splitNarrationIntoShots } from "@/lib/script-import";
 import { apiError } from "@/lib/api-error";
 
@@ -34,33 +35,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!shots.length) return apiError(req, "脚本无法切分出分镜（缺少有效文案）", "Could not split the script into shots (no valid copy)", 422);
   const totalDuration = shots.reduce((sum, s) => sum + s.duration, 0);
 
-  // Get the next version number; deselect old scripts and mark the newly imported script as current
-  const [latest] = await db
-    .select({ version: scriptsTable.version })
-    .from(scriptsTable)
-    .where(eq(scriptsTable.projectId, id))
-    .orderBy(desc(scriptsTable.version))
-    .limit(1);
-  const nextVersion = (latest?.version ?? 0) + 1;
-  await db.update(scriptsTable).set({ selected: false }).where(eq(scriptsTable.projectId, id));
-
   const title =
     typeof body.title === "string" && body.title.trim()
       ? body.title.trim().slice(0, 80)
       : (shots[0]?.voiceover ?? "导入脚本").slice(0, 30);
 
-  const [row] = await db
-    .insert(scriptsTable)
-    .values({
-      projectId: id,
-      version: nextVersion,
+  const [row] = appendScriptVariants(id, [{
       styleType: "custom",
       title,
       totalDuration,
       shots,
-      selected: true,
-    })
-    .returning();
+    }]);
 
-  return NextResponse.json({ scriptId: row.id, version: nextVersion, shots: shots.length, totalDuration });
+  return NextResponse.json({ scriptId: row.id, version: row.version, shots: shots.length, totalDuration });
 }

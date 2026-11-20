@@ -24,6 +24,8 @@
   <a href="https://skills.sh/xixihhhh/clipforge"><img src="https://skills.sh/b/xixihhhh/clipforge" alt="Agent Skill 安装量" /></a>
 </p>
 
+**逐镜复刻** · 传入参考片和商品图后，可按原片切点逐镜对照、锁镜、替换商品图和复制 A/B 版本。[0.11.0 使用说明](docs/releases/v0.11.0.md)
+
 ## ✨ 为什么选 ClipForge
 
 | 独家能力 | 一句话 |

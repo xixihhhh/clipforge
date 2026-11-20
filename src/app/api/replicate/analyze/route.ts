@@ -4,7 +4,7 @@ import { join } from "path";
 import { getDataDir } from "@/lib/paths";
 import { probeMedia } from "@/lib/media-probe";
 import { detectSceneTimes } from "@/lib/video-composer/contact-sheet";
-import { shotPlanFromCuts, replicateReferenceStructure, REPLICATE_MAX_REF_SEC } from "@/lib/replicate-plan";
+import { sourceCutPlan, shotPlanFromCuts, replicateReferenceStructure, REPLICATE_MAX_REF_SEC } from "@/lib/replicate-plan";
 import { apiError, errText } from "@/lib/api-error";
 
 /** Single-file limit (matches the materials route; the model tier's own cap is 50MB/15s, reported per-mode) */
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const dir = join(getDataDir(), "uploads", "replicate");
     await mkdir(dir, { recursive: true });
     // renamed on save (original filename never reused — same policy as the materials route)
-    const name = `ref-${Date.now()}.${EXT_BY_MIME[file.type] ?? "mp4"}`;
+    const name = `ref-${crypto.randomUUID()}.${EXT_BY_MIME[file.type] ?? "mp4"}`;
     const filePath = join(dir, name);
     await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
 
@@ -49,15 +49,18 @@ export async function POST(req: NextRequest) {
     if (!probe.duration) {
       return apiError(req, "无法读取视频时长，文件可能损坏", "Could not read the video duration — the file may be corrupt", 400);
     }
-    const cuts = await detectSceneTimes(filePath);
-    const shots = shotPlanFromCuts(cuts, probe.duration);
+    const cuts = await detectSceneTimes(filePath, undefined, true);
+    const sourceShots = sourceCutPlan(cuts, probe.duration);
+    const shots = sourceShots.length <= 12 ? sourceShots : shotPlanFromCuts(cuts, probe.duration, { minShotSec: 0 });
+    await writeFile(filePath + ".cuts.json", JSON.stringify(sourceShots));
 
     return NextResponse.json({
       path: `/api/files/replicate/${name}`,
       duration: probe.duration,
       width: probe.width,
       height: probe.height,
-      shots,
+      shots: sourceShots,
+      generationBeats: shots,
       referenceStructure: replicateReferenceStructure(shots, probe.duration),
       // model-tier eligibility (Seedance reference_videos: ≤15s) decided server-side once
       modelTierEligible: probe.duration <= REPLICATE_MAX_REF_SEC,

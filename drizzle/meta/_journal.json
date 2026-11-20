@@ -141,6 +141,20 @@
       "when": 1788575554801,
       "tag": "0019_calm_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1795200000020,
+      "tag": "0020_script_asset_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1795200000021,
+      "tag": "0021_reference_export_errors",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,16 @@ export interface ReplicateShot {
   duration: number;
 }
 
+/** Every measured cut survives on the edit timeline, including frame-length inserts. */
+export function sourceCutPlan(cuts: number[], duration: number): ReplicateShot[] {
+  if (!Number.isFinite(duration) || duration <= 0) return [];
+  const inner = [...new Set(cuts.filter((t) => Number.isFinite(t) && t > 0 && t < duration))].sort((a, b) => a - b);
+  const boundaries = [0, ...inner, duration];
+  return boundaries.slice(0, -1).map((start, index) => ({
+    index: index + 1, start, duration: boundaries[index + 1] - start,
+  }));
+}
+
 /** Segments shorter than this get merged into their predecessor (flash frames, cut jitter). */
 const MIN_SHOT_SEC = 1.0;
 /** Skeleton cap — scripts beyond ~12 shots degrade (Seedance docs: >10 shots turn chaotic). */

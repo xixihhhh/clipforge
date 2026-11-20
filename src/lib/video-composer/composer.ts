@@ -377,6 +377,7 @@ export interface ComposeConfig {
 }
 
 export interface ClipInput {
+  sourceStart?: number;
   type: "video" | "image"; // video clip or static image with motion
   filePath: string;
   duration: number; // seconds
@@ -419,6 +420,7 @@ export const SPEEDFIT_MIN_RATIO = 0.7;
 
 /** One ffmpeg `-i` input. loop/t reproduce the `-loop 1 [-t N]` flags used for still images / the product-card image. */
 interface InputSpec {
+  start?: number;
   loop?: boolean;
   t?: number;
   path: string;
@@ -431,6 +433,7 @@ function inputToArgv(spec: InputSpec): string[] {
     a.push("-loop", "1");
     if (spec.t != null) a.push("-t", String(spec.t));
   }
+  if (spec.start && spec.start > 0) a.push("-ss", String(spec.start));
   a.push("-i", spec.path);
   return a;
 }
@@ -438,7 +441,7 @@ function inputToArgv(spec: InputSpec): string[] {
 /** Shell fragment for one input — path shell-escaped + double-quoted (legacy command-string form). */
 function inputToShell(spec: InputSpec): string {
   const flags = spec.loop ? (spec.t != null ? `-loop 1 -t ${spec.t} ` : `-loop 1 `) : "";
-  return `${flags}-i "${escapeShellPath(spec.path)}"`;
+  return `${flags}${spec.start && spec.start > 0 ? `-ss ${spec.start} ` : ""}-i "${escapeShellPath(spec.path)}"`;
 }
 
 interface ComposeGraph {
@@ -500,7 +503,7 @@ function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
       // video clip: scale to fill + align to shot duration. real stock library videos (Wikimedia etc.) vary in length;
       // clips shorter than the shot duration would leave a black tail and cause audio/subtitle desync if only trimmed —
       // use tpad to clone the last frame up to the target duration, then trim, so each video clip is always exactly clip.duration.
-      inputs.push({ path: clip.filePath });
+      inputs.push({ path: clip.filePath, start: clip.sourceStart });
       // Speed-fit (silent clips only): a source moderately longer than its slot is time-compressed
       // with setpts so BOTH endpoints survive — tail-trim would cut a keyframe-chained ending (the
       // in-clip transition into the next shot); a source moderately SHORTER than its slot is

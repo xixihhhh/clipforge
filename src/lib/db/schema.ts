@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import type {
   CreativeIntent,
   ProductionSnapshot,
@@ -95,6 +95,7 @@ export const publishMetrics = sqliteTable("publish_metrics", {
 export const assets = sqliteTable("assets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scriptId: text("script_id").references(() => scripts.id, { onDelete: "set null" }),
   shotId: integer("shot_id").notNull(), // Corresponding shot index
   // stock_footage = free commercial-use video/images fetched from a stock library (e.g. Pexels)
   type: text("type", { enum: ["ai_generated", "product_image", "user_upload", "stock_footage"] }).notNull(),
@@ -113,7 +114,7 @@ export const assets = sqliteTable("assets", {
   selected: integer("selected", { mode: "boolean" }).notNull().default(true),
   status: text("status", { enum: ["pending", "generating", "done", "failed"] }).notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-});
+}, (table) => [index("assets_project_script_shot").on(table.projectId, table.scriptId, table.shotId)]);
 
 // Multimodal shot reviews are append-only: the same asset can be reassessed when the
 // contract or evaluator improves while preserving the evidence behind earlier decisions.
@@ -154,6 +155,11 @@ export const aiTasks = sqliteTable("ai_tasks", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   // nullable on purpose: generation can be triggered outside a project context
   projectId: text("project_id"),
+  scriptId: text("script_id").references(() => scripts.id, { onDelete: "set null" }),
+  awaitingAsset: integer("awaiting_asset", { mode: "boolean" }).notNull().default(false),
+  deliveredAssetId: text("delivered_asset_id"),
+  purpose: text("purpose", { enum: ["replicate"] }),
+  compositionId: text("composition_id"),
   shotId: integer("shot_id"),
   provider: text("provider").notNull(),
   // the model actually submitted to the provider (after any mode remapping)
@@ -170,13 +176,15 @@ export const aiTasks = sqliteTable("ai_tasks", {
   error: text("error"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-});
+}, (table) => [uniqueIndex("ai_tasks_project_purpose").on(table.projectId, table.purpose)]);
 
 // Compositions table
 export const compositions = sqliteTable("compositions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scriptId: text("script_id").references(() => scripts.id, { onDelete: "set null" }),
   outputPath: text("output_path"),
+  failureReason: text("failure_reason"),
   // First-frame poster extracted right after a successful render (absolute path next to the
   // output file). Local extraction — never a third-party URL that can expire. Backfilled
   // lazily by /api/works for rows rendered before this column existed.
@@ -401,6 +409,8 @@ export interface ScriptCharacter {
 }
 
 export interface Shot {
+  /** Original edit interval; independent of the duration supported by a generation model. */
+  referenceCut?: { start: number; end: number; locked: boolean; productImage?: string; segment?: { path: string; offset: number } };
   shotId: number;
   type: "hook" | "pain_point" | "product_reveal" | "demo" | "social_proof" | "cta";
   duration: number; // Seconds

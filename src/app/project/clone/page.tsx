@@ -68,6 +68,7 @@ export default function ClonePage() {
 
   // generation state
   const [isGenerating, setIsGenerating] = useState(false);
+  const [openingEditor, setOpeningEditor] = useState(false);
   const [genError, setGenError] = useState("");
 
   // model-tier one-shot replication state (Seedance reference-to-video)
@@ -180,7 +181,7 @@ export default function ClonePage() {
         productDescription: productFeatures,
         productImages: [],
         sourceType: "clone",
-        ...(videoUrl.trim() && { sourceVideoUrl: videoUrl.trim() }),
+        ...((refAnalysis?.path || videoUrl.trim()) && { sourceVideoUrl: refAnalysis?.path || videoUrl.trim() }),
       }),
     });
     if (!projRes.ok) throw new Error(t("errorProjectCreate"));
@@ -195,13 +196,14 @@ export default function ClonePage() {
       throw new Error(e.error || t("errorCloneFailed"));
     }
     const { paths } = await uploadRes.json();
-    await fetch(`/api/project/${project.id}`, {
+    const updated = await fetch(`/api/project/${project.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productImages: paths }),
     });
+    if (!updated.ok) throw new Error(t("errorCloneFailed"));
     return { projectId: project.id, paths };
-  }, [productName, productFeatures, productImages, videoUrl, t]);
+  }, [productName, productFeatures, productImages, refAnalysis?.path, videoUrl, t]);
 
   /**
    * Model-tier one-shot replication (Seedance 2.0 reference-to-video): the analyzed
@@ -219,7 +221,11 @@ export default function ClonePage() {
     setReplicateError("");
     setReplicateResult(null);
     try {
-      const { projectId, paths } = await createCloneProject();
+      const inputKey = JSON.stringify([refVideoFile ? [refVideoFile.name, refVideoFile.size, refVideoFile.lastModified] : refAnalysis.path, productName, productFeatures, productImages.map(image => [image.file.name, image.file.size, image.file.lastModified])]);
+      const previous = sessionStorage.getItem("clipforge-replicate-operation");
+      const savedOperation = previous ? JSON.parse(previous) : null;
+      const { projectId, paths } = savedOperation?.inputKey === inputKey ? savedOperation : await createCloneProject();
+      sessionStorage.setItem("clipforge-replicate-operation", JSON.stringify({ inputKey, projectId, paths }));
       const videoOptions = buildVideoOptions(videoParams);
       videoOptions.duration = Math.min(15, Math.max(4, Math.round(refAnalysis.duration)));
       const res = await fetch("/api/ai/video", {
@@ -230,6 +236,7 @@ export default function ClonePage() {
           model: refModel,
           apiKey: videoModelTarget.apiKey,
           baseUrl: videoModelTarget.baseUrl,
+          purpose: "replicate",
           mode: "video-to-video",
           prompt: buildReplicatePrompt({ productName, sellingPoints: productFeatures, imageCount: paths.length }),
           referenceVideoUrls: [refAnalysis.path],
@@ -239,24 +246,18 @@ export default function ClonePage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("modelTierFailed"));
-      const videoUrlOut = data.videoUrls?.[0];
-      if (!videoUrlOut) throw new Error(t("modelTierFailed"));
-      // persist as a finished composition (provider URLs expire) → export page
-      const saveRes = await fetch(`/api/project/${projectId}/replicate/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: videoUrlOut }),
-      });
-      const saved = await saveRes.json().catch(() => ({}));
-      if (!saveRes.ok) throw new Error(saved.error || t("modelTierFailed"));
-      setReplicateResult({ url: saved.url, projectId });
+      if (!res.ok) {
+        if (data.terminal) sessionStorage.removeItem("clipforge-replicate-operation");
+        throw new Error(data.error || t("modelTierFailed"));
+      }
+      if (!data.compositionId || !data.url) throw new Error(t("modelTierFailed"));
+      setReplicateResult({ url: data.url, projectId });
     } catch (err) {
       setReplicateError(err instanceof Error ? err.message : t("modelTierFailed"));
     } finally {
       setIsReplicating(false);
     }
-  }, [isReplicating, refAnalysis, videoModelTarget, videoParams, productName, productFeatures, createCloneProject, t]);
+  }, [isReplicating, refAnalysis, videoModelTarget, videoParams, productName, productFeatures, productImages, refVideoFile, createCloneProject, t]);
 
   /**
    * Rhythm-tier clone: create the project + generate a script whose shot count and
@@ -278,7 +279,7 @@ export default function ClonePage() {
 
       // rhythm skeleton: total duration follows the reference when analyzed (15-40s clamp)
       const targetDuration = refAnalysis
-        ? Math.min(40, Math.max(15, Math.round(refAnalysis.duration)))
+        ? Math.max(1, Math.round(refAnalysis.duration))
         : 40;
       const scriptRes = await fetch("/api/llm/script", {
         method: "POST",
@@ -311,6 +312,25 @@ export default function ClonePage() {
       setIsGenerating(false);
     }
   }, [isGenerating, llm, productName, productFeatures, refAnalysis, createCloneProject, router, t]);
+
+  async function openCutEditor() {
+    if (!refAnalysis || openingEditor) return;
+    setOpeningEditor(true);
+    setGenError("");
+    try {
+      const { projectId } = await createCloneProject();
+      const res = await fetch(`/api/project/${projectId}/reference-cuts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: refAnalysis.path }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("errorCloneFailed"));
+      router.push(`/project/${projectId}/assets`);
+    } catch (error) {
+      setGenError(error instanceof Error ? error.message : t("errorCloneFailed"));
+      setOpeningEditor(false);
+    }
+  }
 
   /** handle file selection / upload */
   const handleFiles = useCallback(
@@ -789,6 +809,11 @@ export default function ClonePage() {
 
         {/* bottom action buttons */}
         <div className="flex flex-col items-center pb-10 gap-3">
+          {refAnalysis && (
+            <Button size="lg" disabled={openingEditor || isGenerating || isReplicating || !productName.trim() || !productImages.length} onClick={openCutEditor}>
+              {t("editOriginalCuts", { n: refAnalysis.shots.length })}
+            </Button>
+          )}
           {genError && (
             <p className="text-sm text-destructive">{genError}</p>
           )}

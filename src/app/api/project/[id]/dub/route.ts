@@ -1,3 +1,4 @@
+import { appendScriptVariants } from "@/lib/script-variants";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -54,29 +55,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const totalDuration = translated.reduce((sum, sh) => sum + sh.duration, 0);
 
-  // Get the next version number; deselect old scripts and mark the dubbed version as current
-  const [latest] = await db
-    .select({ version: scriptsTable.version })
-    .from(scriptsTable)
-    .where(eq(scriptsTable.projectId, id))
-    .orderBy(desc(scriptsTable.version))
-    .limit(1);
-  const nextVersion = (latest?.version ?? 0) + 1;
-  await db.update(scriptsTable).set({ selected: false }).where(eq(scriptsTable.projectId, id));
-
   const title =
     typeof body.title === "string" && body.title.trim()
       ? body.title.trim().slice(0, 80)
       : `[${langName(targetLang)}] ${source.title ?? "dub"}`.slice(0, 80);
 
-  const [row] = await db
-    .insert(scriptsTable)
-    .values({ projectId: id, version: nextVersion, styleType: "custom", title, totalDuration, shots: translated, selected: true })
-    .returning();
+  const [row] = appendScriptVariants(id, [{ styleType: "custom", title, totalDuration, shots: translated }], source.id);
 
   return NextResponse.json({
     scriptId: row.id,
-    version: nextVersion,
+    version: row.version,
     targetLang,
     shots: translated.length,
     recommendedVoice: defaultVoiceForLang(targetLang),

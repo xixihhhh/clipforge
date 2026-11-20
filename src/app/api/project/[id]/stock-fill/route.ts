@@ -1,3 +1,4 @@
+import { referenceLocked } from "@/lib/shot-ownership";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { join } from "path";
@@ -74,7 +75,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (rows.length === 0) {
     return apiError(req, "该项目还没有脚本，请先生成脚本", "This project has no script yet; please generate a script first", 404);
   }
-  const script = rows.find((r) => r.selected) ?? rows[rows.length - 1];
+  const script = body.scriptId ? rows.find(r => r.id === body.scriptId) : rows.find((r) => r.selected) ?? rows[rows.length - 1];
+  if (!script) return apiError(req, "脚本不存在", "Script not found", 404);
   const shots = (script.shots ?? []) as Shot[];
   if (shots.length === 0) {
     return apiError(req, "脚本没有分镜", "The script has no shots");
@@ -87,6 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .from(assetsTable)
     .where(and(
       eq(assetsTable.projectId, id),
+      eq(assetsTable.scriptId, script.id),
       eq(assetsTable.selected, true),
       inArray(assetsTable.status, ["pending", "generating", "done"]),
     ));
@@ -145,6 +148,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const skipOf = (shot: Shot): ShotFillResult | null => {
     const sid = shot.shotId;
+    if (referenceLocked(shot)) return { shotId: sid, ok: false, query: "", reason: "locked reference shot" };
     if (!force && already.has(sid)) return { shotId: sid, ok: false, query: "", reason: "already has asset, skipped" };
     // Product-image shots do not receive free stock: the compose step uses the product image for fidelity, and free stock would overwrite it
     if (shot.visualSource === "product_image") return { shotId: sid, ok: false, query: "", reason: "product-image shot, skipped" };
@@ -247,7 +251,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return { shotId: sid, ok: false, query: g.query, reason: g.error ?? "no asset found" };
       }
       try {
-        const asset = await persistCandidate(id, sid, g.query, g.chosen);
+        const asset = await persistCandidate(id, sid, g.query, g.chosen, script.id);
         return {
           shotId: sid,
           ok: true,
@@ -300,7 +304,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
       const query = shotQuery(shot);
       try {
-        const common = { projectId: id, shotId: sid, query, source, usedIds, sameSourceAuthors, slotSec: slotSecOf(shot), subjectEn };
+        const common = { projectId: id, scriptId: script.id, shotId: sid, query, source, usedIds, sameSourceAuthors, slotSec: slotSecOf(shot), subjectEn };
         let asset = await fillShotStock({ ...common, searchOpts: searchOptsFor(shot) });
         // In auto mode, if no video was found → fall back to image to ensure the shot is never empty
         if (!asset && autoMode && mediaType !== "image") {
