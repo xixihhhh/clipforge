@@ -3,15 +3,17 @@ import type { NamespaceMessages } from "../config";
 // clone 命名空间：爆款复刻页文案
 export const clone: NamespaceMessages = {
   zh: {
+    removeProductPhoto: "移除 {name}",
+    analyzeFile: "解析上传的视频",
     editOriginalCuts: "按原片 {n} 个镜头逐镜制作",
-    heroTitle: "爆款复刻",
-    heroSubtitle: "贴爆款视频链接做参考，载入高转化带货结构，用你的商品重新生成脚本",
+    heroTitle: "参考片复刻",
+    heroSubtitle: "上传参考片和商品图，保留原片切点，制作自己的版本。",
     // 从首页热点雷达跳转过来的同款横幅
     trendBannerTitle: "做热点「{trend}」的同款",
     trendBannerDesc: "先去抖音搜这个热点，挑一条你想复刻的爆款——把链接粘到下面，或下载后上传参考视频。",
     trendBannerSearch: "去抖音搜「{trend}」 ↗",
     trendBannerDismiss: "知道了",
-    step1Title: "输入爆款视频",
+    step1Title: "参考片",
     videoUrlLabel: "视频链接",
     videoUrlPlaceholder: "粘贴抖音 / 快手 / 小红书视频链接",
     analyzing: "载入中...",
@@ -20,7 +22,7 @@ export const clone: NamespaceMessages = {
     structureTitle: "爆款通用结构（参考）",
     storyboardCount: "{n} 个分镜",
     structureHint: "暂不支持解析视频画面内容，以下为高转化带货视频的通用结构；AI 将据此并结合你的商品真实生成脚本。",
-    step2Title: "上传你的商品",
+    step2Title: "商品素材",
     productImageLabel: "商品图片",
     productImageRange: "(1-5张)",
     uploadHint: "拖拽图片到此处，或点击上传",
@@ -31,7 +33,7 @@ export const clone: NamespaceMessages = {
     productFeaturesLabel: "商品卖点",
     productFeaturesPlaceholder: "描述商品的核心卖点、优势特性等...",
     cloning: "复刻生成中...",
-    startClone: "开始复刻生成",
+    startClone: "用 AI 生成脚本",
     // 分镜结构卡片
     shot1Title: "开场吸引",
     shot1Desc: "产品特写 + 痛点提问，黄金3秒抓住注意力",
@@ -52,7 +54,7 @@ export const clone: NamespaceMessages = {
     errorScriptGen: "脚本生成失败，请检查 LLM 设置",
     errorCloneFailed: "复刻生成失败",
     // 参考视频真分析（场景切点→节奏骨架）
-    refVideoLabel: "参考视频文件（推荐，可真实解析节奏）",
+    refVideoLabel: "参考视频文件",
     refVideoBtn: "选择视频文件",
     refVideoReplace: "换一个视频",
     refVideoHint: "上传爆款视频文件（mp4/webm/mov，≤80MB），将真实解析镜头切点与节奏",
@@ -60,7 +62,7 @@ export const clone: NamespaceMessages = {
     copyrightNote: "⚠️ 请仅使用你有权使用的素材做参考；复刻他人视频的版权与合规风险由使用者自行承担",
     analyzeFailed: "参考视频分析失败，请重试",
     realStructureTitle: "参考视频真实镜头结构",
-    realStructureHint: "已按画面切点解析出真实节奏骨架（全长约 {sec}s）。生成脚本时将逐镜对齐镜头数与时长，只复刻节奏不照搬内容。",
+    realStructureHint: "参考片时长 {sec} 秒。逐镜制作将保留以下切点。",
     realShotTitle: "第 {n} 镜",
     realShotDesc: "节奏复刻位：时长与切换节奏跟随参考，内容由 AI 结合你的商品重写",
     // 模型级一键成片复刻（Seedance 参考生视频）
@@ -76,9 +78,11 @@ export const clone: NamespaceMessages = {
     modelTierViewExport: "去导出页查看 →",
   },
   en: {
+    removeProductPhoto: "Remove {name}",
+    analyzeFile: "Analyze uploaded video",
     editOriginalCuts: "Edit all {n} reference shots",
-    heroTitle: "Clone a hit",
-    heroSubtitle: "Paste a trending video as reference, load a high-converting commerce structure, and regenerate the script with your product",
+    heroTitle: "Reference edit",
+    heroSubtitle: "Import a reference film and your product photos to build a new cut on the original timeline.",
     // 从首页热点雷达跳转过来的同款横幅
     trendBannerTitle: "Remixing the trend “{trend}”",
     trendBannerDesc: "Search this trend on Douyin, pick a viral video you want to remix — paste its link below, or download it and upload as the reference.",
@@ -104,7 +108,7 @@ export const clone: NamespaceMessages = {
     productFeaturesLabel: "Selling points",
     productFeaturesPlaceholder: "Describe the core selling points, key advantages, etc...",
     cloning: "Cloning...",
-    startClone: "Start cloning",
+    startClone: "Generate script with AI",
     // 分镜结构卡片
     shot1Title: "Hook opening",
     shot1Desc: "Product close-up + pain-point question — grab attention in the golden 3 seconds",
@@ -125,7 +129,7 @@ export const clone: NamespaceMessages = {
     errorScriptGen: "Script generation failed, please check your LLM settings",
     errorCloneFailed: "Cloning failed",
     // Real reference-video analysis (scene cuts → rhythm skeleton)
-    refVideoLabel: "Reference video file (recommended — enables real rhythm analysis)",
+    refVideoLabel: "Reference video file",
     refVideoBtn: "Choose video file",
     refVideoReplace: "Replace video",
     refVideoHint: "Upload the reference video (mp4/webm/mov, ≤80MB) — shot cuts and pacing are analyzed for real",
@@ -133,7 +137,7 @@ export const clone: NamespaceMessages = {
     copyrightNote: "⚠️ Only use footage you are allowed to use as reference; copyright and compliance risks of replicating others' videos are borne by the user",
     analyzeFailed: "Reference video analysis failed, please retry",
     realStructureTitle: "Actual shot structure of the reference",
-    realStructureHint: "The real rhythm skeleton was extracted from scene cuts (about {sec}s total). Script generation will match the shot count and per-shot durations — only the rhythm is replicated, never the content.",
+    realStructureHint: "Reference duration: {sec} seconds. The shot editor keeps each cut shown below.",
     realShotTitle: "Shot {n}",
     realShotDesc: "Rhythm slot: duration and pacing follow the reference; content is rewritten by AI around your product",
     // Model-tier one-shot replication (Seedance reference-to-video)

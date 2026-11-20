@@ -1,6 +1,7 @@
 "use client";
 
 import { DUB_LANGUAGES } from "@/lib/tts-voices";
+import { formatVersion } from "@/lib/script-version-label";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuShuffle, LuLoaderCircle, LuSparkles, LuImage, LuLayoutGrid, LuQrCode, LuScanLine, LuLanguages, LuShieldCheck, LuTriangleAlert, LuCircleX, LuClipboardCheck } from "react-icons/lu";
@@ -39,6 +40,9 @@ const styleLabelKeys: Record<string, string> = {
 };
 
 interface Composition {
+  id: string;
+  scriptId?: string | null;
+  label?: string | null;
   url: string | null;
   fileName: string;
   resolution: string | null;
@@ -335,15 +339,27 @@ export default function ExportPage() {
             });
           }
         }
+        const scriptRows = scriptsRes.ok ? await scriptsRes.json() : [];
+        const arr = Array.isArray(scriptRows) ? scriptRows : [];
+        const requested = new URLSearchParams(window.location.search).get("compositionId");
+        let chosen: Composition | null = null;
         if (compRes.ok) {
           const data = await compRes.json();
-          const latestDone = Array.isArray(data.compositions) ? data.compositions[0] : null;
-          if (!cancelled && latestDone) setComposition(latestDone);
-          if (!cancelled && Array.isArray(data.compositions)) setHistory(data.compositions);
+          const name = (c: Composition): Composition => {
+            const s = arr.find((row: {id: string}) => row.id === c.scriptId);
+            return s?.shots?.[0]?.referenceCut ? { ...c, label: [formatVersion(s.version, locale), c.label].filter(Boolean).join(" · ") } : c;
+          };
+          const rows: Composition[] = Array.isArray(data.compositions) ? data.compositions.map(name) : [];
+          chosen = requested ? rows.find(c => c.id === requested) ?? null : rows[0] ?? null;
+          if (requested && !chosen) {
+            const exact = await fetch(`/api/project/${id}/compose?compositionId=${encodeURIComponent(requested)}`);
+            const result = exact.ok ? (await exact.json()).composition : null;
+            if (result?.status === "done" && result.url) { chosen = name(result); rows.unshift(chosen); }
+          }
+          if (!cancelled) { setComposition(chosen); setHistory(rows); }
         }
-        if (scriptsRes.ok) {
-          const arr = await scriptsRes.json();
-          const sel = Array.isArray(arr) ? (arr.find((s: { selected?: boolean }) => s.selected) ?? arr[0]) : null;
+        if (arr.length) {
+          const sel = (chosen?.scriptId && arr.find((s: {id: string}) => s.id === chosen?.scriptId)) || arr.find((s: {selected?: boolean}) => s.selected) || arr[0];
           if (!cancelled && sel) {
             setScriptInfo({
               styleType: sel.styleType,
@@ -361,7 +377,7 @@ export default function ExportPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, locale]);
 
   // once the real composed video is available, HEAD-probe for the file size
   useEffect(() => {
@@ -504,10 +520,10 @@ export default function ExportPage() {
 
         {/* action buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-8">
-          <a href={`${composition.url}?download=1`} download={composition.fileName}>
+          <a href={`${composition.url}?download=1`} aria-label={[t("downloadVideo"), composition.label].filter(Boolean).join(" · ")} download={composition.fileName}>
             <Button className="brand-gradient text-white h-12 px-8 text-base font-semibold w-full">
               <LuDownload className="w-[18px] h-[18px] mr-2" />
-              {t("downloadVideo")}
+              {[t("downloadVideo"), composition?.label].filter(Boolean).join(" · ")}
             </Button>
           </a>
           <Button
@@ -644,7 +660,7 @@ export default function ExportPage() {
           </CardContent>
         </Card>
 
-        <PlatformExportPanel key={id} projectId={id} compositions={history} />
+        <PlatformExportPanel key={composition?.id ?? id} projectId={id} compositions={history} initialCompositionId={composition?.id} />
 
         {/* advanced tools (collapsed by default): feedback / A/B testing / QC & compliance — keeps the primary download action prominent for casual users */}
         <details className="group rounded-xl border border-border/50 bg-card/30 mb-6">

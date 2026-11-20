@@ -1,6 +1,7 @@
 "use client";
 
 import { DEFAULT_FREE_VOICE, FREE_TTS_VOICES, defaultVoiceForLang } from "@/lib/tts-voices";
+import { formatVersion } from "@/lib/script-version-label";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight, LuLoaderCircle } from "react-icons/lu";
@@ -148,6 +149,8 @@ export default function VideoPage() {
   const [composeProgress, setComposeProgress] = useState(0);
   const [composeDone, setComposeDone] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
+  const [outputId, setOutputId] = useState("");
+  const [versionLabel, setVersionLabel] = useState("");
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   // 背景音乐
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
@@ -230,14 +233,18 @@ export default function VideoPage() {
           }
         }
         // 收集每个分镜已生成的画面，作时间线缩略图（已完成且有文件的才算）
+        const requested = new URLSearchParams(window.location.search).get("scriptId");
         const selected = Array.isArray(scripts)
-          ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
+          ? requested ? scripts.find((s: {id: string}) => s.id === requested) : scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
           : null;
         const thumbMap: Record<number, string> = {};
         for (const a of (Array.isArray(assets) ? assets : []) as DbAsset[]) {
           if (a && a.selected && selected && a.scriptId === selected.id && typeof a.shotId === "number" && a.filePath && a.status === "done" && thumbMap[a.shotId] == null) {
             thumbMap[a.shotId] = a.filePath;
           }
+        }
+        for (const shot of (selected?.shots ?? []) as Shot[]) {
+          if (!thumbMap[shot.shotId] && shot.referenceCut?.productImage) thumbMap[shot.shotId] = shot.referenceCut.productImage;
         }
         setThumbs(thumbMap);
         const language = selected?.shots?.[0]?.dubLanguage ?? "";
@@ -250,6 +257,7 @@ export default function VideoPage() {
         } else {
           // raw shots feed the variant matrix (hook rewrites need full Shot objects)
           setScriptId(selected.id);
+          setVersionLabel(selected.shots[0]?.referenceCut ? formatVersion(selected.version, locale) : "");
           setScriptShots(selected.shots as Shot[]);
           setClips(
             (selected.shots as DbShot[]).map((s) => ({
@@ -270,7 +278,7 @@ export default function VideoPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, locale, t]);
 
   // 用设置里的默认分辨率/比例初始化一次
   useEffect(() => {
@@ -510,6 +518,7 @@ export default function VideoPage() {
     setComposeError(null);
     setComposeDone(false);
     setOutputUrl(null);
+    setOutputId("");
     setComposeProgress(0);
 
     // 乐观进度：先爬到 90%，等真实结果回来再到 100%
@@ -578,6 +587,7 @@ export default function VideoPage() {
       clearInterval(timer);
       setComposeProgress(100);
       setOutputUrl(url);
+      setOutputId(data.compositionId);
       setComposeDone(true);
     } catch (e) {
       clearInterval(timer);
@@ -592,7 +602,7 @@ export default function VideoPage() {
     <div className="min-h-screen grid-bg">
       {/* project context strip: name + CLICKABLE step navigation — replaces the legacy
           inline non-clickable stepper this page carried while owned by a parallel session */}
-      <ProjectHeader projectName={projectName || t("defaultProjectName")} />
+      <ProjectHeader projectName={[projectName || t("defaultProjectName"), versionLabel].filter(Boolean).join(" · ")} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* page-level load feedback: these states existed but were never rendered,
@@ -767,6 +777,7 @@ export default function VideoPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{t("ttsEnableLabel")}</span>
                   <button
+                    role="switch" aria-checked={config.ttsEnabled} aria-label={t("ttsEnableLabel")}
                     onClick={() => setConfig((c) => ({ ...c, ttsEnabled: !c.ttsEnabled }))}
                     className={`relative w-10 h-5 rounded-full transition-colors ${config.ttsEnabled ? "bg-primary" : "bg-muted"}`}
                   >
@@ -1097,9 +1108,9 @@ export default function VideoPage() {
               {composeDone && outputUrl && (
                 <>
                   <a href={`${outputUrl}?download=1`} download>
-                    <Button variant="outline" className="w-full">{t("downloadVideo")}</Button>
+                    <Button variant="outline" className="w-full">{[t("downloadVideo"), versionLabel].filter(Boolean).join(" · ")}</Button>
                   </a>
-                  <Link href={`/project/${id}/export`}>
+                  <Link href={`/project/${id}/export?compositionId=${encodeURIComponent(outputId)}`}>
                     <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
                       {t("nextExport")}
                       <LuArrowRight className="w-4 h-4 ml-1" />

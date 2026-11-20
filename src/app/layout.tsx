@@ -34,7 +34,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Site-wide default dark studio theme: pin the dark class on <html>
+  // Render the default dark workspace before the shell restores the saved theme.
   return (
     <html
       lang="zh-CN"
