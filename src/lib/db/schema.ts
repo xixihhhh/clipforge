@@ -409,6 +409,7 @@ export interface Shot {
   visualSource: "ai_generate" | "product_image" | "user_upload";
   transition: "ai_start_end" | "ai_reference" | "direct_concat" | "ffmpeg_fade";
   voiceover: string; // Voiceover copy
+  dubLanguage?: string; // Target language for shots created by the dubbing workflow
   prompt?: string; // AI image/video generation prompt
   /** English stock-footage keywords for this shot (1-3), used to auto-match footage from free libraries (key for topic-based videos without a product) */
   stockKeywords?: string[];

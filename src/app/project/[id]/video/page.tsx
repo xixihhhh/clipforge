@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_FREE_VOICE, FREE_TTS_VOICES, defaultVoiceForLang } from "@/lib/tts-voices";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { LuArrowLeft, LuPlay, LuChevronDown, LuArrowRight, LuLoaderCircle } from "react-icons/lu";
@@ -65,16 +66,6 @@ interface ComposeConfig {
   voiceGround: boolean;
 }
 
-// 免费配音音色（微软 Edge keyless TTS，无需 Key）——与后端 FREE_TTS_VOICES 对应
-// label 改为 i18n key，渲染时经 t() 取对应语言文案
-const freeVoiceOptions = [
-  { value: "zh-CN-XiaoxiaoNeural", labelKey: "freeVoiceXiaoxiao" },
-  { value: "zh-CN-XiaoyiNeural", labelKey: "freeVoiceXiaoyi" },
-  { value: "zh-CN-YunxiNeural", labelKey: "freeVoiceYunxi" },
-  { value: "zh-CN-YunyangNeural", labelKey: "freeVoiceYunyang" },
-  { value: "zh-CN-YunjianNeural", labelKey: "freeVoiceYunjian" },
-];
-
 // 背景音乐选项（label 改为 i18n key）
 const bgmOptions = [
   { value: "none", labelKey: "bgmNone" },
@@ -134,7 +125,7 @@ export default function VideoPage() {
   const [config, setConfig] = useState<ComposeConfig>({
     ttsEnabled: true,
     ttsVoice: "female-gentle",
-    freeVoice: "zh-CN-XiaoxiaoNeural",
+    freeVoice: DEFAULT_FREE_VOICE,
     bgm: "upbeat",
     subtitleSize: 24,
     subtitlePosition: "bottom",
@@ -160,7 +151,14 @@ export default function VideoPage() {
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
   const [bgmUploading, setBgmUploading] = useState(false);
   // 是否已配置付费 TTS（否则配音走免费 Edge keyless TTS）
-  const paidTtsReady = isPaidTTSReady(tts, providers);
+  const [dubLanguage, setDubLanguage] = useState("");
+  const dubVoice = defaultVoiceForLang(dubLanguage);
+  const hasPaidVoice = isPaidTTSReady(tts, providers);
+  const [useConfiguredDubVoice, setUseConfiguredDubVoice] = useState(true);
+  const paidTtsReady = hasPaidVoice && (!dubVoice || useConfiguredDubVoice);
+  const freeVoiceOptions = dubVoice
+    ? FREE_TTS_VOICES.filter((voice) => voice.lang.split("-")[0] === dubLanguage.toLowerCase().split("-")[0])
+    : FREE_TTS_VOICES;
   // 免费配音试听状态
   const [previewingVoice, setPreviewingVoice] = useState(false);
 
@@ -169,10 +167,11 @@ export default function VideoPage() {
     if (previewingVoice) return;
     setPreviewingVoice(true);
     try {
+      const dubSample = dubLanguage && clips.find((clip) => clip.voiceover)?.voiceover?.slice(0, 120);
       const res = await fetch("/api/tts/free", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voice: config.freeVoice, text: t("ttsPreviewText") }),
+        body: JSON.stringify({ voice: config.freeVoice, text: dubSample || t("ttsPreviewText") }),
       });
       if (!res.ok) throw new Error(t("errorPreviewFailed"));
       const blob = await res.blob();
@@ -237,6 +236,10 @@ export default function VideoPage() {
         const selected = Array.isArray(scripts)
           ? scripts.find((s: { selected?: boolean }) => s.selected) ?? scripts[0]
           : null;
+        const language = selected?.shots?.[0]?.dubLanguage ?? "";
+        setDubLanguage(language);
+        setUseConfiguredDubVoice(true);
+        setConfig((current) => ({ ...current, freeVoice: defaultVoiceForLang(language) ?? DEFAULT_FREE_VOICE }));
         if (!selected || !Array.isArray(selected.shots) || selected.shots.length === 0) {
           setLoadError(t("errorNoScript"));
           setClips([]);
@@ -762,7 +765,13 @@ export default function VideoPage() {
                     <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${config.ttsEnabled ? "translate-x-5" : "translate-x-0.5"}`} />
                   </button>
                 </div>
-                {config.ttsEnabled && paidTtsReady && (
+                {config.ttsEnabled && dubVoice && hasPaidVoice && (
+                  <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={useConfiguredDubVoice} onChange={(event) => setUseConfiguredDubVoice(event.target.checked)} />
+                    {t("useConfiguredDubVoice", { provider: getTTSProviderMeta(tts.provider).label })}
+                  </label>
+                )}
+                {config.ttsEnabled && paidTtsReady && !dubVoice && (
                   <p className="text-[11px] text-muted-foreground">
                     {t("ttsPaidHint", { provider: getTTSProviderMeta(tts.provider).label })}
                   </p>
@@ -775,14 +784,14 @@ export default function VideoPage() {
                         <SelectValue>
                           {(value: string) => {
                             const o = freeVoiceOptions.find((o) => o.value === value);
-                            return o ? t(o.labelKey) : value;
+                            return o?.labelKey ? t(o.labelKey) : o?.label ?? value;
                           }}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {freeVoiceOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {t(o.labelKey)}
+                            {o.labelKey ? t(o.labelKey) : o.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

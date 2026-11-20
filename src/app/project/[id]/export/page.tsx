@@ -1,5 +1,6 @@
 "use client";
 
+import { DUB_LANGUAGES } from "@/lib/tts-voices";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { LuCheck, LuCircleCheck, LuFilm, LuDownload, LuLink2, LuFileText, LuPlus, LuHouse, LuShuffle, LuLoaderCircle, LuSparkles, LuImage, LuLayoutGrid, LuQrCode, LuScanLine, LuLanguages, LuShieldCheck, LuTriangleAlert, LuCircleX, LuClipboardCheck } from "react-icons/lu";
@@ -857,10 +858,9 @@ export default function ExportPage() {
                 <div className="flex items-center gap-2"><LuLanguages className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-medium">{t("moreDub")}</span></div>
                 <div className="flex items-center gap-2">
                   <select className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-xs" value={dubLang} onChange={(e) => setDubLang(e.target.value)}>
-                    <option value="en">English</option>
-                    <option value="ja">日本語</option>
-                    <option value="ko">한국어</option>
-                    <option value="es">Español</option>
+                    {DUB_LANGUAGES.map((code) => (
+                      <option key={code} value={code}>{new Intl.DisplayNames([code], { type: "language" }).of(code)}</option>
+                    ))}
                   </select>
                   <Button size="sm" variant="outline" className="text-xs h-7" disabled={more.dub?.loading} onClick={genDub}>
                     {more.dub?.loading ? <LuLoaderCircle className="w-3.5 h-3.5 animate-spin" /> : t("moreGenerate")}
