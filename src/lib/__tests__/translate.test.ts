@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { buildTranslatePrompt, parseTranslations, langName, defaultVoiceForLang } from "@/lib/script-engine/translate";
+// @vitest-environment node
+import { describe, it, expect, vi } from "vitest";
+import { DUB_LANGUAGES } from "@/lib/tts-voices";
+import { buildSubtitleTimeline } from "@/lib/video-composer/timeline";
+import { type Shot } from "@/lib/db/schema";
+import { translateShots, buildTranslatePrompt, parseTranslations, langName, defaultVoiceForLang } from "@/lib/script-engine/translate";
 
 describe("langName / defaultVoiceForLang", () => {
   it("code → 语种名（带区域 code 退化到主码）", () => {
@@ -42,5 +46,30 @@ describe("parseTranslations", () => {
   });
   it("非法文本 → null", () => {
     expect(parseTranslations("not json", 1)).toBeNull();
+  });
+});
+
+describe("localized video scripts", () => {
+  const source: Shot = {
+    shotId: 1, type: "hook", duration: 3, description: "same product", camera: "static",
+    visualSource: "user_upload", transition: "direct_concat", voiceover: "十二欧元",
+  };
+  it.each([
+    ["de", "German", "de-DE-KatjaNeural", "Zwölf Euro."],
+    ["fr", "French", "fr-FR-DeniseNeural", "Douze euros."],
+  ])("exposes %s, saves the target for the voice and captions the translated line", async (code, language, voice, line) => {
+    expect(DUB_LANGUAGES).toContain(code);
+    const fetch = vi.fn(async () => Response.json({ choices: [{ message: { content: JSON.stringify([line]) } }] }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const [shot] = await translateShots([source], code, { model: "translation", apiKey: "", baseUrl: "http://localhost:11434/v1" });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(buildTranslatePrompt([source.voiceover], code)).toContain(language);
+      expect(shot).toMatchObject({ description: source.description, voiceover: line, dubLanguage: code });
+      expect(defaultVoiceForLang(shot.dubLanguage!)).toBe(voice);
+      expect(buildSubtitleTimeline([shot]).cues.map((cue) => cue.text).join(" ")).toContain(line);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -7,6 +7,7 @@ import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, estimateSpeechSeconds, type TTSConfig } from "@/lib/tts";
 import { stripPauseMarks } from "@/lib/voice-markup";
 import { shotEmotion, EMOTION_TTS } from "@/lib/emotion-acting";
+import { defaultVoiceForLang } from "@/lib/tts-voices";
 import { generateSpeechFreeDetailed, DEFAULT_FREE_VOICE, type TTSWord } from "@/lib/edge-tts";
 import { resolveRenderProfile, isRenderPreset } from "@/lib/compose-presets";
 import { isCaptionPreset, captionPresetOverrides, CAPTION_PRESETS } from "@/lib/caption-presets";
@@ -191,9 +192,9 @@ export async function POST(
     // 免费配音兜底（微软 Edge keyless TTS，无需 Key）：未配付费 TTS 时让「一句话主题成片」也能出声
     const freeTts = body.freeTts as { enabled?: boolean; voice?: string; rate?: string } | undefined;
     const useFreeTts = !ttsConfig && freeTts?.enabled === true;
-    const freeVoice = freeTts?.voice || DEFAULT_FREE_VOICE;
+    const freeVoice = freeTts?.voice || defaultVoiceForLang(shots[0].dubLanguage ?? "") || DEFAULT_FREE_VOICE;
     const freeRate = typeof freeTts?.rate === "string" ? freeTts.rate : undefined;
-    const ttsDir = join(getDataDir(), "uploads", id, "tts");
+    const ttsDir = join(getDataDir(), "uploads", id, "tts", shots[0].dubLanguage ? selected.id : "");
     if (ttsConfig || useFreeTts) await mkdir(ttsDir, { recursive: true });
 
     /** 探测视频文件是否带「可听见」的音轨（自带语音/音效）；仅静音/空轨不算，让免费 TTS 旁白照常生效 */
@@ -364,11 +365,13 @@ export async function POST(
           continue;
         }
       }
-      const nativeAudio = isVideo ? await videoHasAudio(local) : false;
+      const redub = Boolean(shot.dubLanguage && shot.voiceover && (ttsConfig || useFreeTts));
+      const nativeAudio = isVideo && !redub ? await videoHasAudio(local) : false;
       const vo =
         shot.voiceover && !nativeAudio
-          ? await buildVoiceover(shot.shotId, shot.voiceover, shot.characterId ? characterVoices.get(shot.characterId) : undefined, shot.type)
+          ? await buildVoiceover(shot.shotId, shot.voiceover, !redub && shot.characterId ? characterVoices.get(shot.characterId) : undefined, shot.type)
           : undefined;
+      if (redub && !vo) throw new Error(`Dub narration failed for shot ${shot.shotId} (${shot.dubLanguage})`);
       const audioPath = vo?.file;
 
       // Effective duration (core fix for issue #14 "next segment starts before speech ends"):

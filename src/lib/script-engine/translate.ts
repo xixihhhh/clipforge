@@ -9,7 +9,7 @@
  */
 
 import OpenAI from "openai";
-import { FREE_TTS_VOICES } from "@/lib/edge-tts";
+export { defaultVoiceForLang } from "@/lib/tts-voices";
 import { estimateDurationSec } from "@/lib/script-import";
 import { reasoningParams } from "@/lib/script-engine/generator";
 import { createLLMClient, withLLMErrors } from "@/lib/llm-error";
@@ -42,12 +42,6 @@ export const LANG_NAMES: Record<string, string> = {
 export function langName(code: string): string {
   const c = (code || "").toLowerCase();
   return LANG_NAMES[c] || LANG_NAMES[c.split("-")[0]] || code;
-}
-
-/** Target language → recommended free Edge TTS voice (first entry in FREE_TTS_VOICES whose lang prefix matches); null if none found. Pure function. */
-export function defaultVoiceForLang(code: string): string | null {
-  const c = (code || "").toLowerCase().split("-")[0];
-  return FREE_TTS_VOICES.find((v) => v.lang.toLowerCase().startsWith(c))?.value ?? null;
 }
 
 /** Builds the translation prompt: translates N voiceover lines into the target language one-by-one; expects a same-length JSON string array in return. Pure function. */
@@ -119,7 +113,8 @@ export async function translateShots(shots: Shot[], targetLang: string, cfg: Dub
   const voiceovers = shots.map((s) => s.voiceover || "");
   const translated = await translateVoiceovers(voiceovers, targetLang, cfg);
   return shots.map((s, i) => {
-    const vo = translated[i] || s.voiceover;
-    return { ...s, voiceover: vo, duration: estimateDurationSec(vo || s.voiceover || "") };
+    const vo = translated[i];
+    if (s.voiceover?.trim() && !vo) throw new Error("Translation returned an empty narration line");
+    return { ...s, voiceover: vo, dubLanguage: targetLang, duration: estimateDurationSec(vo) };
   });
 }

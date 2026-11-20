@@ -34,7 +34,6 @@ const USER_AGENT =
  * Curated free voices (short name + label + language). Defaults to the gentle female voice Xiaoxiao.
  * Global positioning: English/Japanese/Korean/Spanish scripts need native-language voices —
  * using a Chinese voice for foreign-language text produces garbled output.
- * All entries are real Edge keyless-synthesisable voices (server-tested to produce 18–26 KB mp3);
  * generateSpeechFree already accepts any Edge voice name — this list simply makes non-Chinese voices
  * discoverable for international users and agents.
  */
@@ -221,8 +220,9 @@ async function synthesizeOnce(
       // itself has no XML-special chars, so it survives escapeSsml intact); this is the ONE
       // consumer that renders the marker, every other path strips it (see voice-markup.ts)
       const spoken = escapeSsml(clean).replace(/\[pause\]/gi, "<break time='350ms'/>");
+      const language = voice.match(/^([a-z]{2,3}-[A-Z]{2})-/)?.[1] ?? "zh-CN";
       const ssml =
-        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='zh-CN'>` +
+        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${language}'>` +
         `<voice name='${escapeSsml(voice)}'><prosody pitch='${escapeSsml(pitch)}' rate='${escapeSsml(rate)}' volume='+0%'>${spoken}</prosody></voice></speak>`;
       const msg =
         `X-RequestId:${uuidNoDash()}\r\nContent-Type:application/ssml+xml\r\n` +

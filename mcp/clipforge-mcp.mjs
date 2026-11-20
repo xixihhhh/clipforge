@@ -427,7 +427,7 @@ const TOOLS = [
       type: "object",
       properties: {
         projectId: PROJECT_ID_PROP,
-        targetLang: { type: "string", description: "目标语种码，如 en。免费音色覆盖 en/ja/ko/es/zh，其它语种可译出但需自备音色" },
+        targetLang: { type: "string", description: "目标语种码，如 en。免费音色覆盖 en/ja/ko/es/zh/fr/de，其它语种可译出但需自备音色" },
       },
       required: ["projectId", "targetLang"],
     },
